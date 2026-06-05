@@ -1,5 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Network access for the backend (Cloud mode) + direct OpenAI (On-device
+         mode). REQUIRED here in the main manifest: Flutter only adds INTERNET to
+         the debug/profile manifests, so RELEASE builds (flutter build apk) have
+         no network at all without this — the cause of "works in `flutter run`,
+         can't connect after install". -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Floating overlay widget (visible, clearly labeled). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Foreground services for screen capture + overlay. -->
@@ -10,10 +17,15 @@
     <!-- Keep capture pipeline alive while solving. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Allow plain-HTTP (cleartext) so the app can reach a local/LAN backend
+         like http://192.168.x.x:3000. Android blocks cleartext by default at
+         targetSdk >= 28; the backend URL is a user-set LAN address (no fixed
+         domain to scope a network-security-config to), so permit it app-wide. -->
     <application
         android:label="xiangqi_solver"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

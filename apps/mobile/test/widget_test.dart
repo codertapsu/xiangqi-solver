@@ -3,8 +3,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xiangqi_solver/core/constants/app_constants.dart';
+import 'package:xiangqi_solver/core/network/api_result.dart';
+import 'package:xiangqi_solver/core/network/dio_client.dart';
+import 'package:xiangqi_solver/features/solver/data/analysis_api.dart';
+import 'package:xiangqi_solver/features/solver/data/analysis_repository.dart';
 import 'package:xiangqi_solver/features/solver/presentation/pages/home_page.dart';
 import 'package:xiangqi_solver/features/solver/presentation/providers/solver_providers.dart';
+
+/// A repository that reports a healthy backend with no network, so the home
+/// page's startup mode-health probe resolves to `ready` (no dialog/snackbar).
+class _HealthyRepo extends AnalysisRepository {
+  _HealthyRepo() : super(AnalysisApi(DioClient()));
+
+  @override
+  Future<ApiResult<HealthStatus>> checkHealth() async => const ApiResult.success(
+    HealthStatus(
+      status: 'ok',
+      timestamp: '',
+      uptimeSeconds: 0,
+      version: '1.0.0',
+      latency: Duration.zero,
+    ),
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +34,10 @@ void main() {
     SharedPreferences.setMockInitialValues(const {});
     final prefs = await SharedPreferences.getInstance();
     return ProviderScope(
-      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        analysisRepositoryProvider.overrideWithValue(_HealthyRepo()),
+      ],
       child: const MaterialApp(home: HomePage()),
     );
   }

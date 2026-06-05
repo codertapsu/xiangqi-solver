@@ -50,11 +50,14 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
+  const aiModel =
+    appConfig?.ai.provider === 'gemini' ? appConfig.ai.geminiModel : appConfig?.ai.openaiModel;
+
   await app.listen(port, '0.0.0.0');
   logger.log(`Backend listening on http://0.0.0.0:${port}/api`);
   logger.log(`Swagger docs at http://0.0.0.0:${port}/api/docs`);
   logger.log(
-    `Providers -> AI: ${appConfig?.ai.provider ?? 'mock'}, Engine: ${appConfig?.engine.provider ?? 'mock'}`,
+    `Providers -> AI: ${appConfig?.ai.provider ?? 'mock'} - Model: ${aiModel ?? 'mock'}, Engine: ${appConfig?.engine.provider ?? 'mock'}`,
   );
 }
 

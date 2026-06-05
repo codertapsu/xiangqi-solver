@@ -105,6 +105,69 @@ final onDeviceAnalyzerProvider = Provider<OnDeviceAnalyzer>((ref) {
   );
 });
 
+/// Outcome of a [ModeCoordinator.ensureUsableMode] check.
+enum ModeCheckOutcome {
+  /// The active mode can run as-is (Cloud backend healthy, or On-device chosen).
+  ready,
+
+  /// Cloud was selected but the backend is down; switched to On-device (a BYO
+  /// key is present). The UI should tell the user.
+  switchedToOnDevice,
+
+  /// Neither mode is usable: the backend is down AND On-device has no API key.
+  noModeAvailable,
+}
+
+/// Keeps the app in a *usable* analysis mode. In Cloud mode it pings the
+/// backend; when it's down it falls back to On-device (if a BYO OpenAI key is
+/// set), otherwise reports that no mode is usable. On-device mode is
+/// self-contained, so it's always considered ready (the analyzer surfaces a
+/// missing key at run time).
+class ModeCoordinator {
+  ModeCoordinator(this._ref);
+
+  final Ref _ref;
+
+  Future<ModeCheckOutcome> ensureUsableMode() async {
+    final mode = _ref.read(settingsProvider).engineMode;
+    if (mode == EngineMode.onDevice) return ModeCheckOutcome.ready;
+
+    if (await _backendHealthy()) return ModeCheckOutcome.ready;
+
+    if (await _hasApiKey()) {
+      await _ref
+          .read(settingsProvider.notifier)
+          .patch((s) => s.copyWith(engineMode: EngineMode.onDevice));
+      return ModeCheckOutcome.switchedToOnDevice;
+    }
+    return ModeCheckOutcome.noModeAvailable;
+  }
+
+  Future<bool> _backendHealthy() async {
+    try {
+      final result = await _ref
+          .read(analysisRepositoryProvider)
+          .checkHealth()
+          .timeout(const Duration(seconds: 6));
+      return result.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _hasApiKey() async {
+    try {
+      return await _ref.read(secureKeyStoreProvider).hasOpenAiKey();
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
+final modeCoordinatorProvider = Provider<ModeCoordinator>((ref) {
+  return ModeCoordinator(ref);
+});
+
 // ---------------------------------------------------------------------------
 // Settings state
 // ---------------------------------------------------------------------------

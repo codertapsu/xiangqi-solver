@@ -183,24 +183,54 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
         .map((e) => e.toString())
         .toList();
 
-    final rawPieces = (obj['pieces'] as List<dynamic>? ?? const []);
-    final pieces = <BoardPiece>[];
+    // 1) Parse raw pieces in whatever frame the model used (image row/col, or
+    //    legacy canonical file/rank).
+    final entries = <_RawPiece>[];
     var dropped = 0;
-    for (final raw in rawPieces) {
+    for (final raw in (obj['pieces'] as List<dynamic>? ?? const [])) {
       if (raw is! Map) {
         dropped++;
         continue;
       }
-      try {
-        final piece = BoardPiece.fromJson(raw.cast<String, dynamic>());
-        if (piece.file < 0 || piece.file > 8 || piece.rank < 0 || piece.rank > 9) {
-          dropped++;
-          continue;
-        }
-        pieces.add(piece);
-      } catch (_) {
+      final m = raw.cast<String, dynamic>();
+      final row = _asInt(m['row']);
+      final col = _asInt(m['col']);
+      final file = _asInt(m['file']);
+      final rank = _asInt(m['rank']);
+      final entry = _RawPiece(
+        color: PieceColor.fromWire(m['color'] as String?),
+        type: PieceType.fromWire(m['type'] as String?),
+        row: row,
+        col: col,
+        file: file,
+        rank: rank,
+        confidence: (m['confidence'] as num?)?.toDouble(),
+      );
+      if (entry.hasPosition) {
+        entries.add(entry);
+      } else {
         dropped++;
       }
+    }
+
+    // 2) Decide orientation deterministically: the kings are a hard invariant,
+    //    so derive from them; else the model's flag; else standard (Red-bottom).
+    final redHomeAtTop = _resolveRedHomeAtTop(entries, obj['redHomeAtTop']);
+
+    // 3) Rotate to canonical coords + bounds-check.
+    final pieces = <BoardPiece>[];
+    for (final e in entries) {
+      final pos = e.toCanonical(redHomeAtTop);
+      if (pos.file < 0 || pos.file > 8 || pos.rank < 0 || pos.rank > 9) {
+        dropped++;
+        continue;
+      }
+      pieces.add(BoardPiece(
+        color: e.color,
+        type: e.type,
+        position: pos,
+        confidence: e.confidence,
+      ));
     }
     if (dropped > 0) {
       warnings.add('Ignored $dropped malformed piece(s) from the vision response.');
@@ -215,6 +245,31 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
     );
   }
 
+  /// Red is at the top when the red general sits above the black general in the
+  /// image (the hard invariant); fall back to the model's flag, else standard.
+  bool _resolveRedHomeAtTop(List<_RawPiece> entries, Object? flag) {
+    _RawPiece? king(PieceColor color) {
+      for (final e in entries) {
+        if (e.row != null && e.col != null && e.color == color && e.type == PieceType.king) {
+          return e;
+        }
+      }
+      return null;
+    }
+
+    final red = king(PieceColor.red);
+    final black = king(PieceColor.black);
+    if (red != null && black != null) return red.row! < black.row!;
+    if (flag is bool) return flag;
+    return false;
+  }
+
+  int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return null;
+  }
+
   String _stripCodeFences(String text) {
     var t = text.trim();
     if (t.startsWith('```')) {
@@ -225,16 +280,56 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
   }
 }
 
+/// A raw vision piece in whatever frame the model used (image row/col, or
+/// legacy canonical file/rank), before deterministic rotation to canonical.
+class _RawPiece {
+  _RawPiece({
+    required this.color,
+    required this.type,
+    this.row,
+    this.col,
+    this.file,
+    this.rank,
+    this.confidence,
+  });
+
+  final PieceColor color;
+  final PieceType type;
+  final int? row;
+  final int? col;
+  final int? file;
+  final int? rank;
+  final double? confidence;
+
+  bool get hasPosition =>
+      (row != null && col != null) || (file != null && rank != null);
+
+  /// Rotate the image-space (row/col) position to canonical engine coords.
+  /// `redHomeAtTop` means Red is drawn at the top (Black's perspective), a 180°
+  /// rotation from standard. Legacy file/rank pass through unchanged.
+  BoardPosition toCanonical(bool redHomeAtTop) {
+    if (row != null && col != null) {
+      return redHomeAtTop
+          ? BoardPosition(file: 8 - col!, rank: row!)
+          : BoardPosition(file: col!, rank: 9 - row!);
+    }
+    return BoardPosition(file: file ?? -1, rank: rank ?? -1);
+  }
+}
+
 /// Strict board-extraction prompt — kept in sync with the backend
-/// `prompts/board-extraction.prompt.ts`.
+/// `prompts/board-extraction.prompt.ts`. The model transcribes the board by
+/// IMAGE position (row/col) + reports `redHomeAtTop`; code rotates to canonical.
 const String _boardExtractionPrompt = '''
 You are a precise Xiangqi (Chinese chess) board digitizer.
 
 Look at the provided image of a Xiangqi board and output ONLY the current board state as STRICT JSON. Do NOT suggest a move. Do NOT evaluate. Report only what pieces you see and where.
 
-COORDINATE SYSTEM (use exactly this):
-- file: integer 0..8. 0 = Red's far-left file, 8 = Red's far-right file.
-- rank: integer 0..9. 0 = Red's home rank, 9 = Black's home rank (top).
+COORDINATE SYSTEM — report what you SEE, by image position. Do NOT rotate or flip the board:
+- row: integer 0..9. row 0 = the TOP rank line in the image, row 9 = the BOTTOM rank line.
+- col: integer 0..8. col 0 = the LEFT file line, col 8 = the RIGHT file line.
+
+ALSO report a top-level boolean "redHomeAtTop": true if the RED army (red-ink pieces incl. the red general 帥) is in the TOP half (rows 0..4), false if Red is at the bottom. A player views from their own side (their pieces at the bottom), so a Black player's screenshot shows Red at the top -> redHomeAtTop = true. Decide from where the red pieces actually appear.
 
 PIECE COLORS: "red" or "black" (by ink color AND character).
 PIECE TYPES (lowercase) with Chinese characters:
@@ -247,15 +342,17 @@ BOTH generals (kings) are ALWAYS on the board — find each inside its 3x3 palac
 OUTPUT a single JSON object with EXACTLY these fields:
 {
   "boardDetected": boolean,
+  "redHomeAtTop": boolean,
   "sideToMove": "red" | "black" | "unknown",
   "confidence": number,
-  "pieces": [ { "color": "red", "type": "cannon", "file": 1, "rank": 2, "confidence": 0.95 } ],
+  "pieces": [ { "color": "red", "type": "cannon", "row": 7, "col": 1, "confidence": 0.95 } ],
   "warnings": [ "string" ]
 }
 
 RULES:
 - JSON only. No markdown, no code fences, no prose.
-- Every piece MUST have integer file 0..8 and rank 0..9.
-- Never place two pieces on the same (file, rank). Do NOT invent pieces or exceed the per-side maximums.
+- Every piece MUST have integer row 0..9 and col 0..8, matching where it sits in the IMAGE.
+- Never place two pieces on the same (row, col). Do NOT invent pieces or exceed the per-side maximums.
 - Read each piece's character to decide type and color.
+- Do NOT output "file", "rank", "move", or any field not listed above.
 - If you cannot read the board, set "boardDetected": false, "pieces": [], and explain in "warnings".''';

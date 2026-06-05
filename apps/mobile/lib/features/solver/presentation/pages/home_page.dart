@@ -42,6 +42,66 @@ class _HomePageState extends ConsumerState<HomePage> {
         .read(solverModeProvider.notifier)
         .analyzeRequests
         .listen(_handleAnalyzeRequest);
+    // On app open, verify the active mode can actually run (see _checkModeHealth).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_checkModeHealth());
+    });
+  }
+
+  /// On startup (and after picking Cloud), make sure we're in a working mode.
+  /// If Cloud is selected but the backend is unreachable, fall back to On-device
+  /// when possible; if neither mode can run, tell the user how to fix it.
+  Future<void> _checkModeHealth() async {
+    final ModeCheckOutcome outcome;
+    try {
+      outcome = await ref.read(modeCoordinatorProvider).ensureUsableMode();
+    } catch (_) {
+      return; // never let a startup probe disrupt the UI
+    }
+    if (!mounted) return;
+    switch (outcome) {
+      case ModeCheckOutcome.ready:
+        break;
+      case ModeCheckOutcome.switchedToOnDevice:
+        _snack('Server unavailable — switched to On-device Mode.');
+      case ModeCheckOutcome.noModeAvailable:
+        await _showNoModeDialog();
+    }
+  }
+
+  Future<void> _showNoModeDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.cloud_off_outlined),
+        title: const Text('No analysis mode available'),
+        content: const Text(
+          'The server is unreachable, and On-device Mode isn’t set up yet.\n\n'
+          'Add your own OpenAI API key in Settings to analyze on-device, or try '
+          'again when the server is back online.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              unawaited(_checkModeHealth());
+            },
+            child: const Text('Retry'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              if (mounted) context.push(AppRoutes.settings);
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

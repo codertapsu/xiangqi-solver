@@ -100,6 +100,86 @@ void main() {
     );
   });
 
+  Future<BoardExtraction> extractBoard(Object content) async {
+    final client = _client(
+      (_) => _json(200, {
+        'choices': [
+          {
+            'message': {'content': jsonEncode(content)},
+          },
+        ],
+      }),
+    );
+    return client.extract(imageBytes: bytes, mimeType: 'image/png', apiKey: 'sk-test');
+  }
+
+  test('rotates a Black-perspective board (Red at top) to canonical coords', () async {
+    // Red drawn at the TOP (Black player's view). Kings: red row 0, black row 9.
+    final result = await extractBoard({
+      'boardDetected': true,
+      'redHomeAtTop': true,
+      'sideToMove': 'black',
+      'confidence': 0.9,
+      'pieces': [
+        {'color': 'red', 'type': 'king', 'row': 0, 'col': 4},
+        {'color': 'black', 'type': 'king', 'row': 9, 'col': 4},
+        {'color': 'red', 'type': 'cannon', 'row': 2, 'col': 7},
+      ],
+      'warnings': <String>[],
+    });
+
+    final redKing = result.pieces.firstWhere(
+      (p) => p.color == PieceColor.red && p.type == PieceType.king,
+    );
+    final blackKing = result.pieces.firstWhere(
+      (p) => p.color == PieceColor.black && p.type == PieceType.king,
+    );
+    final cannon = result.pieces.firstWhere((p) => p.type == PieceType.cannon);
+    // Red general lands on its home rank 0; black general on rank 9.
+    expect([redKing.file, redKing.rank], [4, 0]);
+    expect([blackKing.file, blackKing.rank], [4, 9]);
+    // cannon row2,col7 -> rank 2, file 8-7 = 1.
+    expect([cannon.file, cannon.rank], [1, 2]);
+  });
+
+  test('standard board (Red at bottom, row/col) yields the same canonical board', () async {
+    final result = await extractBoard({
+      'boardDetected': true,
+      'sideToMove': 'red',
+      'confidence': 0.9,
+      'pieces': [
+        {'color': 'red', 'type': 'king', 'row': 9, 'col': 4},
+        {'color': 'black', 'type': 'king', 'row': 0, 'col': 4},
+        {'color': 'red', 'type': 'cannon', 'row': 7, 'col': 1},
+      ],
+      'warnings': <String>[],
+    });
+
+    final redKing = result.pieces.firstWhere(
+      (p) => p.color == PieceColor.red && p.type == PieceType.king,
+    );
+    final cannon = result.pieces.firstWhere((p) => p.type == PieceType.cannon);
+    expect([redKing.file, redKing.rank], [4, 0]);
+    expect([cannon.file, cannon.rank], [1, 2]);
+  });
+
+  test('the kings override a wrong redHomeAtTop flag', () async {
+    final result = await extractBoard({
+      'boardDetected': true,
+      'redHomeAtTop': false, // WRONG — kings show Red is at the top
+      'sideToMove': 'black',
+      'pieces': [
+        {'color': 'red', 'type': 'king', 'row': 0, 'col': 4},
+        {'color': 'black', 'type': 'king', 'row': 9, 'col': 4},
+      ],
+      'warnings': <String>[],
+    });
+    final redKing = result.pieces.firstWhere(
+      (p) => p.color == PieceColor.red && p.type == PieceType.king,
+    );
+    expect(redKing.rank, 0); // rotated as Red-at-top despite the false flag
+  });
+
   test('drops out-of-range pieces and warns', () async {
     final content = jsonEncode({
       'boardDetected': true,

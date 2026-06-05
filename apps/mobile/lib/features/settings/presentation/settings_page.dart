@@ -103,18 +103,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ],
             selected: {settings.engineMode},
-            onSelectionChanged: (s) =>
-                _notifier.patch((st) => st.copyWith(engineMode: s.first)),
+            onSelectionChanged: (s) => _onEngineModeSelected(s.first),
           ),
           const SizedBox(height: 8),
           Text(
             onDevice
                 ? 'Experimental Offline mode: recognizes the board on this '
-                      'device using your own OpenAI key — no backend. The local '
-                      'engine isn’t bundled yet, so it shows the board but can’t '
-                      'compute the move.'
+                      'device using your own OpenAI key and solves it with the '
+                      'bundled engine — no backend needed.'
                 : 'Analysis runs on the backend; provider API keys stay '
-                      'server-side.',
+                      'server-side. If the server is unreachable the app falls '
+                      'back to On-device Mode.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           if (onDevice) ...[
@@ -179,6 +178,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
     );
+  }
+
+  /// Applies the chosen engine mode. Picking Cloud re-checks the backend and
+  /// falls back to On-device (or warns) if it's unreachable.
+  Future<void> _onEngineModeSelected(EngineMode mode) async {
+    await _notifier.patch((st) => st.copyWith(engineMode: mode));
+    if (mode != EngineMode.cloud) return;
+    final outcome = await ref.read(modeCoordinatorProvider).ensureUsableMode();
+    if (!mounted) return;
+    switch (outcome) {
+      case ModeCheckOutcome.ready:
+        break;
+      case ModeCheckOutcome.switchedToOnDevice:
+        _snack('Server unavailable — kept On-device Mode.');
+      case ModeCheckOutcome.noModeAvailable:
+        _snack(
+          'Server unavailable. Add your OpenAI API key below to analyze on-device.',
+        );
+    }
   }
 
   Future<void> _saveApiKey() async {
