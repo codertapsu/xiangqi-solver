@@ -88,6 +88,16 @@ class MainActivity : FlutterActivity() {
             Constants.METHOD_HAS_CAPTURE_REGION ->
                 result.success(CaptureRegionHolder.hasRegion)
 
+            Constants.METHOD_NATIVE_LIBRARY_DIR ->
+                result.success(applicationInfo.nativeLibraryDir)
+
+            Constants.METHOD_SET_OVERLAY_SIDE -> {
+                OverlayService.instance?.showSide(
+                    call.argument<String>(Constants.KEY_SIDE) ?: Constants.SIDE_RED,
+                )
+                result.success(null)
+            }
+
             else -> result.notImplemented()
         }
     }

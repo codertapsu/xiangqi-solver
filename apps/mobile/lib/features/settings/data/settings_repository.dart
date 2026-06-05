@@ -11,6 +11,7 @@ import '../../solver/domain/solver_enums.dart';
 class AppSettings extends Equatable {
   const AppSettings({
     required this.backendUrl,
+    required this.engineMode,
     required this.aiProvider,
     required this.engineProvider,
     required this.engineDepth,
@@ -21,9 +22,13 @@ class AppSettings extends Equatable {
     required this.language,
     required this.storeScreenshots,
     required this.mySide,
+    required this.onDeviceVisionModel,
   });
 
   final String backendUrl;
+
+  /// Cloud (backend) or experimental On-device (offline) analysis.
+  final EngineMode engineMode;
   final AiProvider aiProvider;
   final EngineProvider engineProvider;
   final int engineDepth;
@@ -45,9 +50,18 @@ class AppSettings extends Equatable {
   /// [SideToMove.red] or [SideToMove.black] are ever stored here.
   final SideToMove mySide;
 
+  /// OpenAI vision model used by the On-device (BYO-key) path. Defaults to a
+  /// capable model; `gpt-4o-mini` is too weak to read the small piece glyphs
+  /// reliably (it misplaces advisors/elephants → illegal boards). Set this to
+  /// the same model your Cloud backend uses for matching accuracy.
+  final String onDeviceVisionModel;
+
+  static const String _defaultOnDeviceVisionModel = 'gpt-4o';
+
   /// Zero-config defaults derived from compile-time env (see [AppConstants]).
   factory AppSettings.defaults() => const AppSettings(
     backendUrl: AppConstants.defaultBackendUrl,
+    engineMode: _defaultEngineMode,
     aiProvider: _defaultAi,
     engineProvider: _defaultEngine,
     engineDepth: AppConstants.defaultEngineDepth,
@@ -58,12 +72,18 @@ class AppSettings extends Equatable {
     language: AppConstants.defaultLanguage,
     storeScreenshots: false,
     mySide: _defaultMySide,
+    onDeviceVisionModel: _defaultOnDeviceVisionModel,
   );
 
   static const SideToMove _defaultMySide =
       AppConstants.defaultMySide == 'black'
       ? SideToMove.black
       : SideToMove.red;
+
+  static const EngineMode _defaultEngineMode =
+      AppConstants.defaultEngineMode == 'onDevice'
+      ? EngineMode.onDevice
+      : EngineMode.cloud;
 
   static const AiProvider _defaultAi =
       AppConstants.defaultAiProvider == 'gemini'
@@ -79,6 +99,7 @@ class AppSettings extends Equatable {
 
   AppSettings copyWith({
     String? backendUrl,
+    EngineMode? engineMode,
     AiProvider? aiProvider,
     EngineProvider? engineProvider,
     int? engineDepth,
@@ -89,9 +110,11 @@ class AppSettings extends Equatable {
     String? language,
     bool? storeScreenshots,
     SideToMove? mySide,
+    String? onDeviceVisionModel,
   }) {
     return AppSettings(
       backendUrl: backendUrl ?? this.backendUrl,
+      engineMode: engineMode ?? this.engineMode,
       aiProvider: aiProvider ?? this.aiProvider,
       engineProvider: engineProvider ?? this.engineProvider,
       engineDepth: engineDepth ?? this.engineDepth,
@@ -102,12 +125,14 @@ class AppSettings extends Equatable {
       language: language ?? this.language,
       storeScreenshots: storeScreenshots ?? this.storeScreenshots,
       mySide: mySide ?? this.mySide,
+      onDeviceVisionModel: onDeviceVisionModel ?? this.onDeviceVisionModel,
     );
   }
 
   @override
   List<Object?> get props => [
     backendUrl,
+    engineMode,
     aiProvider,
     engineProvider,
     engineDepth,
@@ -118,6 +143,7 @@ class AppSettings extends Equatable {
     language,
     storeScreenshots,
     mySide,
+    onDeviceVisionModel,
   ];
 }
 
@@ -131,6 +157,7 @@ class SettingsRepository {
   final SharedPreferences _prefs;
 
   static const String _kBackendUrl = 'settings.backendUrl';
+  static const String _kEngineMode = 'settings.engineMode';
   static const String _kAiProvider = 'settings.aiProvider';
   static const String _kEngineProvider = 'settings.engineProvider';
   static const String _kEngineDepth = 'settings.engineDepth';
@@ -141,12 +168,16 @@ class SettingsRepository {
   static const String _kLanguage = 'settings.language';
   static const String _kStoreScreenshots = 'settings.storeScreenshots';
   static const String _kMySide = 'settings.mySide';
+  static const String _kOnDeviceVisionModel = 'settings.onDeviceVisionModel';
 
   /// Loads the persisted settings, merging over [AppSettings.defaults].
   AppSettings load() {
     final defaults = AppSettings.defaults();
     return AppSettings(
       backendUrl: _readString(_kBackendUrl, defaults.backendUrl),
+      engineMode: EngineMode.fromWire(
+        _prefs.getString(_kEngineMode) ?? defaults.engineMode.wireValue,
+      ),
       aiProvider: AiProvider.fromWire(
         _prefs.getString(_kAiProvider) ?? defaults.aiProvider.wireValue,
       ),
@@ -183,6 +214,10 @@ class SettingsRepository {
       storeScreenshots:
           _prefs.getBool(_kStoreScreenshots) ?? defaults.storeScreenshots,
       mySide: _readSide(_prefs.getString(_kMySide), defaults.mySide),
+      onDeviceVisionModel: _readString(
+        _kOnDeviceVisionModel,
+        defaults.onDeviceVisionModel,
+      ),
     );
   }
 
@@ -190,6 +225,7 @@ class SettingsRepository {
   Future<AppSettings> save(AppSettings settings) async {
     await Future.wait([
       _prefs.setString(_kBackendUrl, settings.backendUrl.trim()),
+      _prefs.setString(_kEngineMode, settings.engineMode.wireValue),
       _prefs.setString(_kAiProvider, settings.aiProvider.wireValue),
       _prefs.setString(_kEngineProvider, settings.engineProvider.wireValue),
       _prefs.setInt(_kEngineDepth, _clampInt(settings.engineDepth, 1, 30)),
@@ -203,6 +239,12 @@ class SettingsRepository {
       _prefs.setString(_kLanguage, settings.language),
       _prefs.setBool(_kStoreScreenshots, settings.storeScreenshots),
       _prefs.setString(_kMySide, settings.mySide.wireValue),
+      _prefs.setString(
+        _kOnDeviceVisionModel,
+        settings.onDeviceVisionModel.trim().isEmpty
+            ? AppSettings.defaults().onDeviceVisionModel
+            : settings.onDeviceVisionModel.trim(),
+      ),
     ]);
     return settings;
   }

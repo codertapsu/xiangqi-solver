@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# On-device engine binaries — large/compiled artifacts, bundled locally only.
+# Rebuild libpikafish.so via the NDK (see docs/ON_DEVICE_ENGINE.md) and copy the
+# NNUE from the matching Pikafish release. Not tracked in git.
+assets/engine/*.nnue
+android/app/src/main/jniLibs/

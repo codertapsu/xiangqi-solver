@@ -11,9 +11,10 @@ import { ConfigService } from '@nestjs/config';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { AppConfig } from '../../config/configuration';
 import { AnalysisService } from './analysis.service';
-import { AnalysisResult } from './analysis.types';
+import { AnalysisResult, ExtractionResult } from './analysis.types';
 import { AnalyzeBoardDto } from './dto/analyze-board.dto';
 import { AnalyzeScreenshotDto } from './dto/analyze-screenshot.dto';
+import { ExtractScreenshotDto } from './dto/extract-screenshot.dto';
 import { detectImageType, DetectedImageType } from '../../common/utils/image-type.util';
 
 const ACCEPTED_MIME_TYPES: readonly DetectedImageType[] = ['image/png', 'image/jpeg', 'image/webp'];
@@ -57,6 +58,28 @@ export class AnalysisController {
       engineHashMb: dto.engineHashMb,
       engineMultiPv: dto.engineMultiPv,
       language: dto.language,
+    });
+  }
+
+  /**
+   * POST /api/analysis/extract (multipart/form-data).
+   * Vision-only: recognize the board and return it WITHOUT running the engine.
+   * Intended for clients that compute the move themselves (e.g. an on-device
+   * engine), keeping the AI key server-side.
+   */
+  @Post('extract')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('screenshot'))
+  async extractScreenshot(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: ExtractScreenshotDto,
+  ): Promise<ExtractionResult> {
+    const upload = this.validateUpload(file);
+    return this.analysisService.extractBoard({
+      imageBuffer: upload.buffer,
+      mimeType: upload.mimeType,
+      provider: dto.provider,
+      sideToMove: dto.sideToMove,
     });
   }
 

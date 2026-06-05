@@ -13,5 +13,6 @@
     <string name="overlay_menu_more">More actions</string>
     <string name="overlay_menu_select_area">Select capture area</string>
     <string name="overlay_menu_stop">Stop Solver Mode</string>
+    <string name="overlay_menu_switch_side">Switch side (Red / Black)</string>
     <string name="overlay_content_description">Xiangqi Solver floating analysis button</string>
 </resources>

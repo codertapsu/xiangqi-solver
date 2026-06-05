@@ -13,13 +13,19 @@ import '../../../../core/platform/method_channel_native_solver.dart';
 import '../../../../core/platform/native_solver_event.dart';
 import '../../../../core/platform/native_solver_platform.dart';
 import '../../../../core/platform/noop_native_solver.dart';
+import '../../../../core/security/secure_key_store.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../history/data/history_repository.dart';
 import '../../../history/domain/history_entry.dart';
 import '../../../settings/data/settings_repository.dart';
 import '../../data/analysis_api.dart';
 import '../../data/analysis_repository.dart';
+import '../../data/ondevice/direct_openai_vision.dart';
+import '../../data/ondevice/on_device_analyzer.dart';
+import '../../data/ondevice/on_device_engine.dart';
+import '../../data/ondevice/on_device_engine_resolver.dart';
 import '../../domain/analysis_result.dart';
+import '../../domain/solver_enums.dart';
 
 const AppLogger _log = AppLogger('SolverProviders');
 
@@ -66,6 +72,37 @@ final analysisApiProvider = Provider<AnalysisApi>((ref) {
 
 final analysisRepositoryProvider = Provider<AnalysisRepository>((ref) {
   return AnalysisRepository(ref.watch(analysisApiProvider));
+});
+
+/// Secure store for the user's own API key (On-device / BYO-key mode).
+final secureKeyStoreProvider = Provider<SecureKeyStore>((ref) {
+  return SecureKeyStore();
+});
+
+/// Resolves the bundled Pikafish + NNUE into a runnable engine (or an
+/// unavailable stub off-device / when assets are missing).
+final onDeviceEngineResolverProvider = Provider<OnDeviceEngineResolver>((ref) {
+  return OnDeviceEngineResolver(ref.watch(nativeSolverProvider));
+});
+
+/// The resolved on-device engine. Async because it locates the native binary
+/// and copies the NNUE out of assets on first use. Cached for the session.
+final onDeviceEngineProvider = FutureProvider<OnDeviceEngine>((ref) {
+  return ref.watch(onDeviceEngineResolverProvider).resolve();
+});
+
+/// Direct OpenAI vision client (BYO key) for the on-device path.
+final boardVisionClientProvider = Provider<BoardVisionClient>((ref) {
+  return DirectOpenAiVisionClient();
+});
+
+/// Coordinates the experimental On-device (Offline) analysis path. The engine
+/// is resolved per-request (see [onDeviceEngineProvider]) and passed in.
+final onDeviceAnalyzerProvider = Provider<OnDeviceAnalyzer>((ref) {
+  return OnDeviceAnalyzer(
+    ref.watch(secureKeyStoreProvider),
+    ref.watch(boardVisionClientProvider),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -137,11 +174,12 @@ class SolverModeState extends Equatable {
 /// When the overlay "Analyze" action fires or a screenshot is captured, it
 /// emits the file path on [analyzeRequests] so a listener can upload + route.
 class SolverModeNotifier extends StateNotifier<SolverModeState> {
-  SolverModeNotifier(this._native) : super(const SolverModeState()) {
+  SolverModeNotifier(this._ref, this._native) : super(const SolverModeState()) {
     _subscribe();
     unawaited(refreshRunning());
   }
 
+  final Ref _ref;
   final NativeSolverPlatform _native;
   StreamSubscription<NativeSolverEvent>? _eventSub;
 
@@ -170,6 +208,8 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
           lastEvent: event,
           message: 'Solver mode started.',
         );
+        // Mirror the current side onto the overlay's toggle.
+        unawaited(_pushSideToOverlay());
       case SolverModeStoppedEvent():
         state = state.copyWith(
           isRunning: false,
@@ -205,9 +245,42 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
       case OverlayActionStopEvent():
         state = state.copyWith(lastEvent: event);
         unawaited(stop());
+      case OverlayActionSwitchSideEvent():
+        state = state.copyWith(lastEvent: event);
+        _enqueueSideToggle();
       case UnknownEvent():
         state = state.copyWith(lastEvent: event);
     }
+  }
+
+  /// Pushes the current `mySide` setting onto the overlay's side toggle.
+  Future<void> _pushSideToOverlay() async {
+    final side = _ref.read(settingsProvider).mySide;
+    try {
+      await _native.setOverlaySide(side.wireValue);
+    } catch (_) {
+      // Overlay may not be showing; ignore.
+    }
+  }
+
+  /// Serializes side toggles so rapid double-taps don't race the read-modify-
+  /// write on the persisted setting (which would drop a toggle).
+  Future<void> _sideQueue = Future<void>.value();
+
+  void _enqueueSideToggle() {
+    _sideQueue = _sideQueue.then((_) => _toggleSide()).catchError((Object _) {});
+  }
+
+  /// Flips the user's side (Red <-> Black), persists it, and echoes the new side
+  /// back to the overlay toggle. The next analysis solves for the new side.
+  Future<void> _toggleSide() async {
+    final current = _ref.read(settingsProvider).mySide;
+    final next = current == SideToMove.red ? SideToMove.black : SideToMove.red;
+    await _ref
+        .read(settingsProvider.notifier)
+        .patch((s) => s.copyWith(mySide: next));
+    state = state.copyWith(message: 'Side set to ${next.label}.');
+    await _pushSideToOverlay();
   }
 
   void _emitAnalyze(String path) {
@@ -296,7 +369,7 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
 
 final solverModeProvider =
     StateNotifierProvider<SolverModeNotifier, SolverModeState>((ref) {
-      return SolverModeNotifier(ref.watch(nativeSolverProvider));
+      return SolverModeNotifier(ref, ref.watch(nativeSolverProvider));
     });
 
 // ---------------------------------------------------------------------------
@@ -358,19 +431,38 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     engineHashMb: _settings.engineHashMb,
   );
 
-  /// Uploads [file] and analyzes it. [keepPath] controls whether the source
-  /// path is retained (it is only stored when the user opted in).
+  /// Uploads [file] and analyzes it via the cloud backend, or routes to the
+  /// experimental on-device path when that mode is selected.
   Future<void> analyzeScreenshot(File file) async {
     state = const AnalysisLoading();
-    final result = await _repo.analyzeScreenshot(
-      file,
-      provider: _settings.aiProvider,
-      // The user's chosen side is authoritative for whose move it is.
-      sideToMove: _settings.mySide,
-      language: _settings.language,
-      options: _engineOptions,
-    );
+    final result = _settings.engineMode == EngineMode.onDevice
+        ? await _analyzeOnDevice(file)
+        : await _repo.analyzeScreenshot(
+            file,
+            provider: _settings.aiProvider,
+            // The user's chosen side is authoritative for whose move it is.
+            sideToMove: _settings.mySide,
+            language: _settings.language,
+            options: _engineOptions,
+          );
     await _apply(result, screenshotPath: file.path);
+  }
+
+  /// On-device path: resolve the bundled engine (cached), then analyze entirely
+  /// on the phone using the user's own OpenAI key.
+  Future<ApiResult<AnalysisResult>> _analyzeOnDevice(File file) async {
+    final engine = await _ref.read(onDeviceEngineProvider.future);
+    return _ref.read(onDeviceAnalyzerProvider).analyze(
+          file,
+          engine: engine,
+          sideToMove: _settings.mySide,
+          language: _settings.language,
+          visionModel: _settings.onDeviceVisionModel,
+          depth: _settings.engineDepth,
+          threads: _settings.engineThreads,
+          hashMb: _settings.engineHashMb,
+          multiPv: _settings.engineMultiPv,
+        );
   }
 
   /// Runs the engine directly on the supplied board (bypasses vision).

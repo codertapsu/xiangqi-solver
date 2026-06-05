@@ -124,3 +124,30 @@ enum EngineProvider {
     EngineProvider.mock => 'Mock',
   };
 }
+
+/// Where analysis runs.
+///
+/// [cloud] uses the backend (default). [onDevice] is the experimental
+/// "Offline" mode: the app calls the AI vision API directly with the user's own
+/// key and runs the engine locally — no backend. The local engine is not
+/// bundled yet, so this mode is a scaffold.
+enum EngineMode {
+  cloud('cloud'),
+  onDevice('onDevice');
+
+  const EngineMode(this.wireValue);
+
+  final String wireValue;
+
+  static EngineMode fromWire(String? value) {
+    return EngineMode.values.firstWhere(
+      (e) => e.wireValue == value,
+      orElse: () => EngineMode.cloud,
+    );
+  }
+
+  String get label => switch (this) {
+    EngineMode.cloud => 'Cloud',
+    EngineMode.onDevice => 'On-device',
+  };
+}

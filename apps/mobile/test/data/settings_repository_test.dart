@@ -27,6 +27,7 @@ void main() {
       final repo = await buildRepo();
       final updated = AppSettings.defaults().copyWith(
         backendUrl: 'http://192.168.1.50:3000',
+        engineMode: EngineMode.onDevice,
         aiProvider: AiProvider.openai,
         engineProvider: EngineProvider.pikafish,
         engineDepth: 20,
@@ -37,12 +38,14 @@ void main() {
         language: 'vi',
         storeScreenshots: true,
         mySide: SideToMove.black,
+        onDeviceVisionModel: 'gpt-5.4',
       );
 
       await repo.save(updated);
       final reloaded = repo.load();
 
       expect(reloaded, updated);
+      expect(reloaded.onDeviceVisionModel, 'gpt-5.4');
     });
 
     test('clamps out-of-range engine values on save', () async {

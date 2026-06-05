@@ -18,6 +18,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // The on-device engine (jniLibs/<abi>/libpikafish.so) is an EXECUTABLE we
+    // launch at runtime. Legacy packaging extracts native libs onto disk
+    // (nativeLibraryDir), the only place Android allows exec — compressed,
+    // in-APK libs can't be run. Equivalent to extractNativeLibs="true".
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     defaultConfig {
         applicationId = "com.xiangqisolver.xiangqi_solver"
         // TYPE_APPLICATION_OVERLAY (floating widget) requires API 26.

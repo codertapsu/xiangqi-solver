@@ -54,5 +54,11 @@ class NoopNativeSolver implements NativeSolverPlatform {
   Future<void> clearCaptureRegion() async {}
 
   @override
+  Future<String?> nativeLibraryDir() async => null;
+
+  @override
+  Future<void> setOverlaySide(String side) async {}
+
+  @override
   Future<void> dispose() async {}
 }

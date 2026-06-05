@@ -27,6 +27,18 @@ export interface ProviderStatus {
   ok: boolean;
 }
 
+/**
+ * Vision-only result from POST /api/analysis/extract: the recognized board with
+ * NO engine analysis. Lets a client (e.g. a future on-device engine) get the
+ * board state and compute the move locally.
+ */
+export interface ExtractionResult {
+  extractionId: string;
+  board: AnalysisBoard;
+  warnings: string[];
+  vision: ProviderStatus;
+}
+
 /** Full analysis result returned by both analysis endpoints. */
 export interface AnalysisResult {
   analysisId: string;

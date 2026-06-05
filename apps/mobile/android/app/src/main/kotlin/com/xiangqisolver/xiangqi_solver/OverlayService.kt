@@ -3,6 +3,7 @@ package com.xiangqisolver.xiangqi_solver
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -44,6 +45,7 @@ class OverlayService : Service() {
     private var analyzeProgress: View? = null
     private var settingsFab: ImageButton? = null
     private var menuView: View? = null
+    private var switchSideButton: TextView? = null
     private var resultPanel: View? = null
     private var resultTitle: TextView? = null
     private var resultDetail: TextView? = null
@@ -65,6 +67,9 @@ class OverlayService : Service() {
 
     /** Whether the result panel currently sits to the LEFT of the controls. */
     private var resultOnLeft = false
+
+    /** The user's current side, mirrored from Dart; drives the toggle's look. */
+    private var currentSide = Constants.SIDE_RED
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -108,6 +113,7 @@ class OverlayService : Service() {
         analyzeProgress = view.findViewById(R.id.analyze_progress)
         settingsFab = view.findViewById(R.id.overlay_menu_fab)
         menuView = view.findViewById(R.id.overlay_menu)
+        switchSideButton = view.findViewById(R.id.menu_switch_side)
         resultPanel = view.findViewById(R.id.overlay_result)
         resultTitle = view.findViewById(R.id.result_title)
         resultDetail = view.findViewById(R.id.result_detail)
@@ -118,6 +124,7 @@ class OverlayService : Service() {
         analyzeButton?.let { setupTouch(it) { onAnalyze() } }
         settingsFab?.let { setupTouch(it) { toggleMenu() } }
         wireMenu(view)
+        applySide() // reflect the last-known side on the toggle
 
         runCatching { wm.addView(view, layoutParams) }
             .onFailure { stopSelf() }
@@ -215,10 +222,38 @@ class OverlayService : Service() {
             setMenuExpanded(false)
             onSelectArea()
         }
+        root.findViewById<View>(R.id.menu_switch_side).setOnClickListener {
+            // Keep the menu open so the user sees the side flip; Dart owns the
+            // setting and echoes the new side back via [showSide].
+            onSwitchSide()
+        }
         root.findViewById<View>(R.id.menu_stop).setOnClickListener {
             setMenuExpanded(false)
             onStop()
         }
+    }
+
+    private fun onSwitchSide() {
+        SolverEventBus.emit(Constants.EVENT_OVERLAY_ACTION_SWITCH_SIDE)
+    }
+
+    /**
+     * Update the side toggle to [side] ("red"/"black"). Source of truth is the
+     * Dart `mySide` setting; called from the MethodChannel after a toggle or at
+     * solver-mode start. Safe to call from any thread.
+     */
+    fun showSide(side: String) {
+        currentSide = if (side == Constants.SIDE_BLACK) Constants.SIDE_BLACK else Constants.SIDE_RED
+        mainHandler.post { applySide() }
+    }
+
+    private fun applySide() {
+        val button = switchSideButton ?: return
+        val isRed = currentSide != Constants.SIDE_BLACK
+        button.text = if (isRed) "R" else "B"
+        button.backgroundTintList = ColorStateList.valueOf(
+            if (isRed) 0xFFE53935.toInt() else 0xFF455A64.toInt(),
+        )
     }
 
     // --- Analyze + result panel ---
@@ -349,6 +384,7 @@ class OverlayService : Service() {
         analyzeProgress = null
         settingsFab = null
         menuView = null
+        switchSideButton = null
         resultPanel = null
         resultTitle = null
         resultDetail = null

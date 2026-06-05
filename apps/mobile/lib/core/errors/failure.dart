@@ -61,3 +61,9 @@ class FileFailure extends Failure {
 class UnknownFailure extends Failure {
   const UnknownFailure(super.message, {super.code});
 }
+
+/// On-device (Offline) mode could not complete — e.g. the local engine is not
+/// bundled yet, or the user's own API key is missing.
+class OnDeviceFailure extends Failure {
+  const OnDeviceFailure(super.message, {super.code});
+}

@@ -56,6 +56,15 @@ abstract interface class NativeSolverPlatform {
   /// Clears any focus area so captures use the full screen again.
   Future<void> clearCaptureRegion();
 
+  /// The app's native library directory (where bundled `lib*.so` executables
+  /// are extracted), or `null` off Android. Used to locate the on-device engine.
+  Future<String?> nativeLibraryDir();
+
+  /// Pushes the user's current side (`'red'` | `'black'`) into the floating
+  /// overlay's side toggle so it shows the right colour/letter. No-op when no
+  /// overlay is showing.
+  Future<void> setOverlaySide(String side);
+
   /// Releases any resources (e.g. the event subscription). Idempotent.
   Future<void> dispose();
 }

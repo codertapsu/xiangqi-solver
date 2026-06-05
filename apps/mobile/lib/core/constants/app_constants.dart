@@ -31,6 +31,12 @@ class AppConstants {
     defaultValue: 'mock',
   );
 
+  /// Default engine mode: cloud (backend) | onDevice (experimental offline).
+  static const String defaultEngineMode = String.fromEnvironment(
+    'ENGINE_MODE',
+    defaultValue: 'cloud',
+  );
+
   /// Default engine search depth (1..30).
   static const int defaultEngineDepth = 12;
 
@@ -69,6 +75,7 @@ class AppConstants {
   static const String healthPath = '$apiPrefix/health';
   static const String analyzeBoardPath = '$apiPrefix/analysis/board';
   static const String analyzeScreenshotPath = '$apiPrefix/analysis/screenshot';
+  static const String analyzeExtractPath = '$apiPrefix/analysis/extract';
 
   /// Maximum screenshot upload size accepted by the backend (8 MB).
   static const int maxUploadBytes = 8 * 1024 * 1024;

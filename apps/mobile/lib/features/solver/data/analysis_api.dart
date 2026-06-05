@@ -8,6 +8,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/utils/logger.dart';
 import '../domain/analysis_result.dart';
 import '../domain/board_piece.dart';
+import '../domain/board_state.dart';
 import '../domain/solver_enums.dart';
 
 /// Result of a health check, with measured round-trip latency.
@@ -148,6 +149,40 @@ class AnalysisApi {
       formData: formData,
     );
     return _parseEnvelopeData(response, AnalysisResult.fromJson);
+  }
+
+  /// POST /api/analysis/extract — vision-only board recognition (no engine).
+  ///
+  /// Returns just the recognized [BoardState]; the caller computes the move
+  /// itself (used by the future on-device engine mode, keeping the AI key
+  /// server-side).
+  Future<BoardState> extractBoard(
+    File screenshot, {
+    AiProvider? provider,
+    SideToMove? sideToMove,
+  }) async {
+    if (!await screenshot.exists()) {
+      throw FileException(
+        'Screenshot file not found at ${screenshot.path}.',
+        code: 'FILE_NOT_FOUND',
+      );
+    }
+    final formData = FormData.fromMap({
+      'screenshot': await MultipartFile.fromFile(
+        screenshot.path,
+        filename: _fileName(screenshot.path),
+      ),
+      if (provider != null) 'provider': provider.wireValue,
+      if (sideToMove != null) 'sideToMove': sideToMove.wireValue,
+    });
+    final response = await _client.postMultipart(
+      AppConstants.analyzeExtractPath,
+      formData: formData,
+    );
+    return _parseEnvelopeData(
+      response,
+      (data) => BoardState.fromJson((data['board'] as Map).cast<String, dynamic>()),
+    );
   }
 
   // --- envelope handling ---

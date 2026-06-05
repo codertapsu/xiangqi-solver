@@ -111,6 +111,21 @@ class MethodChannelNativeSolver implements NativeSolverPlatform {
   Future<void> clearCaptureRegion() => _invokeVoid('clearCaptureRegion');
 
   @override
+  Future<String?> nativeLibraryDir() async {
+    try {
+      return await _methods.invokeMethod<String>('nativeLibraryDir');
+    } on PlatformException catch (e) {
+      throw _mapPlatformException(e);
+    } on MissingPluginException catch (e) {
+      throw _mapMissingPlugin(e);
+    }
+  }
+
+  @override
+  Future<void> setOverlaySide(String side) =>
+      _invokeVoidArgs('setOverlaySide', {'side': side});
+
+  @override
   Future<void> dispose() async {
     _events = null;
   }

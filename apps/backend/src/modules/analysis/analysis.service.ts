@@ -11,7 +11,7 @@ import { MoveNotationService, NotationLanguage } from '../board/move-notation.se
 import { BoardPiece, NormalizedBoard, SideToMove } from '../board/xiangqi.types';
 import { EngineService, EngineProviderName } from '../engine/engine.service';
 import { EngineBestMoveResult } from '../engine/engine.interface';
-import { AnalysisBestMove, AnalysisResult } from './analysis.types';
+import { AnalysisBestMove, AnalysisResult, ExtractionResult } from './analysis.types';
 
 /** Engine tuning resolved from request + config defaults. */
 interface EngineOptions {
@@ -39,6 +39,14 @@ export interface AnalyzeScreenshotParams extends EngineOptions {
   language?: NotationLanguage;
 }
 
+/** Parameters for the vision-only board extraction (no engine). */
+export interface ExtractScreenshotParams {
+  imageBuffer: Buffer;
+  mimeType: string;
+  provider?: AiProviderName;
+  sideToMove?: SideToMove;
+}
+
 /**
  * Orchestrates the product flow:
  *   (screenshot) vision -> validate + normalize -> FEN -> engine -> explain.
@@ -60,6 +68,54 @@ export class AnalysisService {
 
   /** Vision path: extract board from image, then run the engine pipeline. */
   async analyzeScreenshot(params: AnalyzeScreenshotParams): Promise<AnalysisResult> {
+    const { visionName, pieces, sideToMove, visionWarnings } = await this.runVision(params);
+    return this.runPipeline({
+      pieces,
+      sideToMove,
+      visionProvider: visionName,
+      visionOk: true,
+      incomingWarnings: visionWarnings,
+      engineOptions: params,
+      language: params.language,
+      // Vision output is imperfect: repair the board rather than 400 the whole
+      // analysis on a single mis-read piece.
+      lenient: true,
+    });
+  }
+
+  /**
+   * Vision-only path: recognize the board from an image and return it WITHOUT
+   * running the engine. Powers POST /api/analysis/extract — a client (e.g. a
+   * future on-device engine) can then compute the move locally.
+   */
+  async extractBoard(params: ExtractScreenshotParams): Promise<ExtractionResult> {
+    const { visionName, pieces, sideToMove, visionWarnings } = await this.runVision(params);
+    // Repair the (imperfect) AI board; throws NO_BOARD_DETECTED on an empty one.
+    const { board, fen } = this.prepareBoard(pieces, sideToMove, visionWarnings, true);
+    return {
+      extractionId: uuidv4(),
+      board: {
+        sideToMove: board.sideToMove,
+        fen,
+        pieces: board.pieces,
+        confidence: board.confidence,
+      },
+      warnings: board.warnings,
+      vision: { provider: visionName, ok: true },
+    };
+  }
+
+  /**
+   * Run the AI vision provider and resolve the authoritative side to move. The
+   * caller's explicit side (e.g. "I am Red") overrides the vision guess; a
+   * mismatch is surfaced as a warning.
+   */
+  private async runVision(params: ExtractScreenshotParams): Promise<{
+    visionName: string;
+    pieces: BoardPiece[];
+    sideToMove: SideToMove;
+    visionWarnings: string[];
+  }> {
     const visionName = params.provider ?? this.aiService.defaultProvider;
     let extraction: ExtractBoardStateResult;
     try {
@@ -82,9 +138,6 @@ export class AnalysisService {
       visionWarnings.push('Vision provider did not confidently detect a board.');
     }
 
-    // The caller's explicit side (e.g. "I am Red") is AUTHORITATIVE: when the
-    // user tells us whose move it is, we trust that over the vision guess and
-    // only surface a warning if the image looked like the other side.
     let sideToMove: SideToMove;
     if (params.sideToMove && params.sideToMove !== 'unknown') {
       sideToMove = params.sideToMove;
@@ -98,18 +151,7 @@ export class AnalysisService {
       sideToMove = extraction.sideToMove;
     }
 
-    return this.runPipeline({
-      pieces: extraction.pieces,
-      sideToMove,
-      visionProvider: visionName,
-      visionOk: true,
-      incomingWarnings: visionWarnings,
-      engineOptions: params,
-      language: params.language,
-      // Vision output is imperfect: repair the board rather than 400 the whole
-      // analysis on a single mis-read piece.
-      lenient: true,
-    });
+    return { visionName, pieces: extraction.pieces, sideToMove, visionWarnings };
   }
 
   /** No-vision path: pieces are supplied directly. */
@@ -142,37 +184,13 @@ export class AnalysisService {
     const analysisId = uuidv4();
     const language: NotationLanguage = args.language ?? 'en';
 
-    // 1. Either repair an imperfect (AI) board into something analyzable, or
-    //    validate explicit input strictly.
-    let pieces: BoardPiece[];
-    const preWarnings: string[] = [];
-    if (args.lenient) {
-      const repaired = this.validator.repair(args.pieces);
-      pieces = repaired.pieces;
-      preWarnings.push(...repaired.warnings);
-      if (pieces.length === 0) {
-        throw new BadRequestException({
-          message: 'No Xiangqi board was detected in the screenshot.',
-          code: 'NO_BOARD_DETECTED',
-          details: [
-            'Make sure the whole board is clearly visible, then try again. ' +
-              'Tip: in Solver Mode use “Select capture area” to frame just the board.',
-          ],
-        });
-      }
-    } else {
-      preWarnings.push(...this.validator.validateOrThrow(args.pieces));
-      pieces = args.pieces;
-    }
-
-    // 2. Normalize into a deterministic, ordered board.
-    const board: NormalizedBoard = this.normalizer.normalize(pieces, args.sideToMove, [
-      ...args.incomingWarnings,
-      ...preWarnings,
-    ]);
-
-    // 3. Convert to FEN.
-    const fen = this.fenService.toFen(board.pieces, board.sideToMove);
+    // 1-3. Repair/validate -> normalize -> FEN (shared with /extract).
+    const { pieces, board, fen } = this.prepareBoard(
+      args.pieces,
+      args.sideToMove,
+      args.incomingWarnings,
+      args.lenient,
+    );
 
     // 4. Run the engine — but only if both generals are present (a position
     //    without a king is illegal and not solvable). On an imperfect capture we
@@ -270,6 +288,45 @@ export class AnalysisService {
       engine: { provider: engineName, ok: engineOk },
       vision: { provider: args.visionProvider, ok: args.visionOk },
     };
+  }
+
+  /**
+   * Repair (lenient/AI) or strictly validate the raw pieces, then normalize and
+   * convert to FEN. Throws NO_BOARD_DETECTED (lenient) or INVALID_BOARD (strict).
+   */
+  private prepareBoard(
+    rawPieces: BoardPiece[],
+    sideToMove: SideToMove,
+    incomingWarnings: string[],
+    lenient: boolean,
+  ): { pieces: BoardPiece[]; board: NormalizedBoard; fen: string } {
+    let pieces: BoardPiece[];
+    const preWarnings: string[] = [];
+    if (lenient) {
+      const repaired = this.validator.repair(rawPieces);
+      pieces = repaired.pieces;
+      preWarnings.push(...repaired.warnings);
+      if (pieces.length === 0) {
+        throw new BadRequestException({
+          message: 'No Xiangqi board was detected in the screenshot.',
+          code: 'NO_BOARD_DETECTED',
+          details: [
+            'Make sure the whole board is clearly visible, then try again. ' +
+              'Tip: in Solver Mode use “Select capture area” to frame just the board.',
+          ],
+        });
+      }
+    } else {
+      preWarnings.push(...this.validator.validateOrThrow(rawPieces));
+      pieces = rawPieces;
+    }
+
+    const board = this.normalizer.normalize(pieces, sideToMove, [
+      ...incomingWarnings,
+      ...preWarnings,
+    ]);
+    const fen = this.fenService.toFen(board.pieces, board.sideToMove);
+    return { pieces, board, fen };
   }
 
   /** A human phrase for any absent general(s), or null when both are present. */

@@ -52,6 +52,7 @@ describe('Backend (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/analysis/board')
         .send({
+          engineProvider: 'mock',
           sideToMove: 'red',
           pieces: [
             { color: 'red', type: 'king', file: 4, rank: 0 },
@@ -86,6 +87,8 @@ describe('Backend (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/analysis/screenshot')
         .attach('screenshot', TINY_PNG, { filename: 'board.png', contentType: 'image/png' })
+        .field('provider', 'mock')
+        .field('engineProvider', 'mock')
         .expect(201);
 
       expect(res.body.success).toBe(true);
@@ -96,6 +99,22 @@ describe('Backend (e2e)', () => {
     it('rejects a missing file with 400', async () => {
       const res = await request(app.getHttpServer()).post('/api/analysis/screenshot').expect(400);
       expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/analysis/extract', () => {
+    it('returns the recognized board (vision-only) with no bestMove', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/analysis/extract')
+        .attach('screenshot', TINY_PNG, { filename: 'board.png', contentType: 'image/png' })
+        .field('provider', 'mock')
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.vision).toEqual({ provider: 'mock', ok: true });
+      expect(res.body.data.board.pieces.length).toBeGreaterThan(0);
+      expect(res.body.data.bestMove).toBeUndefined();
+      expect(res.body.data.engine).toBeUndefined();
     });
   });
 });

@@ -25,6 +25,9 @@ dependencies:
   # Local persistence.
   shared_preferences: ^2.3.3
 
+  # Secure storage for the user's own API key (on-device / BYO-key mode).
+  flutter_secure_storage: ^9.2.4
+
   # Platform / file utilities.
   path_provider: ^2.1.5
   permission_handler: ^11.3.1
@@ -44,3 +47,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # On-device engine network. The NNUE is large (~51MB) and gitignored; it is
+  # bundled locally so the offline engine can run without a backend. The
+  # directory is referenced (not the file) so the build still works when the
+  # NNUE isn't present (the app then falls back to board-only on-device).
+  assets:
+    - assets/engine/

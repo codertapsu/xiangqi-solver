@@ -26,6 +26,12 @@ object Constants {
     const val METHOD_CLEAR_CAPTURE_REGION = "clearCaptureRegion"
     const val METHOD_HAS_CAPTURE_REGION = "hasCaptureRegion"
 
+    // On-device engine: where the bundled lib*.so executables are extracted.
+    const val METHOD_NATIVE_LIBRARY_DIR = "nativeLibraryDir"
+
+    // Push the user's current side (red/black) into the overlay's side toggle.
+    const val METHOD_SET_OVERLAY_SIDE = "setOverlaySide"
+
     // --- Event "type" values emitted on the EventChannel. ---
     const val EVENT_SOLVER_MODE_STARTED = "solverModeStarted"
     const val EVENT_SOLVER_MODE_STOPPED = "solverModeStopped"
@@ -34,6 +40,7 @@ object Constants {
     const val EVENT_PERMISSION_DENIED = "permissionDenied"
     const val EVENT_OVERLAY_ACTION_ANALYZE = "overlayActionAnalyze"
     const val EVENT_OVERLAY_ACTION_STOP = "overlayActionStop"
+    const val EVENT_OVERLAY_ACTION_SWITCH_SIDE = "overlayActionSwitchSide"
 
     // --- Event payload keys. ---
     const val KEY_TYPE = "type"
@@ -46,6 +53,11 @@ object Constants {
     const val KEY_TITLE = "title"
     const val KEY_DETAIL = "detail"
     const val KEY_KIND = "kind"
+    const val KEY_SIDE = "side"
+
+    // --- Side identifiers shared with Dart (SideToMove.wireValue). ---
+    const val SIDE_RED = "red"
+    const val SIDE_BLACK = "black"
 
     // --- Overlay result panel "kind" values (passed from Dart). ---
     const val OVERLAY_KIND_LOADING = "loading"

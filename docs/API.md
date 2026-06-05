@@ -219,10 +219,15 @@ Recognize a board from a screenshot, normalize it, then run the engine.
 | `engineProvider`  | string enum | no       | `pikafish` \| `mock`; default from `ENGINE_PROVIDER` env.          |
 | `engineDepth`     | int 1..30   | no       | Engine search depth.                                               |
 | `engineMoveTimeMs`| int 50..60000| no      | Per-move think time in ms.                                         |
+| `engineThreads`   | int 1..1024 | no       | Pikafish `Threads`.                                                |
+| `engineHashMb`    | int 1..32768| no       | Pikafish `Hash` (MB).                                              |
+| `engineMultiPv`   | int 1..10   | no       | Top-N moves (`MultiPV`); >1 fills `candidates[]`.                  |
+| `language`        | string enum | no       | `en` \| `vi` \| `zh`; notation language. Default `en`.            |
 
 **Response payload:** `AnalysisResult` (same shape as `/board`), with
 `vision.provider` reflecting the chosen vision provider and
-`board.pieces`/`board.confidence` derived from recognition.
+`board.pieces`/`board.confidence` derived from recognition. When
+`engineMultiPv > 1`, `candidates[]` holds the ranked moves (index 0 = best).
 
 **curl (mock mode — any small PNG works; mock ignores image bytes):**
 
@@ -257,6 +262,50 @@ curl -s -X POST http://localhost:3000/api/analysis/screenshot \
     "message": "screenshot must be image/png, image/jpeg, or image/webp."
   }
 }
+```
+
+---
+
+## `POST /api/analysis/extract`
+
+**Vision-only**: recognize and normalize the board, then return it **without
+running the engine**. Intended for clients that compute the move themselves
+(e.g. an on-device engine), keeping the AI key server-side. See
+[ON_DEVICE_ENGINE.md](ON_DEVICE_ENGINE.md).
+
+**Content-Type:** `multipart/form-data`
+
+**Fields:**
+
+| Field        | Type        | Required | Notes                                                           |
+| ------------ | ----------- | -------- | --------------------------------------------------------------- |
+| `screenshot` | image file  | yes      | `image/png`, `image/jpeg`, or `image/webp`; **max 8 MB**.       |
+| `provider`   | string enum | no       | `gemini` \| `openai` \| `mock`; default from `AI_PROVIDER` env. |
+| `sideToMove` | string enum | no       | `red` \| `black` \| `unknown` (authoritative when set).         |
+
+**Response payload (`ExtractionResult` — no `bestMove`/`engine`/`explanation`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "extractionId": "uuid",
+    "board": { "sideToMove": "red", "fen": "…", "pieces": [ /* … */ ], "confidence": 0.9 },
+    "warnings": [],
+    "vision": { "provider": "mock", "ok": true }
+  }
+}
+```
+
+`400 NO_BOARD_DETECTED` is returned only when no pieces are recognized at all.
+
+**curl (mock mode):**
+
+```bash
+curl -s -X POST http://localhost:3000/api/analysis/extract \
+  -F 'screenshot=@./sample.png;type=image/png' \
+  -F 'provider=mock' \
+  -F 'sideToMove=red'
 ```
 
 ---

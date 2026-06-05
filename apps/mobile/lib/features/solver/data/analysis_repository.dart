@@ -6,6 +6,7 @@ import '../../../core/network/api_result.dart';
 import '../../../core/utils/logger.dart';
 import '../domain/analysis_result.dart';
 import '../domain/board_piece.dart';
+import '../domain/board_state.dart';
 import '../domain/solver_enums.dart';
 import 'analysis_api.dart';
 
@@ -56,6 +57,21 @@ class AnalysisRepository {
         sideToMove: sideToMove,
         language: language,
         options: options,
+      ),
+    );
+  }
+
+  /// Vision-only board recognition (no engine) — for the future on-device flow.
+  Future<ApiResult<BoardState>> extractBoard(
+    File screenshot, {
+    AiProvider? provider,
+    SideToMove? sideToMove,
+  }) {
+    return _run(
+      () => _api.extractBoard(
+        screenshot,
+        provider: provider,
+        sideToMove: sideToMove,
       ),
     );
   }

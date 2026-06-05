@@ -54,6 +54,8 @@ sealed class NativeSolverEvent extends Equatable {
         return const OverlayActionAnalyzeEvent();
       case 'overlayActionStop':
         return const OverlayActionStopEvent();
+      case 'overlayActionSwitchSide':
+        return const OverlayActionSwitchSideEvent();
       default:
         return UnknownEvent(type ?? 'null');
     }
@@ -123,6 +125,14 @@ class OverlayActionAnalyzeEvent extends NativeSolverEvent {
 
 class OverlayActionStopEvent extends NativeSolverEvent {
   const OverlayActionStopEvent();
+
+  @override
+  List<Object?> get props => const [];
+}
+
+/// The user tapped "switch side" on the floating overlay (flip Red <-> Black).
+class OverlayActionSwitchSideEvent extends NativeSolverEvent {
+  const OverlayActionSwitchSideEvent();
 
   @override
   List<Object?> get props => const [];

@@ -186,6 +186,42 @@ describe('AnalysisService', () => {
     });
   });
 
+  describe('extractBoard (vision-only)', () => {
+    it('returns the recognized board without running the engine', async () => {
+      const result = await service.extractBoard({
+        imageBuffer: Buffer.from('fake-png'),
+        mimeType: 'image/png',
+      });
+      expect(result.board.fen).toBe(START_POSITION_FEN);
+      expect(result.board.pieces.length).toBe(32);
+      expect(result.vision).toEqual({ provider: 'mock', ok: true });
+      // An extraction result carries no engine fields.
+      const asAny = result as unknown as Record<string, unknown>;
+      expect(asAny.bestMove).toBeUndefined();
+      expect(asAny.engine).toBeUndefined();
+    });
+
+    it('honors the side-to-move hint', async () => {
+      const result = await service.extractBoard({
+        imageBuffer: Buffer.from('x'),
+        mimeType: 'image/png',
+        sideToMove: 'black',
+      });
+      expect(result.board.sideToMove).toBe('black');
+      expect(result.board.fen.split(' ')[1]).toBe('b');
+    });
+
+    it('propagates a provider error when credentials are missing', async () => {
+      await expect(
+        service.extractBoard({
+          imageBuffer: Buffer.from('x'),
+          mimeType: 'image/png',
+          provider: 'openai',
+        }),
+      ).rejects.toThrow(/OPENAI_API_KEY/i);
+    });
+  });
+
   describe('analyzeScreenshot leniency (imperfect AI extraction)', () => {
     function serviceWithExtraction(pieces: unknown[]): AnalysisService {
       const config = buildConfig();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../solver/domain/solver_enums.dart';
 import '../../solver/presentation/providers/solver_providers.dart';
 import '../../solver/presentation/widgets/provider_dropdowns.dart';
 import '../../solver/presentation/widgets/section_card.dart';
@@ -19,6 +20,9 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   late final TextEditingController _backendController;
+  late final TextEditingController _visionModelController;
+  final TextEditingController _apiKeyController = TextEditingController();
+  bool _apiKeyObscured = true;
 
   @override
   void initState() {
@@ -26,11 +30,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _backendController = TextEditingController(
       text: ref.read(settingsProvider).backendUrl,
     );
+    _visionModelController = TextEditingController(
+      text: ref.read(settingsProvider).onDeviceVisionModel,
+    );
+    // Load any previously stored BYO key into the field (on-device mode).
+    ref.read(secureKeyStoreProvider).readOpenAiKey().then((key) {
+      if (mounted && key != null) _apiKeyController.text = key;
+    });
   }
 
   @override
   void dispose() {
     _backendController.dispose();
+    _visionModelController.dispose();
+    _apiKeyController.dispose();
     super.dispose();
   }
 
@@ -46,6 +59,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           padding: const EdgeInsets.all(16),
           children: [
             _buildBackendCard(),
+            const SizedBox(height: 16),
+            _buildEngineModeCard(settings),
             const SizedBox(height: 16),
             _buildSideCard(settings),
             const SizedBox(height: 16),
@@ -63,6 +78,118 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildEngineModeCard(AppSettings settings) {
+    final onDevice = settings.engineMode == EngineMode.onDevice;
+    return SectionCard(
+      title: 'Engine mode',
+      icon: Icons.dns_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SegmentedButton<EngineMode>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(
+                value: EngineMode.cloud,
+                label: Text('Cloud'),
+                icon: Icon(Icons.cloud_outlined),
+              ),
+              ButtonSegment(
+                value: EngineMode.onDevice,
+                label: Text('On-device'),
+                icon: Icon(Icons.smartphone),
+              ),
+            ],
+            selected: {settings.engineMode},
+            onSelectionChanged: (s) =>
+                _notifier.patch((st) => st.copyWith(engineMode: s.first)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            onDevice
+                ? 'Experimental Offline mode: recognizes the board on this '
+                      'device using your own OpenAI key — no backend. The local '
+                      'engine isn’t bundled yet, so it shows the board but can’t '
+                      'compute the move.'
+                : 'Analysis runs on the backend; provider API keys stay '
+                      'server-side.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (onDevice) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiKeyController,
+              obscureText: _apiKeyObscured,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: InputDecoration(
+                labelText: 'Your OpenAI API key',
+                hintText: 'sk-…',
+                prefixIcon: const Icon(Icons.key_outlined),
+                suffixIcon: IconButton(
+                  tooltip: _apiKeyObscured ? 'Show' : 'Hide',
+                  icon: Icon(
+                    _apiKeyObscured ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () =>
+                      setState(() => _apiKeyObscured = !_apiKeyObscured),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _saveApiKey,
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Save key'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                TextButton(onPressed: _clearApiKey, child: const Text('Clear')),
+              ],
+            ),
+            Text(
+              'Stored only on this device (secure storage); never sent to our '
+              'backend. You pay your own API usage.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _visionModelController,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: const InputDecoration(
+                labelText: 'Vision model',
+                hintText: 'gpt-4o',
+                prefixIcon: Icon(Icons.visibility_outlined),
+                helperMaxLines: 3,
+                helperText:
+                    'Reads the board from your screenshot. Use a capable model — '
+                    'ideally the same one your Cloud mode uses. Avoid gpt-4o-mini: '
+                    'it misreads pieces and produces illegal boards.',
+              ),
+              onChanged: (v) =>
+                  _notifier.patch((s) => s.copyWith(onDeviceVisionModel: v.trim())),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveApiKey() async {
+    await ref.read(secureKeyStoreProvider).writeOpenAiKey(_apiKeyController.text);
+    _snack('API key saved on this device.');
+  }
+
+  Future<void> _clearApiKey() async {
+    await ref.read(secureKeyStoreProvider).clearOpenAiKey();
+    _apiKeyController.clear();
+    _snack('API key cleared.');
   }
 
   Widget _buildBackendCard() {

@@ -54,7 +54,18 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _handleAnalyzeRequest(String path) async {
     await ref.read(analysisProvider.notifier).analyzeScreenshot(File(path));
     if (!mounted) return;
-    unawaited(context.push(AppRoutes.result));
+    _openResult();
+  }
+
+  /// Opens the result screen, but never stacks a second copy. The result page
+  /// reads [analysisProvider] reactively, so when one is already showing (e.g.
+  /// several captures in a row) it just refreshes in place. This keeps a single
+  /// `/result` on the stack so system/AppBar back returns straight to Home
+  /// instead of popping through one result per analysis.
+  void _openResult() {
+    final alreadyOnResult =
+        GoRouter.of(context).state.uri.path == AppRoutes.result;
+    if (!alreadyOnResult) unawaited(context.push(AppRoutes.result));
   }
 
   Future<void> _testConnection() async {
@@ -91,7 +102,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         .read(analysisProvider.notifier)
         .analyzeScreenshot(File(picked.path));
     if (!mounted) return;
-    unawaited(context.push(AppRoutes.result));
+    _openResult();
   }
 
   void _snack(String message) {
