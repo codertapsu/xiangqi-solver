@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Xiangqi Solver</string>
+
+    <!-- Foreground-service notification (honest, non-misleading). -->
+    <string name="notification_channel_name">Solver Mode</string>
+    <string name="notification_channel_description">Shown while Xiangqi Solver is capturing the screen for analysis.</string>
+    <string name="notification_title">Xiangqi Solver — Solver Mode active</string>
+    <string name="notification_text">Screen capture is enabled for board analysis. Tap the floating button to analyze.</string>
+
+    <!-- Floating overlay widget. -->
+    <string name="overlay_menu_analyze">Analyze current screen</string>
+    <string name="overlay_menu_more">More actions</string>
+    <string name="overlay_menu_select_area">Select capture area</string>
+    <string name="overlay_menu_stop">Stop Solver Mode</string>
+    <string name="overlay_content_description">Xiangqi Solver floating analysis button</string>
+</resources>

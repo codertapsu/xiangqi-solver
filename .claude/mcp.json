@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "figma-mcp-go": {
+      "command": "node",
+      "args": ["/Users/marcus/development/projects/figma-mcp-node/dist/bin.js"]
+    }
+  }
+}

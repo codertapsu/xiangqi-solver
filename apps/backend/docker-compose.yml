@@ -1,0 +1,19 @@
+services:
+  backend:
+    build: .
+    image: xiangqi-solver-backend:dev
+    ports:
+      - "3000:3000"
+    environment:
+      # Mock defaults keep the container fully self-contained.
+      PORT: "3000"
+      AI_PROVIDER: "mock"
+      ENGINE_PROVIDER: "mock"
+    # An optional .env file may override the values above when present.
+    env_file:
+      - path: .env
+        required: false
+    # Use the dev watch command for local development.
+    command: npm run start:dev
+    volumes:
+      - ./src:/app/src

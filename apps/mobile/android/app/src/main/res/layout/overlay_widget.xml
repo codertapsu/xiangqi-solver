@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Floating Solver-Mode widget.
+  - A big, always-visible Analyze button (one tap to analyze; animates while busy).
+  - A small secondary FAB that expands Select-area + Stop.
+  - A result panel placed beside the controls (left/right is chosen at runtime).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlay_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="top"
+    android:orientation="horizontal">
+
+    <!-- Controls column: the Analyze button, the small settings FAB, and the
+         (vertically expanding) secondary actions. -->
+    <LinearLayout
+        android:id="@+id/overlay_controls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Primary Analyze button: icon swaps to a spinner while busy. -->
+            <FrameLayout
+                android:id="@+id/overlay_analyze"
+                android:layout_width="62dp"
+                android:layout_height="62dp"
+                android:background="@drawable/overlay_fab_bg"
+                android:clickable="true"
+                android:contentDescription="@string/overlay_menu_analyze"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/analyze_icon"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/overlay_menu_analyze"
+                    android:src="@drawable/ic_overlay_analyze" />
+
+                <ProgressBar
+                    android:id="@+id/analyze_progress"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:indeterminateTint="#FFFFFFFF"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Small secondary (settings) FAB. -->
+            <ImageButton
+                android:id="@+id/overlay_menu_fab"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/overlay_menufab_bg"
+                android:contentDescription="@string/overlay_menu_more"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_overlay_more" />
+        </LinearLayout>
+
+        <!-- Secondary actions, hidden until the settings FAB is tapped. -->
+        <LinearLayout
+            android:id="@+id/overlay_menu"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="end"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageButton
+                android:id="@+id/menu_select_area"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/overlay_sub_bg"
+                android:backgroundTint="#FF1E88E5"
+                android:contentDescription="@string/overlay_menu_select_area"
+                android:padding="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_overlay_crop" />
+
+            <ImageButton
+                android:id="@+id/menu_stop"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/overlay_sub_bg"
+                android:backgroundTint="#FFE53935"
+                android:contentDescription="@string/overlay_menu_stop"
+                android:padding="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_overlay_stop" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Result panel: fixed width, placed left or right of the controls at
+         runtime. Hidden until the first analysis completes. -->
+    <LinearLayout
+        android:id="@+id/overlay_result"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/overlay_menu_bg"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/result_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FF8BC34A"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/result_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

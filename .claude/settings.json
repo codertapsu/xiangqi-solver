@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "skipDangerousModePermissionPrompt": true,
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1"
+  },
+  "teammateMode": "in-process",
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(npm run lint:check)",
+      "Bash(npm run lint:fix)",
+      "Bash(npm run format:check)",
+      "Bash(npm run format:fix)",
+      "Bash(npm run build)",
+      "Bash(npm test *)",
+      "Bash(cat package.json)",
+      "Bash(node -v)",
+      "Bash(npm -v)"
+    ],
+    "ask": [],
+    "deny": []
+  }
+}

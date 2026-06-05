@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# Root .gitignore for the Xiangqi Solver monorepo
+# Covers: Node/NestJS backend (apps/backend) and Flutter/Android app (apps/mobile)
+# ---------------------------------------------------------------------------
+
+# Node / NestJS
+node_modules/
+dist/
+coverage/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Environment / secrets (NEVER commit API keys)
+.env
+.env.*
+!.env.example
+
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+apps/mobile/.flutter-plugins*
+
+# Android / Gradle
+.gradle/
+*.iml
+local.properties
+apps/mobile/android/local.properties
+ephemeral/
+**/ephemeral/
+
+# IDE / editor
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Pikafish.2026-01-02
+Pikafish.2026-01-02
+Pikafish.2026-01-02.7z

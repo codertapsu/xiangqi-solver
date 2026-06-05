@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Circular background for the main floating action button. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:angle="270"
+        android:startColor="#FFE53935"
+        android:endColor="#FFB71C1C" />
+    <stroke
+        android:width="2dp"
+        android:color="#33FFFFFF" />
+</shape>

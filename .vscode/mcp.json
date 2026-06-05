@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "figma-mcp-go": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/Users/marcus/development/projects/figma-mcp-node/dist/bin.js"]
+    }
+  }
+}

@@ -1,0 +1,114 @@
+import 'package:dio/dio.dart';
+
+import '../constants/app_constants.dart';
+import '../errors/exceptions.dart';
+import '../utils/logger.dart';
+
+/// Thin wrapper around [Dio] that centralizes base configuration and maps
+/// transport-level failures to typed [AppException]s.
+///
+/// The base URL is configurable at runtime (Settings) so the same build can
+/// point at an emulator host, a LAN device, or a remote server.
+class DioClient {
+  DioClient({Dio? dio, String? baseUrl})
+    : _dio = dio ?? Dio() {
+    _dio.options = _dio.options.copyWith(
+      baseUrl: baseUrl ?? AppConstants.defaultBackendUrl,
+      connectTimeout: AppConstants.connectTimeout,
+      receiveTimeout: AppConstants.receiveTimeout,
+      sendTimeout: AppConstants.sendTimeout,
+      // We validate status ourselves so we can read structured error envelopes.
+      validateStatus: (_) => true,
+      headers: const {'Accept': 'application/json'},
+    );
+  }
+
+  final Dio _dio;
+  static const AppLogger _log = AppLogger('DioClient');
+
+  /// The underlying client (exposed for advanced/streaming use).
+  Dio get raw => _dio;
+
+  /// Current base URL.
+  String get baseUrl => _dio.options.baseUrl;
+
+  /// Re-points the client at a new base URL (e.g. when settings change).
+  set baseUrl(String value) {
+    _dio.options = _dio.options.copyWith(baseUrl: value);
+  }
+
+  Future<Response<dynamic>> getJson(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Duration? receiveTimeout,
+  }) {
+    return _guard(
+      () => _dio.get<dynamic>(
+        path,
+        queryParameters: queryParameters,
+        options: receiveTimeout == null
+            ? null
+            : Options(receiveTimeout: receiveTimeout),
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> postJson(
+    String path, {
+    Object? data,
+  }) {
+    return _guard(
+      () => _dio.post<dynamic>(
+        path,
+        data: data,
+        options: Options(
+          contentType: Headers.jsonContentType,
+        ),
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> postMultipart(
+    String path, {
+    required FormData formData,
+  }) {
+    return _guard(
+      () => _dio.post<dynamic>(
+        path,
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      ),
+    );
+  }
+
+  /// Wraps a Dio call, translating [DioException]s into [NetworkException]s
+  /// with friendly messages.
+  Future<Response<dynamic>> _guard(
+    Future<Response<dynamic>> Function() run,
+  ) async {
+    try {
+      return await run();
+    } on DioException catch (e) {
+      _log.warn('Dio error: ${e.type} ${e.message}');
+      throw NetworkException(_describe(e), code: e.type.name);
+    }
+  }
+
+  String _describe(DioException e) {
+    return switch (e.type) {
+      DioExceptionType.connectionTimeout =>
+        'Connection timed out. Is the backend reachable at $baseUrl?',
+      DioExceptionType.sendTimeout => 'Upload timed out. Try a smaller image.',
+      DioExceptionType.receiveTimeout =>
+        'The server took too long to respond.',
+      DioExceptionType.connectionError =>
+        'Could not reach the backend at $baseUrl.',
+      DioExceptionType.badCertificate => 'The server certificate is invalid.',
+      DioExceptionType.cancel => 'The request was cancelled.',
+      DioExceptionType.badResponse =>
+        'The server returned an unexpected response.',
+      DioExceptionType.unknown =>
+        e.message ?? 'An unknown network error occurred.',
+    };
+  }
+}
