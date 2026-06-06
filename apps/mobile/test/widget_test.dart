@@ -10,6 +10,8 @@ import 'package:xiangqi_solver/features/solver/data/analysis_repository.dart';
 import 'package:xiangqi_solver/features/solver/presentation/pages/home_page.dart';
 import 'package:xiangqi_solver/features/solver/presentation/providers/solver_providers.dart';
 
+import 'support/remote_config_test_override.dart';
+
 /// A repository that reports a healthy backend with no network, so the home
 /// page's startup mode-health probe resolves to `ready` (no dialog/snackbar).
 class _HealthyRepo extends AnalysisRepository {
@@ -30,13 +32,14 @@ class _HealthyRepo extends AnalysisRepository {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Future<Widget> buildHome() async {
+  Future<Widget> buildHome({Override? remoteConfig}) async {
     SharedPreferences.setMockInitialValues(const {});
     final prefs = await SharedPreferences.getInstance();
     return ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         analysisRepositoryProvider.overrideWithValue(_HealthyRepo()),
+        remoteConfig ?? remoteConfigTestOverride,
       ],
       child: const MaterialApp(home: HomePage()),
     );
@@ -53,7 +56,9 @@ void main() {
     expect(find.text('Solver Mode'), findsOneWidget);
     expect(find.text('Start'), findsOneWidget);
     expect(find.text('Stop'), findsOneWidget);
-    expect(find.text('Test Backend Connection'), findsOneWidget);
+    // The Backend card is hidden by default (a remote-config UI flag), so it is
+    // intentionally NOT among the core controls here.
+    expect(find.text('Test Backend Connection'), findsNothing);
 
     // Privacy banner.
     expect(find.text('Privacy & AI use'), findsOneWidget);
@@ -71,7 +76,10 @@ void main() {
   testWidgets('Backend URL field is seeded with the default URL', (
     tester,
   ) async {
-    await tester.pumpWidget(await buildHome());
+    // The Backend card is gated behind a remote-config flag — reveal it here.
+    await tester.pumpWidget(
+      await buildHome(remoteConfig: remoteConfigUiVisibleTestOverride),
+    );
     await tester.pump();
 
     // Find the labelled field, then assert its controller holds the default.

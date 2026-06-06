@@ -10,7 +10,7 @@ import '../utils/logger.dart';
 /// The base URL is configurable at runtime (Settings) so the same build can
 /// point at an emulator host, a LAN device, or a remote server.
 class DioClient {
-  DioClient({Dio? dio, String? baseUrl})
+  DioClient({Dio? dio, String? baseUrl, String? deviceId})
     : _dio = dio ?? Dio() {
     _dio.options = _dio.options.copyWith(
       baseUrl: baseUrl ?? AppConstants.defaultBackendUrl,
@@ -19,7 +19,12 @@ class DioClient {
       sendTimeout: AppConstants.sendTimeout,
       // We validate status ourselves so we can read structured error envelopes.
       validateStatus: (_) => true,
-      headers: const {'Accept': 'application/json'},
+      headers: {
+        'Accept': 'application/json',
+        // Stable per-install id so the backend can rate-limit per device
+        // (cheap abuse cap now that hints are a device-local counter).
+        'x-device-id': ?deviceId,
+      },
     );
   }
 
@@ -71,12 +76,13 @@ class DioClient {
   Future<Response<dynamic>> postMultipart(
     String path, {
     required FormData formData,
+    Map<String, String>? headers,
   }) {
     return _guard(
       () => _dio.post<dynamic>(
         path,
         data: formData,
-        options: Options(contentType: 'multipart/form-data'),
+        options: Options(contentType: 'multipart/form-data', headers: headers),
       ),
     );
   }

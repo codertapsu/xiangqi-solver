@@ -175,6 +175,12 @@ export class PikafishEngineService implements XiangqiEngine {
           // Apply UCI options BEFORE isready: the engine reallocates on Hash/
           // Threads changes and blocks on isready until they take effect.
           // (Pikafish has no Skill/Elo option — strength is depth/movetime only.)
+          //
+          // For a commercially-clean engine, point the binary/nnue at
+          // Fairy-Stockfish + the CC0 xiangqi net and set ENGINE_UCI_VARIANT=xiangqi:
+          // the variant MUST be selected before the variant net loads.
+          const variant = engineCfg?.uciVariant;
+          if (variant) send(`setoption name UCI_Variant value ${variant}`);
           if (nnuePath) send(`setoption name EvalFile value ${nnuePath}`);
           send(`setoption name Threads value ${threads}`);
           send(`setoption name Hash value ${hashMb}`);

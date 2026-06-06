@@ -36,8 +36,15 @@ dependencies:
   # Value equality for immutable models.
   equatable: ^2.0.7
 
+  # Open external links (privacy policy).
+  url_launcher: ^6.3.2
+
   # Formatting (timestamps, etc.).
   intl: ^0.20.1
+
+  # Monetization (hint wallet): rewarded ads + in-app purchases.
+  google_mobile_ads: ^8.0.0
+  in_app_purchase: ^3.2.3
 
 dev_dependencies:
   flutter_test:
@@ -48,9 +55,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # On-device engine network. The NNUE is large (~51MB) and gitignored; it is
-  # bundled locally so the offline engine can run without a backend. The
-  # directory is referenced (not the file) so the build still works when the
-  # NNUE isn't present (the app then falls back to board-only on-device).
-  assets:
-    - assets/engine/
+  # NOTE: the on-device engine (Pikafish .so + NNUE) is NOT a Flutter asset and
+  # is NOT bundled in release builds — it's GPLv3 + a non-commercial net, so it
+  # must stay out of the commercial app. It ships only in DEBUG via
+  # android/app/src/debug/jniLibs/ (libpikafish.so + libpikafish_nnue.so),
+  # extracted to nativeLibraryDir. See docs/ON_DEVICE_ENGINE.md.

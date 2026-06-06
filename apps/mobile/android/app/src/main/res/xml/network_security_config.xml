@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- RELEASE network policy: HTTPS-only for the whole app EXCEPT the current
+     plain-HTTP backend host. The backend at http://103.157.205.175:3000 has no
+     TLS yet, so without this exception an installed release build cannot reach
+     it at all (Android blocks cleartext by default on API 28+).
+
+     Scope is intentionally narrow — only this one host is allowed over cleartext;
+     everything else (OpenAI, AdMob, etc.) stays HTTPS-only. REMOVE this exception
+     once the backend is served over HTTPS (e.g. behind the Firebase Hosting /
+     Cloud Run rewrite) and point BACKEND_URL at the https:// origin.
+
+     Debug builds override this file (src/debug/res/xml/) to allow cleartext to
+     any LAN/emulator host for development. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">103.157.205.175</domain>
+    </domain-config>
+</network-security-config>

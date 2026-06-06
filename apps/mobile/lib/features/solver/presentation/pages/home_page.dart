@@ -8,8 +8,14 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/router.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/remote_config/remote_config_provider.dart';
+import '../../../monetization/presentation/banner_ad.dart';
+import '../../../monetization/presentation/get_more_hints_sheet.dart';
+import '../../../monetization/presentation/hint_balance_chip.dart';
+import '../../../monetization/presentation/mobile_ads_provider.dart';
 import '../../../settings/data/settings_repository.dart';
 import '../../data/analysis_api.dart';
+import '../providers/engine_net_provider.dart';
 import '../providers/solver_providers.dart';
 import '../widgets/privacy_banner.dart';
 import '../widgets/provider_dropdowns.dart';
@@ -42,6 +48,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         .read(solverModeProvider.notifier)
         .analyzeRequests
         .listen(_handleAnalyzeRequest);
+    // On app open: kick off the Mobile Ads SDK (consent + init) and the
+    // background on-device engine net download (both self-gate if unsupported).
+    ref.read(mobileAdsProvider);
+    ref.read(engineNetProvider);
     // On app open, verify the active mode can actually run (see _checkModeHealth).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_checkModeHealth());
@@ -158,9 +168,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       return;
     }
     if (picked == null) return;
-    await ref
-        .read(analysisProvider.notifier)
-        .analyzeScreenshot(File(picked.path));
+    await ref.read(analysisProvider.notifier).analyzeScreenshot(File(picked.path));
     if (!mounted) return;
     _openResult();
   }
@@ -177,6 +185,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final solverMode = ref.watch(solverModeProvider);
     final analysisStatus = ref.watch(analysisProvider);
     final native = ref.watch(nativeSolverProvider);
+    final remoteConfig = ref.watch(remoteConfigProvider);
 
     // Surface transient solver-mode messages as snackbars.
     ref.listen(solverModeProvider, (prev, next) {
@@ -187,12 +196,22 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
     });
 
+    // Out of hints on a cloud solve → open the "get more hints" sheet.
+    ref.listen(analysisProvider, (prev, next) {
+      if (next is AnalysisError && next.failure.code == 'NO_HINTS') {
+        showGetMoreHintsSheet(context);
+      }
+    });
+
     final isAnalyzing = analysisStatus is AnalysisLoading;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppConstants.appName),
         actions: [
+          // Hint balance + "get more hints" — only when the backend is used
+          // (our key OR cloud engine). Fully-local mode consumes no hints.
+          if (settings.usesBackend) const HintBalanceChip(),
           IconButton(
             tooltip: 'History',
             icon: const Icon(Icons.history),
@@ -209,14 +228,19 @@ class _HomePageState extends ConsumerState<HomePage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const BannerAdWidget(),
             const PrivacyBanner(),
             const SizedBox(height: 16),
             _buildSolverModeCard(solverMode, native.isSupported),
             const SizedBox(height: 16),
-            _buildBackendCard(settings),
-            const SizedBox(height: 16),
-            _buildProvidersCard(settings),
-            const SizedBox(height: 16),
+            if (remoteConfig.showBackendSection) ...[
+              _buildBackendCard(settings),
+              const SizedBox(height: 16),
+            ],
+            if (remoteConfig.showProvidersSection) ...[
+              _buildProvidersCard(settings),
+              const SizedBox(height: 16),
+            ],
             _buildSideCard(settings),
             const SizedBox(height: 16),
             _buildMockTestCard(isAnalyzing),

@@ -27,7 +27,8 @@ void main() {
       final repo = await buildRepo();
       final updated = AppSettings.defaults().copyWith(
         backendUrl: 'http://192.168.1.50:3000',
-        engineMode: EngineMode.onDevice,
+        aiKeySource: AiKeySource.own,
+        engineLocation: EngineLocation.onDevice,
         aiProvider: AiProvider.openai,
         engineProvider: EngineProvider.pikafish,
         engineDepth: 20,

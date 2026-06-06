@@ -153,10 +153,11 @@ class AnalysisApi {
 
   /// POST /api/analysis/extract — vision-only board recognition (no engine).
   ///
-  /// Returns just the recognized [BoardState]; the caller computes the move
-  /// itself (used by the future on-device engine mode, keeping the AI key
-  /// server-side).
-  Future<BoardState> extractBoard(
+  /// Returns the recognized [BoardState] plus any vision/repair warnings; the
+  /// caller computes the move itself (used by the "our key + on-device engine"
+  /// mode, keeping the AI key server-side). The warnings are forwarded into the
+  /// local engine step so board-quality feedback isn't lost on this path.
+  Future<({BoardState board, List<String> warnings})> extractBoard(
     File screenshot, {
     AiProvider? provider,
     SideToMove? sideToMove,
@@ -181,7 +182,12 @@ class AnalysisApi {
     );
     return _parseEnvelopeData(
       response,
-      (data) => BoardState.fromJson((data['board'] as Map).cast<String, dynamic>()),
+      (data) => (
+        board: BoardState.fromJson((data['board'] as Map).cast<String, dynamic>()),
+        warnings:
+            (data['warnings'] as List?)?.map((w) => w.toString()).toList(growable: false) ??
+            const <String>[],
+      ),
     );
   }
 

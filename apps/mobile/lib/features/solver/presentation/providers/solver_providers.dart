@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
@@ -13,10 +15,12 @@ import '../../../../core/platform/method_channel_native_solver.dart';
 import '../../../../core/platform/native_solver_event.dart';
 import '../../../../core/platform/native_solver_platform.dart';
 import '../../../../core/platform/noop_native_solver.dart';
+import '../../../../core/remote_config/remote_config_provider.dart';
 import '../../../../core/security/secure_key_store.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../history/data/history_repository.dart';
 import '../../../history/domain/history_entry.dart';
+import '../../../monetization/presentation/wallet_providers.dart';
 import '../../../settings/data/settings_repository.dart';
 import '../../data/analysis_api.dart';
 import '../../data/analysis_repository.dart';
@@ -25,7 +29,9 @@ import '../../data/ondevice/on_device_analyzer.dart';
 import '../../data/ondevice/on_device_engine.dart';
 import '../../data/ondevice/on_device_engine_resolver.dart';
 import '../../domain/analysis_result.dart';
+import '../../domain/board_state.dart';
 import '../../domain/solver_enums.dart';
+import 'engine_net_provider.dart';
 
 const AppLogger _log = AppLogger('SolverProviders');
 
@@ -58,10 +64,27 @@ final historyRepositoryProvider = Provider<HistoryRepository>((ref) {
   return HistoryRepository(ref.watch(sharedPreferencesProvider));
 });
 
+/// Stable, opaque per-install device id. Sent as the `x-device-id` header so the
+/// backend can rate-limit per device (hints are a device-local counter now, so
+/// this is the only abuse signal). Created lazily and persisted.
+final deviceIdProvider = Provider<String>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  const key = 'device.id';
+  final existing = prefs.getString(key);
+  if (existing != null && existing.length >= 8) return existing;
+  final rng = Random.secure();
+  final id = base64UrlEncode(List<int>.generate(16, (_) => rng.nextInt(256)));
+  unawaited(prefs.setString(key, id));
+  return id;
+});
+
 /// Dio client kept in sync with the configured backend URL.
 final dioClientProvider = Provider<DioClient>((ref) {
   final settings = ref.watch(settingsProvider);
-  final client = DioClient(baseUrl: settings.backendUrl);
+  final client = DioClient(
+    baseUrl: settings.backendUrl,
+    deviceId: ref.watch(deviceIdProvider),
+  );
   ref.onDispose(client.raw.close);
   return client;
 });
@@ -85,10 +108,13 @@ final onDeviceEngineResolverProvider = Provider<OnDeviceEngineResolver>((ref) {
   return OnDeviceEngineResolver(ref.watch(nativeSolverProvider));
 });
 
-/// The resolved on-device engine. Async because it locates the native binary
-/// and copies the NNUE out of assets on first use. Cached for the session.
+/// The resolved on-device engine. Recomputes when the downloaded net becomes
+/// ready: the binary ships in the APK, the net is fetched at runtime
+/// ([engineNetProvider]), so this is [UnavailableOnDeviceEngine] until both exist.
 final onDeviceEngineProvider = FutureProvider<OnDeviceEngine>((ref) {
-  return ref.watch(onDeviceEngineResolverProvider).resolve();
+  final net = ref.watch(engineNetProvider);
+  final nnuePath = net is EngineNetReady ? net.path : null;
+  return ref.watch(onDeviceEngineResolverProvider).resolve(nnuePath);
 });
 
 /// Direct OpenAI vision client (BYO key) for the on-device path.
@@ -129,15 +155,22 @@ class ModeCoordinator {
   final Ref _ref;
 
   Future<ModeCheckOutcome> ensureUsableMode() async {
-    final mode = _ref.read(settingsProvider).engineMode;
-    if (mode == EngineMode.onDevice) return ModeCheckOutcome.ready;
+    final s = _ref.read(settingsProvider);
+    // Fully local (own key + on-device engine) needs no backend; engine
+    // readiness surfaces at run time (a board-only result with a warning).
+    if (s.isFullyLocal) return ModeCheckOutcome.ready;
 
+    // Any backend-using combo needs the backend reachable.
     if (await _backendHealthy()) return ModeCheckOutcome.ready;
 
+    // Backend down → fall back to fully-local if the user has their own key.
     if (await _hasApiKey()) {
-      await _ref
-          .read(settingsProvider.notifier)
-          .patch((s) => s.copyWith(engineMode: EngineMode.onDevice));
+      await _ref.read(settingsProvider.notifier).patch(
+        (st) => st.copyWith(
+          aiKeySource: AiKeySource.own,
+          engineLocation: EngineLocation.onDevice,
+        ),
+      );
       return ModeCheckOutcome.switchedToOnDevice;
     }
     return ModeCheckOutcome.noModeAvailable;
@@ -494,38 +527,201 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     engineHashMb: _settings.engineHashMb,
   );
 
-  /// Uploads [file] and analyzes it via the cloud backend, or routes to the
-  /// experimental on-device path when that mode is selected.
+  /// Analyzes [file], routing across the 2x2 of AI-key source x engine location.
+  ///
+  /// Hints are consumed only when the backend is involved: our key = 1 hint per
+  /// analysis; the user's own key + our cloud engine = 1 hint per
+  /// `ownKeyDivisor` analyses; fully-local (own key + on-device engine) = none.
+  /// An empty wallet surfaces a `NO_HINTS` failure (the UI opens the "get more
+  /// hints" sheet); a hint is only charged for a SUCCESSFUL result.
   Future<void> analyzeScreenshot(File file) async {
+    final s = _settings;
+    final wallet = _ref.read(walletProvider.notifier);
+
+    if (s.usesBackend && !wallet.canSpend()) {
+      state = const AnalysisError(
+        UnknownFailure(
+          'You\'re out of hints — watch an ad or buy a pack to keep analyzing.',
+          code: 'NO_HINTS',
+        ),
+      );
+      return;
+    }
+
     state = const AnalysisLoading();
-    final result = _settings.engineMode == EngineMode.onDevice
-        ? await _analyzeOnDevice(file)
-        : await _repo.analyzeScreenshot(
-            file,
-            provider: _settings.aiProvider,
-            // The user's chosen side is authoritative for whose move it is.
-            sideToMove: _settings.mySide,
-            language: _settings.language,
-            options: _engineOptions,
-          );
-    await _apply(result, screenshotPath: file.path);
+    final run = await _route(file, s);
+
+    // Charge by what ACTUALLY ran (after any backend fallback), not the
+    // originally-selected mode: our OpenAI key reading the board = 1 full hint;
+    // own key + our cloud engine = 1 hint per N; fully local = nothing.
+    if (run.result.isSuccess) {
+      if (run.usedOurVision) {
+        wallet.spend();
+      } else if (run.usedOurEngine) {
+        wallet.spendForOwnKey(_ref.read(remoteConfigProvider).ownKeyHintDivisor);
+      }
+    }
+    await _apply(run.result, screenshotPath: file.path);
   }
 
-  /// On-device path: resolve the bundled engine (cached), then analyze entirely
-  /// on the phone using the user's own OpenAI key.
-  Future<ApiResult<AnalysisResult>> _analyzeOnDevice(File file) async {
-    final engine = await _ref.read(onDeviceEngineProvider.future);
-    return _ref.read(onDeviceAnalyzerProvider).analyze(
-          file,
-          engine: engine,
-          sideToMove: _settings.mySide,
-          language: _settings.language,
-          visionModel: _settings.onDeviceVisionModel,
-          depth: _settings.engineDepth,
-          threads: _settings.engineThreads,
-          hashMb: _settings.engineHashMb,
-          multiPv: _settings.engineMultiPv,
+  /// Routes the analysis across the 2x2 (AI-key source x engine location) with
+  /// automatic fallback to OUR backend whenever the user's own resources fail:
+  ///  - own-key vision that errors (missing/invalid key, request failure) falls
+  ///    back to our server vision (then charged as a full hint);
+  ///  - the on-device engine returning no usable best move falls back to our
+  ///    cloud engine.
+  /// The returned [_RunOutcome] records what ACTUALLY ran so the caller charges
+  /// the right number of hints. Fallbacks that would cost a hint are only taken
+  /// when the wallet can afford them.
+  Future<_RunOutcome> _route(File file, AppSettings s) async {
+    final wallet = _ref.read(walletProvider.notifier);
+    final ours = s.aiKeySource == AiKeySource.ours;
+    final cloud = s.engineLocation == EngineLocation.cloud;
+    final analyzer = _ref.read(onDeviceAnalyzerProvider);
+
+    // our key + cloud engine → one fused backend call; nothing to fall back to.
+    if (ours && cloud) {
+      final r = await _repo.analyzeScreenshot(
+        file,
+        provider: s.aiProvider,
+        sideToMove: s.mySide,
+        language: s.language,
+        options: _engineOptions,
+      );
+      return _RunOutcome(r, usedOurVision: true, usedOurEngine: true);
+    }
+
+    // ---- VISION STAGE: our server key, or the user's own key (→ server fallback).
+    final BoardState board;
+    final List<String> visionWarnings;
+    final ProviderStatus visionStatus;
+    final bool usedOurVision;
+
+    if (ours) {
+      final r = await _backendVision(file, s);
+      final v = r.valueOrNull;
+      if (v == null) {
+        return _RunOutcome(
+          ApiResult.failure(r.failureOrNull!),
+          usedOurVision: true,
+          usedOurEngine: false,
         );
+      }
+      board = v.board;
+      visionWarnings = v.warnings;
+      visionStatus = _ourServerVision;
+      usedOurVision = true;
+    } else {
+      final own = await analyzer.extractBoardOwnKey(
+        file,
+        sideToMove: s.mySide,
+        visionModel: s.onDeviceVisionModel,
+      );
+      final ownVision = own.valueOrNull;
+      if (ownVision != null) {
+        board = ownVision.board;
+        visionWarnings = ownVision.warnings;
+        visionStatus = const ProviderStatus(provider: 'openai (your key)', ok: true);
+        usedOurVision = false;
+      } else {
+        // Own-key vision failed (no/invalid key, request error) → fall back to
+        // our server vision, but only when the user can pay the full hint.
+        if (!wallet.canSpend()) {
+          return _RunOutcome(
+            ApiResult.failure(own.failureOrNull!),
+            usedOurVision: false,
+            usedOurEngine: false,
+          );
+        }
+        final r = await _backendVision(file, s);
+        final v = r.valueOrNull;
+        if (v == null) {
+          return _RunOutcome(
+            ApiResult.failure(r.failureOrNull!),
+            usedOurVision: true,
+            usedOurEngine: false,
+          );
+        }
+        board = v.board;
+        visionWarnings = [
+          'Couldn\'t use your OpenAI key, so we read the board with ours (1 hint).',
+          ...v.warnings,
+        ];
+        visionStatus = _ourServerVision;
+        usedOurVision = true;
+      }
+    }
+
+    // ---- ENGINE STAGE: our cloud engine, or on-device (→ cloud fallback).
+    if (cloud) {
+      final r = await _backendEngine(board, s);
+      return _RunOutcome(r, usedOurVision: usedOurVision, usedOurEngine: r.isSuccess);
+    }
+
+    final engine = await _ref.read(onDeviceEngineProvider.future);
+    final local = await analyzer.solveLocally(
+      board,
+      engine: engine,
+      visionStatus: visionStatus,
+      language: s.language,
+      depth: s.engineDepth,
+      threads: s.engineThreads,
+      hashMb: s.engineHashMb,
+      multiPv: s.engineMultiPv,
+      warnings: visionWarnings,
+    );
+    if (local.valueOrNull?.bestMove != null) {
+      return _RunOutcome(local, usedOurVision: usedOurVision, usedOurEngine: false);
+    }
+
+    // On-device engine produced no usable move (unavailable / illegal / error) →
+    // retry on our cloud engine. Allowed when the vision was already ours (so it
+    // was paid for) or the user can afford the discounted engine hint.
+    if (usedOurVision || wallet.canSpend()) {
+      final r = await _backendEngine(board, s);
+      if (r.valueOrNull?.bestMove != null) {
+        // When the vision was the user's own key, this fallback is the ONLY
+        // thing that costs a hint (1 per N) — disclose it on the result so a
+        // run the UI labelled "no hints used" doesn't charge silently.
+        final result = usedOurVision
+            ? r
+            : r.map(
+                (res) => res.copyWith(
+                  warnings: [
+                    'On-device engine couldn\'t find a move, so we used our cloud '
+                        'engine (1 hint per ${_ref.read(remoteConfigProvider).ownKeyHintDivisor}).',
+                    ...res.warnings,
+                  ],
+                ),
+              );
+        return _RunOutcome(result, usedOurVision: usedOurVision, usedOurEngine: true);
+      }
+    }
+    // Both engines came up empty → keep the friendlier on-device (board-only)
+    // result, which already carries an honest "why" warning.
+    return _RunOutcome(local, usedOurVision: usedOurVision, usedOurEngine: false);
+  }
+
+  static const ProviderStatus _ourServerVision =
+      ProviderStatus(provider: 'openai (our key, server)', ok: true);
+
+  /// Board recognition on our server with OUR key (POST /analysis/extract).
+  Future<ApiResult<({BoardState board, List<String> warnings})>> _backendVision(
+    File file,
+    AppSettings s,
+  ) {
+    return _repo.extractBoard(file, provider: s.aiProvider, sideToMove: s.mySide);
+  }
+
+  /// Best move from our cloud engine on a recognized board (POST /analysis/board).
+  Future<ApiResult<AnalysisResult>> _backendEngine(BoardState board, AppSettings s) {
+    return _repo.analyzeBoard(
+      sideToMove: board.sideToMove,
+      pieces: board.pieces,
+      provider: s.aiProvider,
+      language: s.language,
+      options: _engineOptions,
+    );
   }
 
   /// Runs the engine directly on the supplied board (bypasses vision).
@@ -603,6 +799,25 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
   }
 
   void reset() => state = const AnalysisIdle();
+}
+
+/// What actually ran to produce an analysis (after any backend fallbacks), so
+/// the hint charge reflects reality rather than the originally-selected mode.
+class _RunOutcome {
+  const _RunOutcome(
+    this.result, {
+    required this.usedOurVision,
+    required this.usedOurEngine,
+  });
+
+  final ApiResult<AnalysisResult> result;
+
+  /// Our OpenAI key read the board (the expensive step → a full hint).
+  final bool usedOurVision;
+
+  /// Our cloud engine computed the move (→ a discounted hint when the vision
+  /// was the user's own key).
+  final bool usedOurEngine;
 }
 
 final analysisProvider =

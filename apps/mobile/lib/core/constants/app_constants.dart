@@ -10,25 +10,41 @@ class AppConstants {
   /// Human-readable app name (also the Home title).
   static const String appName = 'Xiangqi Solver';
 
+  /// Public privacy policy (hosted on the codertapsu Firebase site). Generated
+  /// from codertapsu-web/apps.json (slug `xiangqi-solver`).
+  static const String privacyPolicyUrl =
+      'https://codertapsu-web.web.app/xiangqi-solver/privacy';
+
   /// Default backend base URL.
   ///
-  /// `10.0.2.2` is the host loopback alias from the Android emulator, so this
-  /// works out of the box against a backend listening on the dev machine.
+  /// Points at the live backend so an installed release works out of the box.
+  /// It's plain HTTP for now (no TLS yet) — the app reaches it via the scoped
+  /// cleartext exception in res/xml/network_security_config.xml. Override per
+  /// build with `--dart-define=BACKEND_URL=...` or at runtime in Settings; for
+  /// local dev against the Android emulator use `http://10.0.2.2:3000`.
   static const String defaultBackendUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'http://10.0.2.2:3000',
+    defaultValue: 'http://103.157.205.175:3000',
   );
 
   /// Default AI (vision) provider. One of: gemini | openai | mock.
+  ///
+  /// Defaults to the REAL provider so a shipped release asks the backend for
+  /// real board recognition. The backend honors an explicit value, so a `mock`
+  /// default would make every "our key" cloud analysis return a FAKE board.
+  /// For offline/local dev against the mock backend, override with
+  /// `--dart-define=AI_PROVIDER=mock` or pick "Mock" in Settings → Providers.
   static const String defaultAiProvider = String.fromEnvironment(
     'AI_PROVIDER',
-    defaultValue: 'mock',
+    defaultValue: 'openai',
   );
 
-  /// Default engine provider. One of: pikafish | mock.
+  /// Default engine provider. One of: pikafish | mock. Real by default for the
+  /// same reason as [defaultAiProvider]; override with
+  /// `--dart-define=ENGINE_PROVIDER=mock` for local mock-backend dev.
   static const String defaultEngineProvider = String.fromEnvironment(
     'ENGINE_PROVIDER',
-    defaultValue: 'mock',
+    defaultValue: 'pikafish',
   );
 
   /// Default engine mode: cloud (backend) | onDevice (experimental offline).
@@ -73,6 +89,7 @@ class AppConstants {
   // ---- API routing ----
   static const String apiPrefix = '/api';
   static const String healthPath = '$apiPrefix/health';
+  static const String configPath = '$apiPrefix/config';
   static const String analyzeBoardPath = '$apiPrefix/analysis/board';
   static const String analyzeScreenshotPath = '$apiPrefix/analysis/screenshot';
   static const String analyzeExtractPath = '$apiPrefix/analysis/extract';

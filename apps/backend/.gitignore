@@ -4,6 +4,9 @@ node_modules
 # Build output
 dist
 
+# Release bundle (scripts/build-release.sh) — contains .env + the engine binary.
+release/
+
 # Environment
 .env
 
@@ -18,3 +21,9 @@ npm-debug.log*
 .DS_Store
 .idea
 *.tsbuildinfo
+
+# Hint wallet (SQLite) — runtime data, never commit.
+/data/
+*.db
+*.db-wal
+*.db-shm

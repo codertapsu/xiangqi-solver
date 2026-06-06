@@ -7,6 +7,7 @@ import { AiModule } from '../ai/ai.module';
 import { BoardModule } from '../board/board.module';
 import { EngineModule } from '../engine/engine.module';
 import { StorageModule } from '../storage/storage.module';
+import { DeviceRateLimitGuard } from '../../common/guards/device-rate-limit.guard';
 import { AnalysisController } from './analysis.controller';
 import { AnalysisService } from './analysis.service';
 
@@ -34,6 +35,6 @@ import { AnalysisService } from './analysis.service';
     }),
   ],
   controllers: [AnalysisController],
-  providers: [AnalysisService],
+  providers: [AnalysisService, DeviceRateLimitGuard],
 })
 export class AnalysisModule {}

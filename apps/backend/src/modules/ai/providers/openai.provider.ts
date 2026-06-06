@@ -35,7 +35,7 @@ export class OpenAiVisionProvider implements AiVisionProvider {
       });
     }
 
-    const model = ai?.openaiModel ?? 'gpt-4o-mini';
+    const model = ai?.openaiModel ?? 'gpt-5.4';
     const dataUrl = `data:${input.mimeType};base64,${input.imageBuffer.toString('base64')}`;
 
     const body = {

@@ -6,12 +6,17 @@ import '../../solver/domain/solver_enums.dart';
 
 /// Immutable snapshot of all user-configurable settings.
 ///
-/// API keys deliberately live ONLY on the backend; nothing secret is stored
-/// here. [storeScreenshots] defaults to `false` for privacy.
+/// The two analysis choices are INDEPENDENT:
+///  - [aiKeySource]: who pays for board VISION — [AiKeySource.ours] (our key, on
+///    the backend, costs hints) or [AiKeySource.own] (the user's key, on-device).
+///  - [engineLocation]: where the best-move ENGINE runs — [EngineLocation.cloud]
+///    (our backend Pikafish) or [EngineLocation.onDevice] (local Pikafish).
+/// Only `own` + `onDevice` is fully offline (no backend, no hints).
 class AppSettings extends Equatable {
   const AppSettings({
     required this.backendUrl,
-    required this.engineMode,
+    required this.aiKeySource,
+    required this.engineLocation,
     required this.aiProvider,
     required this.engineProvider,
     required this.engineDepth,
@@ -27,8 +32,12 @@ class AppSettings extends Equatable {
 
   final String backendUrl;
 
-  /// Cloud (backend) or experimental On-device (offline) analysis.
-  final EngineMode engineMode;
+  /// Whose OpenAI key does vision (ours = backend/hints; own = on-device).
+  final AiKeySource aiKeySource;
+
+  /// Where the best-move engine runs (cloud backend vs on-device Pikafish).
+  final EngineLocation engineLocation;
+
   final AiProvider aiProvider;
   final EngineProvider engineProvider;
   final int engineDepth;
@@ -52,16 +61,24 @@ class AppSettings extends Equatable {
 
   /// OpenAI vision model used by the On-device (BYO-key) path. Defaults to a
   /// capable model; `gpt-4o-mini` is too weak to read the small piece glyphs
-  /// reliably (it misplaces advisors/elephants → illegal boards). Set this to
-  /// the same model your Cloud backend uses for matching accuracy.
+  /// reliably (it misplaces advisors/elephants → illegal boards).
   final String onDeviceVisionModel;
 
-  static const String _defaultOnDeviceVisionModel = 'gpt-4o';
+  static const String _defaultOnDeviceVisionModel = 'gpt-5.4';
+
+  /// True when ANY part of the analysis runs on our backend (vision with our
+  /// key, OR the cloud engine). Drives hint metering + whether the hint UI shows.
+  bool get usesBackend =>
+      aiKeySource == AiKeySource.ours || engineLocation == EngineLocation.cloud;
+
+  /// True only for `own` key + `onDevice` engine — no backend, no hints.
+  bool get isFullyLocal => !usesBackend;
 
   /// Zero-config defaults derived from compile-time env (see [AppConstants]).
   factory AppSettings.defaults() => const AppSettings(
     backendUrl: AppConstants.defaultBackendUrl,
-    engineMode: _defaultEngineMode,
+    aiKeySource: AiKeySource.ours,
+    engineLocation: EngineLocation.cloud,
     aiProvider: _defaultAi,
     engineProvider: _defaultEngine,
     engineDepth: AppConstants.defaultEngineDepth,
@@ -80,11 +97,6 @@ class AppSettings extends Equatable {
       ? SideToMove.black
       : SideToMove.red;
 
-  static const EngineMode _defaultEngineMode =
-      AppConstants.defaultEngineMode == 'onDevice'
-      ? EngineMode.onDevice
-      : EngineMode.cloud;
-
   static const AiProvider _defaultAi =
       AppConstants.defaultAiProvider == 'gemini'
       ? AiProvider.gemini
@@ -99,7 +111,8 @@ class AppSettings extends Equatable {
 
   AppSettings copyWith({
     String? backendUrl,
-    EngineMode? engineMode,
+    AiKeySource? aiKeySource,
+    EngineLocation? engineLocation,
     AiProvider? aiProvider,
     EngineProvider? engineProvider,
     int? engineDepth,
@@ -114,7 +127,8 @@ class AppSettings extends Equatable {
   }) {
     return AppSettings(
       backendUrl: backendUrl ?? this.backendUrl,
-      engineMode: engineMode ?? this.engineMode,
+      aiKeySource: aiKeySource ?? this.aiKeySource,
+      engineLocation: engineLocation ?? this.engineLocation,
       aiProvider: aiProvider ?? this.aiProvider,
       engineProvider: engineProvider ?? this.engineProvider,
       engineDepth: engineDepth ?? this.engineDepth,
@@ -132,7 +146,8 @@ class AppSettings extends Equatable {
   @override
   List<Object?> get props => [
     backendUrl,
-    engineMode,
+    aiKeySource,
+    engineLocation,
     aiProvider,
     engineProvider,
     engineDepth,
@@ -157,7 +172,10 @@ class SettingsRepository {
   final SharedPreferences _prefs;
 
   static const String _kBackendUrl = 'settings.backendUrl';
-  static const String _kEngineMode = 'settings.engineMode';
+  static const String _kAiKeySource = 'settings.aiKeySource';
+  static const String _kEngineLocation = 'settings.engineLocation';
+  // Legacy single-mode key (pre-2x2). Read only for one-time migration.
+  static const String _kLegacyEngineMode = 'settings.engineMode';
   static const String _kAiProvider = 'settings.aiProvider';
   static const String _kEngineProvider = 'settings.engineProvider';
   static const String _kEngineDepth = 'settings.engineDepth';
@@ -173,51 +191,41 @@ class SettingsRepository {
   /// Loads the persisted settings, merging over [AppSettings.defaults].
   AppSettings load() {
     final defaults = AppSettings.defaults();
+
+    // Migrate the pre-2x2 single 'engineMode' setting if the new keys are unset.
+    // Old 'onDevice' meant BYO-key vision + local engine → own + onDevice.
+    final legacy = _prefs.getString(_kLegacyEngineMode);
+    final migratedKey = legacy == 'onDevice' ? AiKeySource.own : AiKeySource.ours;
+    final migratedEngine =
+        legacy == 'onDevice' ? EngineLocation.onDevice : EngineLocation.cloud;
+
     return AppSettings(
       backendUrl: _readString(_kBackendUrl, defaults.backendUrl),
-      engineMode: EngineMode.fromWire(
-        _prefs.getString(_kEngineMode) ?? defaults.engineMode.wireValue,
+      aiKeySource: AiKeySource.fromWire(
+        _prefs.getString(_kAiKeySource) ?? migratedKey.wireValue,
+      ),
+      engineLocation: EngineLocation.fromWire(
+        _prefs.getString(_kEngineLocation) ?? migratedEngine.wireValue,
       ),
       aiProvider: AiProvider.fromWire(
         _prefs.getString(_kAiProvider) ?? defaults.aiProvider.wireValue,
       ),
       engineProvider: EngineProvider.fromWire(
-        _prefs.getString(_kEngineProvider) ??
-            defaults.engineProvider.wireValue,
+        _prefs.getString(_kEngineProvider) ?? defaults.engineProvider.wireValue,
       ),
-      engineDepth: _clampInt(
-        _prefs.getInt(_kEngineDepth) ?? defaults.engineDepth,
-        1,
-        30,
-      ),
+      engineDepth: _clampInt(_prefs.getInt(_kEngineDepth) ?? defaults.engineDepth, 1, 30),
       engineMoveTimeMs: _clampInt(
         _prefs.getInt(_kEngineMoveTimeMs) ?? defaults.engineMoveTimeMs,
         50,
         60000,
       ),
-      engineMultiPv: _clampInt(
-        _prefs.getInt(_kEngineMultiPv) ?? defaults.engineMultiPv,
-        1,
-        5,
-      ),
-      engineThreads: _clampInt(
-        _prefs.getInt(_kEngineThreads) ?? defaults.engineThreads,
-        1,
-        8,
-      ),
-      engineHashMb: _clampInt(
-        _prefs.getInt(_kEngineHashMb) ?? defaults.engineHashMb,
-        16,
-        1024,
-      ),
+      engineMultiPv: _clampInt(_prefs.getInt(_kEngineMultiPv) ?? defaults.engineMultiPv, 1, 5),
+      engineThreads: _clampInt(_prefs.getInt(_kEngineThreads) ?? defaults.engineThreads, 1, 8),
+      engineHashMb: _clampInt(_prefs.getInt(_kEngineHashMb) ?? defaults.engineHashMb, 16, 1024),
       language: _readString(_kLanguage, defaults.language),
-      storeScreenshots:
-          _prefs.getBool(_kStoreScreenshots) ?? defaults.storeScreenshots,
+      storeScreenshots: _prefs.getBool(_kStoreScreenshots) ?? defaults.storeScreenshots,
       mySide: _readSide(_prefs.getString(_kMySide), defaults.mySide),
-      onDeviceVisionModel: _readString(
-        _kOnDeviceVisionModel,
-        defaults.onDeviceVisionModel,
-      ),
+      onDeviceVisionModel: _readString(_kOnDeviceVisionModel, defaults.onDeviceVisionModel),
     );
   }
 
@@ -225,14 +233,12 @@ class SettingsRepository {
   Future<AppSettings> save(AppSettings settings) async {
     await Future.wait([
       _prefs.setString(_kBackendUrl, settings.backendUrl.trim()),
-      _prefs.setString(_kEngineMode, settings.engineMode.wireValue),
+      _prefs.setString(_kAiKeySource, settings.aiKeySource.wireValue),
+      _prefs.setString(_kEngineLocation, settings.engineLocation.wireValue),
       _prefs.setString(_kAiProvider, settings.aiProvider.wireValue),
       _prefs.setString(_kEngineProvider, settings.engineProvider.wireValue),
       _prefs.setInt(_kEngineDepth, _clampInt(settings.engineDepth, 1, 30)),
-      _prefs.setInt(
-        _kEngineMoveTimeMs,
-        _clampInt(settings.engineMoveTimeMs, 50, 60000),
-      ),
+      _prefs.setInt(_kEngineMoveTimeMs, _clampInt(settings.engineMoveTimeMs, 50, 60000)),
       _prefs.setInt(_kEngineMultiPv, _clampInt(settings.engineMultiPv, 1, 5)),
       _prefs.setInt(_kEngineThreads, _clampInt(settings.engineThreads, 1, 8)),
       _prefs.setInt(_kEngineHashMb, _clampInt(settings.engineHashMb, 16, 1024)),
@@ -259,9 +265,7 @@ class SettingsRepository {
   /// missing or malformed (incl. "unknown") falls back to [fallback].
   SideToMove _readSide(String? value, SideToMove fallback) {
     final parsed = SideToMove.fromWire(value);
-    return parsed == SideToMove.red || parsed == SideToMove.black
-        ? parsed
-        : fallback;
+    return parsed == SideToMove.red || parsed == SideToMove.black ? parsed : fallback;
   }
 
   int _clampInt(int value, int min, int max) {

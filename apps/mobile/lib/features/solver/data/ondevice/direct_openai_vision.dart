@@ -56,7 +56,7 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
   /// is deliberately AVOIDED here — it misreads the small piece glyphs and
   /// yields illegal boards the engine rejects. The On-device settings let the
   /// user pick a model (and should match their Cloud backend's model).
-  DirectOpenAiVisionClient({Dio? dio, this.model = 'gpt-4o'}) : _dio = dio ?? Dio();
+  DirectOpenAiVisionClient({Dio? dio, this.model = 'gpt-5.4'}) : _dio = dio ?? Dio();
 
   final Dio _dio;
   final String model;

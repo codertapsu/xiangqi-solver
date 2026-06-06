@@ -1,7 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/app_constants.dart';
+import '../../../core/remote_config/remote_config_provider.dart';
+import '../../monetization/presentation/banner_ad.dart';
 import '../../solver/domain/solver_enums.dart';
+import '../../solver/presentation/providers/engine_net_provider.dart';
 import '../../solver/presentation/providers/solver_providers.dart';
 import '../../solver/presentation/widgets/provider_dropdowns.dart';
 import '../../solver/presentation/widgets/section_card.dart';
@@ -52,24 +59,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final remoteConfig = ref.watch(remoteConfigProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _buildBackendCard(),
-            const SizedBox(height: 16),
-            _buildEngineModeCard(settings),
+            const BannerAdWidget(),
+            if (remoteConfig.showBackendSection) ...[
+              _buildBackendCard(),
+              const SizedBox(height: 16),
+            ],
+            _buildModeCard(settings),
             const SizedBox(height: 16),
             _buildSideCard(settings),
             const SizedBox(height: 16),
-            _buildProvidersCard(settings),
-            const SizedBox(height: 16),
-            _buildApiKeyExplanation(context),
-            const SizedBox(height: 16),
-            _buildEngineCard(settings),
-            const SizedBox(height: 16),
+            if (remoteConfig.showProvidersSection) ...[
+              _buildProvidersCard(settings),
+              const SizedBox(height: 16),
+            ],
+            if (remoteConfig.showEngineTuning) ...[
+              _buildEngineCard(settings),
+              const SizedBox(height: 16),
+            ],
             _buildCaptureAreaCard(),
             _buildLanguageCard(settings),
             const SizedBox(height: 16),
@@ -80,99 +93,101 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildEngineModeCard(AppSettings settings) {
-    final onDevice = settings.engineMode == EngineMode.onDevice;
+  /// Two INDEPENDENT choices: who reads the board (AI key) and where the engine
+  /// runs. Shows the hint cost, on-device download status, and (for the own-key
+  /// option) the API-key + vision-model fields.
+  Widget _buildModeCard(AppSettings settings) {
+    final theme = Theme.of(context);
+    final netState = ref.watch(engineNetProvider);
+    final onDeviceUnavailable =
+        netState is EngineNetUnsupported || netState is EngineNetFailed;
+
+    // If on-device became unusable (download failed / unsupported here) while it
+    // was the selected engine, fall back to Cloud so the user is never stuck on a
+    // disabled, non-runnable segment. Done post-frame to avoid mutating during build.
+    if (onDeviceUnavailable && settings.engineLocation == EngineLocation.onDevice) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (ref.read(settingsProvider).engineLocation != EngineLocation.onDevice) return;
+        _notifier.patch((s) => s.copyWith(engineLocation: EngineLocation.cloud));
+        _snack('On-device engine unavailable — switched the engine to Cloud.');
+      });
+    }
+
     return SectionCard(
-      title: 'Engine mode',
+      title: 'Analysis mode',
       icon: Icons.dns_outlined,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SegmentedButton<EngineMode>(
+          Text('Board reading (AI key)', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          SegmentedButton<AiKeySource>(
             showSelectedIcon: false,
             segments: const [
               ButtonSegment(
-                value: EngineMode.cloud,
+                value: AiKeySource.ours,
+                label: Text('Our key'),
+                icon: Icon(Icons.cloud_outlined),
+              ),
+              ButtonSegment(
+                value: AiKeySource.own,
+                label: Text('My key'),
+                icon: Icon(Icons.key_outlined),
+              ),
+            ],
+            selected: {settings.aiKeySource},
+            onSelectionChanged: (s) => _onAiKeySelected(s.first),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            settings.aiKeySource == AiKeySource.own
+                ? 'Your OpenAI key reads the board on this device — usually cheaper '
+                      'than ours, and your key never leaves the phone.'
+                : 'We read the board on the server with our key.',
+            style: theme.textTheme.bodySmall,
+          ),
+
+          const SizedBox(height: 16),
+          Text('Best move (engine)', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          SegmentedButton<EngineLocation>(
+            showSelectedIcon: false,
+            segments: [
+              const ButtonSegment(
+                value: EngineLocation.cloud,
                 label: Text('Cloud'),
                 icon: Icon(Icons.cloud_outlined),
               ),
               ButtonSegment(
-                value: EngineMode.onDevice,
-                label: Text('On-device'),
-                icon: Icon(Icons.smartphone),
+                value: EngineLocation.onDevice,
+                label: const Text('On-device'),
+                icon: const Icon(Icons.smartphone_outlined),
+                enabled: !onDeviceUnavailable,
               ),
             ],
-            selected: {settings.engineMode},
-            onSelectionChanged: (s) => _onEngineModeSelected(s.first),
+            selected: {settings.engineLocation},
+            onSelectionChanged: (s) => _onEngineSelected(s.first),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
-            onDevice
-                ? 'Experimental Offline mode: recognizes the board on this '
-                      'device using your own OpenAI key and solves it with the '
-                      'bundled engine — no backend needed.'
-                : 'Analysis runs on the backend; provider API keys stay '
-                      'server-side. If the server is unreachable the app falls '
-                      'back to On-device Mode.',
-            style: Theme.of(context).textTheme.bodySmall,
+            settings.engineLocation == EngineLocation.onDevice
+                ? 'On-device Pikafish is faster, but its move may be weaker / less '
+                      'accurate than our cloud engine.'
+                : 'Our cloud engine computes the best move.',
+            style: theme.textTheme.bodySmall,
           ),
-          if (onDevice) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _apiKeyController,
-              obscureText: _apiKeyObscured,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                labelText: 'Your OpenAI API key',
-                hintText: 'sk-…',
-                prefixIcon: const Icon(Icons.key_outlined),
-                suffixIcon: IconButton(
-                  tooltip: _apiKeyObscured ? 'Show' : 'Hide',
-                  icon: Icon(
-                    _apiKeyObscured ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  onPressed: () =>
-                      setState(() => _apiKeyObscured = !_apiKeyObscured),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _saveApiKey,
-                    icon: const Icon(Icons.save_outlined),
-                    label: const Text('Save key'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                TextButton(onPressed: _clearApiKey, child: const Text('Clear')),
-              ],
-            ),
-            Text(
-              'Stored only on this device (secure storage); never sent to our '
-              'backend. You pay your own API usage.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _visionModelController,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: const InputDecoration(
-                labelText: 'Vision model',
-                hintText: 'gpt-4o',
-                prefixIcon: Icon(Icons.visibility_outlined),
-                helperMaxLines: 3,
-                helperText:
-                    'Reads the board from your screenshot. Use a capable model — '
-                    'ideally the same one your Cloud mode uses. Avoid gpt-4o-mini: '
-                    'it misreads pieces and produces illegal boards.',
-              ),
-              onChanged: (v) =>
-                  _notifier.patch((s) => s.copyWith(onDeviceVisionModel: v.trim())),
+
+          _buildEngineNetStatus(netState),
+
+          const SizedBox(height: 12),
+          _buildCostHint(settings, theme),
+
+          if (settings.aiKeySource == AiKeySource.own) ...[
+            const Divider(height: 28),
+            _buildOwnKeyFields(
+              theme,
+              showVisionModel: ref.watch(remoteConfigProvider).showVisionModel,
             ),
           ],
         ],
@@ -180,22 +195,181 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  /// Applies the chosen engine mode. Picking Cloud re-checks the backend and
-  /// falls back to On-device (or warns) if it's unreachable.
-  Future<void> _onEngineModeSelected(EngineMode mode) async {
-    await _notifier.patch((st) => st.copyWith(engineMode: mode));
-    if (mode != EngineMode.cloud) return;
+  /// Download progress / ready / failed status for the on-device engine net.
+  Widget _buildEngineNetStatus(EngineNetState state) {
+    final theme = Theme.of(context);
+    switch (state) {
+      case EngineNetDownloading(:final progress):
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    progress == null
+                        ? 'Downloading on-device engine…'
+                        : 'Downloading on-device engine ${(progress * 100).round()}%',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              LinearProgressIndicator(value: progress),
+            ],
+          ),
+        );
+      case EngineNetReady():
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle_outline, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text('On-device engine ready.', style: theme.textTheme.bodySmall),
+            ],
+          ),
+        );
+      case EngineNetFailed(:final message):
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () => ref.read(engineNetProvider.notifier).retry(),
+                  child: const Text('Retry download'),
+                ),
+              ),
+            ],
+          ),
+        );
+      case EngineNetUnsupported():
+      case EngineNetIdle():
+        return const SizedBox.shrink();
+    }
+  }
+
+  /// One-line summary of what the current mode costs in hints.
+  Widget _buildCostHint(AppSettings settings, ThemeData theme) {
+    final String text;
+    if (settings.isFullyLocal) {
+      final n = ref.watch(remoteConfigProvider).ownKeyHintDivisor;
+      text =
+          'Runs on your device — no hints used, unless the on-device engine '
+          'can\'t solve and we finish on our cloud (1 hint per $n).';
+    } else if (settings.aiKeySource == AiKeySource.ours) {
+      text = 'Uses our key — 1 hint per analysis.';
+    } else {
+      final n = ref.watch(remoteConfigProvider).ownKeyHintDivisor;
+      text = 'Your key + our cloud engine — 1 hint per $n analyses.';
+    }
+    return Text(
+      text,
+      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+    );
+  }
+
+  /// The personal OpenAI key field (always, when AI key = own) plus the optional
+  /// vision-model field (shown only when [showVisionModel] is enabled remotely).
+  Widget _buildOwnKeyFields(ThemeData theme, {required bool showVisionModel}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _apiKeyController,
+          obscureText: _apiKeyObscured,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+            labelText: 'Your OpenAI API key',
+            hintText: 'sk-…',
+            prefixIcon: const Icon(Icons.key_outlined),
+            suffixIcon: IconButton(
+              tooltip: _apiKeyObscured ? 'Show' : 'Hide',
+              icon: Icon(_apiKeyObscured ? Icons.visibility : Icons.visibility_off),
+              onPressed: () => setState(() => _apiKeyObscured = !_apiKeyObscured),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: _saveApiKey,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('Save key'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            TextButton(onPressed: _clearApiKey, child: const Text('Clear')),
+          ],
+        ),
+        Text(
+          'Stored only on this device (secure storage); never sent to our backend.',
+          style: theme.textTheme.bodySmall,
+        ),
+        if (showVisionModel) ...[
+          const SizedBox(height: 16),
+          TextField(
+            controller: _visionModelController,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: const InputDecoration(
+              labelText: 'Vision model',
+              hintText: 'gpt-5.4',
+              prefixIcon: Icon(Icons.visibility_outlined),
+              helperMaxLines: 3,
+              helperText:
+                  'Reads the board from your screenshot. Use a capable model. Avoid '
+                  'gpt-4o-mini: it misreads pieces and produces illegal boards.',
+            ),
+            onChanged: (v) => _notifier.patch((s) => s.copyWith(onDeviceVisionModel: v.trim())),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _onAiKeySelected(AiKeySource source) async {
+    await _notifier.patch((s) => s.copyWith(aiKeySource: source));
+    await _recheckMode();
+  }
+
+  Future<void> _onEngineSelected(EngineLocation location) async {
+    if (location == EngineLocation.onDevice) {
+      unawaited(ref.read(engineNetProvider.notifier).ensureDownloaded());
+    }
+    await _notifier.patch((s) => s.copyWith(engineLocation: location));
+    await _recheckMode();
+  }
+
+  /// Re-checks that the chosen combo can run; falls back to fully-local (or
+  /// warns) when the backend is needed but unreachable.
+  Future<void> _recheckMode() async {
     final outcome = await ref.read(modeCoordinatorProvider).ensureUsableMode();
     if (!mounted) return;
     switch (outcome) {
       case ModeCheckOutcome.ready:
         break;
       case ModeCheckOutcome.switchedToOnDevice:
-        _snack('Server unavailable — kept On-device Mode.');
+        _snack('Server unavailable — switched to your own key + on-device engine.');
       case ModeCheckOutcome.noModeAvailable:
-        _snack(
-          'Server unavailable. Add your OpenAI API key below to analyze on-device.',
-        );
+        _snack('Server unavailable. Add your own OpenAI key to analyze on-device.');
     }
   }
 
@@ -269,19 +443,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _notifier.patch((s) => s.copyWith(engineProvider: v)),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildApiKeyExplanation(BuildContext context) {
-    return SectionCard(
-      title: 'API keys',
-      icon: Icons.key_outlined,
-      child: Text(
-        'Provider API keys are configured ON THE BACKEND and are never stored '
-        'in this app. Set them as environment variables where the backend '
-        'runs. This keeps secrets off the device and out of app traffic.',
-        style: Theme.of(context).textTheme.bodyMedium,
       ),
     );
   }
@@ -453,17 +614,53 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return SectionCard(
       title: 'Privacy',
       icon: Icons.privacy_tip_outlined,
-      child: SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        value: settings.storeScreenshots,
-        title: const Text('Store screenshots locally'),
-        subtitle: const Text(
-          'Off by default. When on, analyzed images are kept on this device '
-          'and shown in history.',
-        ),
-        onChanged: (v) =>
-            _notifier.patch((s) => s.copyWith(storeScreenshots: v)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: settings.storeScreenshots,
+            title: const Text('Store screenshots locally'),
+            subtitle: const Text(
+              'Off by default. When on, analyzed images are kept on this device '
+              'and shown in history.',
+            ),
+            onChanged: (v) =>
+                _notifier.patch((s) => s.copyWith(storeScreenshots: v)),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.policy_outlined),
+            title: const Text('Privacy Policy'),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: _openPrivacyPolicy,
+          ),
+          if (ref.watch(remoteConfigProvider).showLicenses)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Open-source licenses'),
+              subtitle: const Text('Incl. the GPLv3 Pikafish on-device engine'),
+              trailing: const Icon(Icons.chevron_right, size: 18),
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: AppConstants.appName,
+              ),
+            ),
+        ],
       ),
     );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(AppConstants.privacyPolicyUrl);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Could not open the privacy policy.')),
+        );
+    }
   }
 }

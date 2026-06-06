@@ -1,4 +1,4 @@
-package com.xiangqisolver.xiangqi_solver
+package com.codertapsu.xiangqi_solver
 
 /**
  * Central place for every string/id shared between the Flutter platform channels

@@ -4,6 +4,7 @@ import {
   Controller,
   Post,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -16,15 +17,21 @@ import { AnalyzeBoardDto } from './dto/analyze-board.dto';
 import { AnalyzeScreenshotDto } from './dto/analyze-screenshot.dto';
 import { ExtractScreenshotDto } from './dto/extract-screenshot.dto';
 import { detectImageType, DetectedImageType } from '../../common/utils/image-type.util';
+import { DeviceRateLimitGuard } from '../../common/guards/device-rate-limit.guard';
 
 const ACCEPTED_MIME_TYPES: readonly DetectedImageType[] = ['image/png', 'image/jpeg', 'image/webp'];
 
 /**
  * Analysis endpoints. Both return an AnalysisResult under the standard
  * { success, data } envelope (applied globally by the ResponseInterceptor).
+ *
+ * These call the AI/engine (real cost), so on top of the global per-IP throttle
+ * they are also capped per device by [DeviceRateLimitGuard] (the `x-device-id`
+ * header) — the cheap abuse cap now that hints are a device-local counter.
  */
 @ApiTags('analysis')
 @Controller('analysis')
+@UseGuards(DeviceRateLimitGuard)
 export class AnalysisController {
   constructor(
     private readonly analysisService: AnalysisService,

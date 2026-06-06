@@ -1,4 +1,4 @@
-package com.xiangqisolver.xiangqi_solver
+package com.codertapsu.xiangqi_solver
 
 /**
  * Process-wide store for the user's optional capture focus area, expressed as

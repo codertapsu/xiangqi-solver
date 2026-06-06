@@ -1,4 +1,4 @@
-package com.xiangqisolver.xiangqi_solver
+package com.codertapsu.xiangqi_solver
 
 import android.app.Service
 import android.content.Context

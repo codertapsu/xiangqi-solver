@@ -61,8 +61,8 @@ class AnalysisRepository {
     );
   }
 
-  /// Vision-only board recognition (no engine) — for the future on-device flow.
-  Future<ApiResult<BoardState>> extractBoard(
+  /// Vision-only board recognition (no engine) — board + vision warnings.
+  Future<ApiResult<({BoardState board, List<String> warnings})>> extractBoard(
     File screenshot, {
     AiProvider? provider,
     SideToMove? sideToMove,

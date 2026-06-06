@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DEBUG override of the release policy: allow plain-HTTP to ANY host so you can
+     point the app at a LAN / emulator backend (10.0.2.2, 192.168.x.x, …) during
+     development. This file shadows src/main/res/xml/network_security_config.xml
+     in debug builds only; release builds use the narrow main config. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

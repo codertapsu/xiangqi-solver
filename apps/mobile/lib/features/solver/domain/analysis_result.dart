@@ -90,6 +90,28 @@ class AnalysisResult extends Equatable {
     'vision': vision.toJson(),
   };
 
+  AnalysisResult copyWith({
+    String? analysisId,
+    BoardState? board,
+    BestMove? bestMove,
+    List<BestMove>? candidates,
+    String? explanation,
+    List<String>? warnings,
+    ProviderStatus? engine,
+    ProviderStatus? vision,
+  }) {
+    return AnalysisResult(
+      analysisId: analysisId ?? this.analysisId,
+      board: board ?? this.board,
+      bestMove: bestMove ?? this.bestMove,
+      candidates: candidates ?? this.candidates,
+      explanation: explanation ?? this.explanation,
+      warnings: warnings ?? this.warnings,
+      engine: engine ?? this.engine,
+      vision: vision ?? this.vision,
+    );
+  }
+
   /// Pretty-printed JSON of the extracted board, for the Result screen.
   String prettyBoardJson() {
     const encoder = JsonEncoder.withIndent('  ');

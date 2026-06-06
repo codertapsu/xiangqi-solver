@@ -125,29 +125,52 @@ enum EngineProvider {
   };
 }
 
-/// Where analysis runs.
+/// Who provides the OpenAI key that does board VISION.
 ///
-/// [cloud] uses the backend (default). [onDevice] is the experimental
-/// "Offline" mode: the app calls the AI vision API directly with the user's own
-/// key and runs the engine locally — no backend. The local engine is not
-/// bundled yet, so this mode is a scaffold.
-enum EngineMode {
-  cloud('cloud'),
-  onDevice('onDevice');
+/// [ours] = our key, used on the backend (consumes hints). [own] = the user's
+/// own key, used ON-DEVICE (direct OpenAI; their key never leaves the device).
+enum AiKeySource {
+  ours('ours'),
+  own('own');
 
-  const EngineMode(this.wireValue);
+  const AiKeySource(this.wireValue);
 
   final String wireValue;
 
-  static EngineMode fromWire(String? value) {
-    return EngineMode.values.firstWhere(
+  static AiKeySource fromWire(String? value) {
+    return AiKeySource.values.firstWhere(
       (e) => e.wireValue == value,
-      orElse: () => EngineMode.cloud,
+      orElse: () => AiKeySource.ours,
     );
   }
 
   String get label => switch (this) {
-    EngineMode.cloud => 'Cloud',
-    EngineMode.onDevice => 'On-device',
+    AiKeySource.ours => 'Our key',
+    AiKeySource.own => 'My own key',
+  };
+}
+
+/// Where the best-move ENGINE runs.
+///
+/// [cloud] = our backend Pikafish. [onDevice] = local Pikafish on the phone
+/// (faster, but the net may be weaker/less accurate than the cloud engine).
+enum EngineLocation {
+  cloud('cloud'),
+  onDevice('onDevice');
+
+  const EngineLocation(this.wireValue);
+
+  final String wireValue;
+
+  static EngineLocation fromWire(String? value) {
+    return EngineLocation.values.firstWhere(
+      (e) => e.wireValue == value,
+      orElse: () => EngineLocation.cloud,
+    );
+  }
+
+  String get label => switch (this) {
+    EngineLocation.cloud => 'Cloud',
+    EngineLocation.onDevice => 'On-device',
   };
 }

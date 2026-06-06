@@ -10,6 +10,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { BoardModule } from './modules/board/board.module';
 import { EngineModule } from './modules/engine/engine.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { RemoteConfigModule } from './modules/config/remote-config.module';
 
 /**
  * Root module. Loads + validates config globally, configures rate limiting,
@@ -43,6 +44,7 @@ import { StorageModule } from './modules/storage/storage.module';
     BoardModule,
     EngineModule,
     StorageModule,
+    RemoteConfigModule,
   ],
   providers: [
     {

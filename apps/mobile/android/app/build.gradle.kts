@@ -1,11 +1,25 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Release signing config from android/key.properties (gitignored). If absent
+// (local dev / CI), release falls back to the debug keystore so the build still
+// works — but you MUST create a real upload key before publishing. See
+// docs/PUBLISHING.md.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
-    namespace = "com.xiangqisolver.xiangqi_solver"
+    namespace = "com.codertapsu.xiangqi_solver"
     // Compile against SDK 36: the AndroidX libraries Flutter resolves
     // (activity 1.12.x, core 1.18.x) require compileSdk >= 36. SDK 36 is
     // installed in this environment. targetSdk stays at 35 per the contract,
@@ -29,7 +43,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.xiangqisolver.xiangqi_solver"
+        applicationId = "com.codertapsu.xiangqi_solver"
         // TYPE_APPLICATION_OVERLAY (floating widget) requires API 26.
         minSdk = 26
         targetSdk = 35
@@ -37,10 +51,38 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasReleaseKeystore) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Use the real upload key when key.properties is present, else the
+            // debug key so local `flutter build` still works.
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+
+            // Disable R8 code/resource shrinking. AGP 9 enables minification by
+            // DEFAULT for release; with no keep rules it strips Room's
+            // reflectively-loaded WorkDatabase_Impl. WorkManager (pulled in by
+            // google_mobile_ads via androidx.startup) then fails to initialize
+            // and the app CRASHES on launch ("Failed to create an instance of
+            // androidx.work.impl.WorkDatabase") — release-only, since debug never
+            // minifies. Matches the other codertapsu apps. To re-enable R8 later
+            // for a smaller APK, flip these to true and add keep rules for
+            // androidx.work / androidx.room / the plugins in proguard-rules.pro.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

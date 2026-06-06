@@ -1,0 +1,14 @@
+# Release signing — copy to android/key.properties and fill in. DO NOT COMMIT
+# the real key.properties or the .jks (both are gitignored).
+#
+# Create an upload keystore first:
+#   keytool -genkey -v -keystore ~/xiangqi-upload.jks -keyalg RSA \
+#     -keysize 2048 -validity 10000 -alias upload
+#
+# Then point storeFile at it (absolute path, or relative to android/app/).
+# See docs/PUBLISHING.md.
+
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=upload
+storeFile=/absolute/path/to/xiangqi-upload.jks

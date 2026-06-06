@@ -35,11 +35,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Future<ProviderContainer> boot({
-    required EngineMode mode,
+    required AiKeySource aiKey,
+    required EngineLocation engine,
     required bool healthy,
     required bool hasKey,
   }) async {
-    SharedPreferences.setMockInitialValues({'settings.engineMode': mode.wireValue});
+    SharedPreferences.setMockInitialValues({
+      'settings.aiKeySource': aiKey.wireValue,
+      'settings.engineLocation': engine.wireValue,
+    });
     FlutterSecureStorage.setMockInitialValues(
       hasKey ? {'secure.openaiApiKey': 'sk-test'} : {},
     );
@@ -54,32 +58,55 @@ void main() {
     return container;
   }
 
-  test('Cloud + backend healthy → ready, stays Cloud', () async {
-    final c = await boot(mode: EngineMode.cloud, healthy: true, hasKey: false);
+  test('backend-using combo + healthy → ready, unchanged', () async {
+    final c = await boot(
+      aiKey: AiKeySource.ours,
+      engine: EngineLocation.cloud,
+      healthy: true,
+      hasKey: false,
+    );
     final outcome = await c.read(modeCoordinatorProvider).ensureUsableMode();
     expect(outcome, ModeCheckOutcome.ready);
-    expect(c.read(settingsProvider).engineMode, EngineMode.cloud);
+    expect(c.read(settingsProvider).aiKeySource, AiKeySource.ours);
+    expect(c.read(settingsProvider).engineLocation, EngineLocation.cloud);
   });
 
-  test('Cloud + backend down + has key → switches to On-device', () async {
-    final c = await boot(mode: EngineMode.cloud, healthy: false, hasKey: true);
+  test('backend down + has key → switches to fully-local', () async {
+    final c = await boot(
+      aiKey: AiKeySource.ours,
+      engine: EngineLocation.cloud,
+      healthy: false,
+      hasKey: true,
+    );
     final outcome = await c.read(modeCoordinatorProvider).ensureUsableMode();
     expect(outcome, ModeCheckOutcome.switchedToOnDevice);
-    expect(c.read(settingsProvider).engineMode, EngineMode.onDevice);
+    final s = c.read(settingsProvider);
+    expect(s.aiKeySource, AiKeySource.own);
+    expect(s.engineLocation, EngineLocation.onDevice);
+    expect(s.isFullyLocal, isTrue);
   });
 
-  test('Cloud + backend down + no key → no mode available, stays Cloud', () async {
-    final c = await boot(mode: EngineMode.cloud, healthy: false, hasKey: false);
+  test('backend down + no key → no mode available, unchanged', () async {
+    final c = await boot(
+      aiKey: AiKeySource.ours,
+      engine: EngineLocation.cloud,
+      healthy: false,
+      hasKey: false,
+    );
     final outcome = await c.read(modeCoordinatorProvider).ensureUsableMode();
     expect(outcome, ModeCheckOutcome.noModeAvailable);
-    expect(c.read(settingsProvider).engineMode, EngineMode.cloud);
+    expect(c.read(settingsProvider).aiKeySource, AiKeySource.ours);
   });
 
-  test('On-device is always ready and never pings the backend', () async {
-    // healthy:false would matter only if the backend were consulted.
-    final c = await boot(mode: EngineMode.onDevice, healthy: false, hasKey: false);
+  test('fully-local is always ready and never pings the backend', () async {
+    final c = await boot(
+      aiKey: AiKeySource.own,
+      engine: EngineLocation.onDevice,
+      healthy: false,
+      hasKey: false,
+    );
     final outcome = await c.read(modeCoordinatorProvider).ensureUsableMode();
     expect(outcome, ModeCheckOutcome.ready);
-    expect(c.read(settingsProvider).engineMode, EngineMode.onDevice);
+    expect(c.read(settingsProvider).isFullyLocal, isTrue);
   });
 }

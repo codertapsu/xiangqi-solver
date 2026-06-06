@@ -16,12 +16,18 @@ import 'local/local_fen.dart';
 import 'local/local_notation.dart';
 import 'on_device_engine.dart';
 
-/// Coordinates the experimental **On-device (Offline)** path entirely on the
-/// device: direct AI vision (the user's OWN key) → repair → local engine →
-/// localized result. The AI key never leaves the device and no backend is used.
+/// A recognized board plus any vision/repair warnings, produced by the own-key
+/// vision step. Kept separate from the engine step so the two halves can be
+/// mixed with the cloud halves (the 2x2 AI-key x engine matrix).
+typedef VisionResult = ({BoardState board, List<String> warnings});
+
+/// On-device building blocks for analysis:
+///  - [extractBoardOwnKey]: direct AI vision with the user's OWN key → board.
+///  - [solveLocally]: the local Pikafish engine on a recognized board → result.
+///  - [analyze]: the fully-local composition of both.
 ///
-/// When the bundled engine isn't available it still returns the recognized
-/// board (no move) with a clear warning. See docs/ON_DEVICE_ENGINE.md.
+/// The two steps are composed differently per mode (e.g. our-key vision +
+/// local engine, or own-key vision + cloud engine) by the AnalysisNotifier.
 class OnDeviceAnalyzer {
   OnDeviceAnalyzer(this._keys, this._vision);
 
@@ -29,26 +35,23 @@ class OnDeviceAnalyzer {
   final BoardVisionClient _vision;
   static const AppLogger _log = AppLogger('OnDeviceAnalyzer');
 
-  Future<ApiResult<AnalysisResult>> analyze(
+  /// Vision via the user's OWN key (direct OpenAI), repaired into a board. The
+  /// key never leaves the device and no backend is used.
+  Future<ApiResult<VisionResult>> extractBoardOwnKey(
     File screenshot, {
-    required OnDeviceEngine engine,
     SideToMove? sideToMove,
-    String language = 'en',
     String visionModel = 'gpt-4o',
-    int depth = 12,
-    int? threads,
-    int? hashMb,
-    int? multiPv,
   }) async {
     final apiKey = await _keys.readOpenAiKey();
     if (apiKey == null || apiKey.trim().isEmpty) {
-      return _fail(
-        'On-device mode needs your own OpenAI API key. Add it in Settings.',
-        'MISSING_API_KEY',
+      return const ApiResult<VisionResult>.failure(
+        OnDeviceFailure(
+          'Using your own key needs an OpenAI API key. Add it in Settings.',
+          code: 'MISSING_API_KEY',
+        ),
       );
     }
 
-    // 1. Vision via the user's key (BYO). Surfaces key/image errors directly.
     final BoardExtraction extraction;
     try {
       final bytes = await screenshot.readAsBytes();
@@ -60,15 +63,13 @@ class OnDeviceAnalyzer {
         model: visionModel,
       );
     } on OnDeviceVisionException catch (e) {
-      return _fail(e.message, e.code ?? 'VISION_ERROR');
+      return ApiResult.failure(OnDeviceFailure(e.message, code: e.code ?? 'VISION_ERROR'));
     } catch (e) {
       _log.warn('On-device vision failed: $e');
-      return _fail('On-device vision failed: $e', 'VISION_ERROR');
+      return ApiResult.failure(OnDeviceFailure('On-device vision failed: $e', code: 'VISION_ERROR'));
     }
 
-    // 2. Repair the (imperfect) board and build it.
     final repaired = repairBoard(extraction.pieces);
-    final warnings = [...extraction.warnings, ...repaired.warnings];
     final side = (sideToMove != null && sideToMove != SideToMove.unknown)
         ? sideToMove
         : extraction.sideToMove;
@@ -78,21 +79,42 @@ class OnDeviceAnalyzer {
       pieces: repaired.pieces,
       confidence: extraction.confidence,
     );
+    return ApiResult.success((
+      board: board,
+      warnings: [...extraction.warnings, ...repaired.warnings],
+    ));
+  }
 
-    // 3. Engine — or return the board alone when it isn't available.
+  /// Runs the LOCAL Pikafish engine on a recognized [board]. [visionStatus]
+  /// records where the board came from (own key vs our backend). When the engine
+  /// is unavailable/illegal, returns the board alone with a clear warning.
+  Future<ApiResult<AnalysisResult>> solveLocally(
+    BoardState board, {
+    required OnDeviceEngine engine,
+    required ProviderStatus visionStatus,
+    String language = 'en',
+    int depth = 12,
+    int? threads,
+    int? hashMb,
+    int? multiPv,
+    List<String> warnings = const [],
+  }) async {
+    final pieces = board.pieces;
+    final allWarnings = [...warnings];
+
     if (!engine.isAvailable) {
-      warnings.add(
-        'On-device engine is not available (binary/NNUE not installed), so the '
-        'best move was not computed. Switch to Cloud mode in Settings to finish.',
+      allWarnings.add(
+        'The on-device engine is not ready, so the best move was not computed. '
+        'Switch the engine to Cloud in Settings to finish.',
       );
-      return _boardOnly(board, warnings, language, ok: false, provider: 'on-device (pending)');
+      return _boardOnly(board, allWarnings, visionStatus, engineOk: false);
     }
-    if (!hasBothGenerals(repaired.pieces)) {
-      warnings.add(
+    if (!hasBothGenerals(pieces)) {
+      allWarnings.add(
         'Could not locate both generals, so the best move was not computed. '
         'Try re-capturing with a clearer view of the board.',
       );
-      return _boardOnly(board, warnings, language, ok: false, provider: 'pikafish (on-device)');
+      return _boardOnly(board, allWarnings, visionStatus, engineOk: false);
     }
 
     try {
@@ -103,37 +125,68 @@ class OnDeviceAnalyzer {
         hashMb: hashMb,
         multiPv: multiPv,
       );
-      final best = _toBestMove(move, repaired.pieces, language);
-      final candidates = move.multipv
-          .map((m) => _toBestMove(m, repaired.pieces, language))
-          .toList(growable: false);
+      final best = _toBestMove(move, pieces, language);
+      final candidates =
+          move.multipv.map((m) => _toBestMove(m, pieces, language)).toList(growable: false);
       return ApiResult.success(
         AnalysisResult(
           analysisId: '',
           board: board,
           bestMove: best,
           candidates: candidates,
-          explanation: '${best.human} (${best.notation}) — eval ${best.score}, depth ${best.depth}.',
-          warnings: warnings,
+          explanation:
+              '${best.human} (${best.notation}) — eval ${best.score}, depth ${best.depth}.',
+          warnings: allWarnings,
           engine: const ProviderStatus(provider: 'pikafish (on-device)', ok: true),
-          vision: const ProviderStatus(provider: 'openai (your key)', ok: true),
+          vision: visionStatus,
         ),
       );
     } on OnDeviceEngineException catch (e) {
       _log.warn('On-device engine failed: ${e.message}');
-      warnings.add(_isIllegalPosition(e.message)
+      allWarnings.add(_isIllegalPosition(e.message)
           ? 'The recognized board isn\'t a legal Xiangqi position — some pieces '
                 'were misread onto impossible squares, so no move was computed. '
-                'Re-capture with a clearer, larger view, or set a stronger '
-                'Vision model in Settings (e.g. the model your Cloud mode uses).'
+                'Re-capture with a clearer view, or use a stronger Vision model.'
           : 'On-device engine failed: ${e.message}');
-      return _boardOnly(board, warnings, language, ok: false, provider: 'pikafish (on-device)');
+      return _boardOnly(board, allWarnings, visionStatus, engineOk: false);
     }
   }
 
-  /// Pikafish rejects boards with pieces on impossible squares (advisors/
-  /// elephants off their points, kings out of the palace) — a vision misread,
-  /// not an engine fault. Detect that so we can explain it usefully.
+  /// Fully-local: own-key vision + local engine (no backend).
+  Future<ApiResult<AnalysisResult>> analyze(
+    File screenshot, {
+    required OnDeviceEngine engine,
+    SideToMove? sideToMove,
+    String language = 'en',
+    String visionModel = 'gpt-4o',
+    int depth = 12,
+    int? threads,
+    int? hashMb,
+    int? multiPv,
+  }) async {
+    final visionRes = await extractBoardOwnKey(
+      screenshot,
+      sideToMove: sideToMove,
+      visionModel: visionModel,
+    );
+    return visionRes.when(
+      success: (v) => solveLocally(
+        v.board,
+        engine: engine,
+        visionStatus: const ProviderStatus(provider: 'openai (your key)', ok: true),
+        language: language,
+        depth: depth,
+        threads: threads,
+        hashMb: hashMb,
+        multiPv: multiPv,
+        warnings: v.warnings,
+      ),
+      failure: (f) => Future.value(ApiResult<AnalysisResult>.failure(f)),
+    );
+  }
+
+  /// Pikafish rejects boards with pieces on impossible squares — a vision
+  /// misread, not an engine fault. Detect that so we can explain it usefully.
   bool _isIllegalPosition(String message) {
     final m = message.toLowerCase();
     return m.contains('unsupported position') ||
@@ -157,20 +210,18 @@ class OnDeviceAnalyzer {
   ApiResult<AnalysisResult> _boardOnly(
     BoardState board,
     List<String> warnings,
-    String language, {
-    required bool ok,
-    required String provider,
+    ProviderStatus visionStatus, {
+    required bool engineOk,
   }) {
     return ApiResult.success(
       AnalysisResult(
         analysisId: '',
         board: board,
         bestMove: null,
-        explanation:
-            'Board recognized on this device with your OpenAI key. No move was computed.',
+        explanation: 'Board recognized. No move was computed.',
         warnings: warnings,
-        engine: ProviderStatus(provider: provider, ok: ok),
-        vision: const ProviderStatus(provider: 'openai (your key)', ok: true),
+        engine: ProviderStatus(provider: 'pikafish (on-device)', ok: engineOk),
+        vision: visionStatus,
       ),
     );
   }
@@ -195,9 +246,5 @@ class OnDeviceAnalyzer {
       return 'image/webp';
     }
     return 'image/png';
-  }
-
-  ApiResult<AnalysisResult> _fail(String message, String code) {
-    return ApiResult<AnalysisResult>.failure(OnDeviceFailure(message, code: code));
   }
 }

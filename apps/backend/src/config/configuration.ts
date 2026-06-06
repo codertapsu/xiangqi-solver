@@ -18,6 +18,7 @@ export interface AppConfig {
     provider: 'pikafish' | 'mock';
     pikafishBinaryPath: string;
     pikafishNnuePath: string;
+    uciVariant: string;
     defaultDepth: number;
     defaultMoveTimeMs: number;
     threads: number;
@@ -31,6 +32,24 @@ export interface AppConfig {
   rateLimit: {
     ttlSeconds: number;
     limit: number;
+    /** Per-device rolling window for the analysis endpoints (seconds). */
+    deviceWindowSeconds: number;
+    /** Max analyses per device within that window. */
+    deviceLimit: number;
+  };
+  /** Remote config served to the app by GET /api/config. */
+  features: {
+    ads: { rewarded: boolean; banner: boolean; appOpen: boolean; useReal: boolean };
+    hints: { freeOnInstall: number; ownKeyDivisor: number };
+    onDevice: { enabled: boolean; netUrl: string; netBytes: number };
+    /** Visibility of optional settings sections (all default OFF). */
+    ui: {
+      backend: boolean;
+      providers: boolean;
+      engineTuning: boolean;
+      visionModel: boolean;
+      licenses: boolean;
+    };
   };
 }
 
@@ -55,6 +74,7 @@ export function configuration(): { app: AppConfig } {
       provider: env.ENGINE_PROVIDER,
       pikafishBinaryPath: env.PIKAFISH_BINARY_PATH,
       pikafishNnuePath: env.PIKAFISH_NNUE_PATH,
+      uciVariant: env.ENGINE_UCI_VARIANT,
       defaultDepth: env.ENGINE_DEFAULT_DEPTH,
       defaultMoveTimeMs: env.ENGINE_DEFAULT_MOVE_TIME_MS,
       threads: env.ENGINE_THREADS,
@@ -68,6 +88,32 @@ export function configuration(): { app: AppConfig } {
     rateLimit: {
       ttlSeconds: env.RATE_LIMIT_TTL,
       limit: env.RATE_LIMIT_LIMIT,
+      deviceWindowSeconds: env.RATE_LIMIT_DEVICE_WINDOW_SECONDS,
+      deviceLimit: env.RATE_LIMIT_DEVICE_LIMIT,
+    },
+    features: {
+      ads: {
+        rewarded: env.FEATURE_REWARDED_ADS,
+        banner: env.FEATURE_BANNER_ADS,
+        appOpen: env.FEATURE_APP_OPEN_ADS,
+        useReal: env.FEATURE_USE_REAL_ADS,
+      },
+      hints: {
+        freeOnInstall: env.HINTS_FREE_ON_INSTALL,
+        ownKeyDivisor: env.HINTS_OWN_KEY_DIVISOR,
+      },
+      onDevice: {
+        enabled: env.ONDEVICE_ENABLED,
+        netUrl: env.ONDEVICE_NET_URL,
+        netBytes: env.ONDEVICE_NET_BYTES,
+      },
+      ui: {
+        backend: env.FEATURE_UI_BACKEND,
+        providers: env.FEATURE_UI_PROVIDERS,
+        engineTuning: env.FEATURE_UI_ENGINE_TUNING,
+        visionModel: env.FEATURE_UI_VISION_MODEL,
+        licenses: env.FEATURE_UI_LICENSES,
+      },
     },
   };
 
