@@ -28,7 +28,8 @@
         android:label="Xiangqi Solver"
         android:name="${applicationName}"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
 
         <!-- Google AdMob app id (real, codertapsu publisher pub-6124263664453069).
              The app crashes on launch if this meta-data is missing. The ad *unit*

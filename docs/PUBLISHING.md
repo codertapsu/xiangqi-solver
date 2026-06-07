@@ -77,7 +77,7 @@ This guide takes the app from the current TEST-wired state to a live Play listin
 | AdMob SSV | — | ❌ removed (local rewards, no SSV) | nothing to configure |
 | Backend abuse cap | `apps/backend/.env` (`RATE_LIMIT_DEVICE_*`) | ✅ per-IP throttle + per-device daily cap (default 100/day) | tune the limits for your traffic |
 
-App identity (already set, confirm before first upload): `applicationId = com.xiangqisolver.xiangqi_solver`, `versionName/versionCode` from `pubspec.yaml` `version: 1.0.0+1`, `minSdk 26`, `targetSdk 35`, `compileSdk 36`.
+App identity (already set, confirm before first upload): `applicationId = com.codertapsu.xiangqi_solver`, `versionName/versionCode` from `pubspec.yaml` `version: 1.0.0+1`, `minSdk 26`, `targetSdk 35`, `compileSdk 36`.
 
 > Note: the `~` separator is an AdMob **App ID**; the `/` separator is an **ad unit ID**. Do not swap them.
 
@@ -117,7 +117,7 @@ App identity (already set, confirm before first upload): `applicationId = com.xi
 
 ### 2a. Create the app
 1. https://play.google.com/console → **Create app**. App name, default language (set Vietnamese if VN is the primary market), App/Game = App, Free/Paid = **Free** (monetization is via IAP/ads).
-2. Accept the developer program & US export declarations. The package name `com.xiangqisolver.xiangqi_solver` is fixed at first upload — it must match `applicationId` in `build.gradle.kts`.
+2. Accept the developer program & US export declarations. The package name `com.codertapsu.xiangqi_solver` is fixed at first upload — it must match `applicationId` in `build.gradle.kts`.
 
 ### 2b. App signing (Play App Signing + your upload key)
 Play App Signing is the default and recommended path: you sign the AAB with an **upload key**; Google re-signs with the **app signing key** it manages.
@@ -319,4 +319,3 @@ Run this against the **Internal testing** build (real ad units, real products, H
 
 **Durability (release blocker):**
 - [ ] Wallet repository is DB-backed (NOT `InMemoryWalletRepository`) so paid balances survive a backend restart.
-
