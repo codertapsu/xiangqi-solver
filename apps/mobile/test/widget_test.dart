@@ -10,6 +10,7 @@ import 'package:xiangqi_solver/features/solver/data/analysis_repository.dart';
 import 'package:xiangqi_solver/features/solver/presentation/pages/home_page.dart';
 import 'package:xiangqi_solver/features/solver/presentation/providers/solver_providers.dart';
 
+import 'support/hint_grant_test_override.dart';
 import 'support/remote_config_test_override.dart';
 
 /// A repository that reports a healthy backend with no network, so the home
@@ -40,6 +41,7 @@ void main() {
         sharedPreferencesProvider.overrideWithValue(prefs),
         analysisRepositoryProvider.overrideWithValue(_HealthyRepo()),
         remoteConfig ?? remoteConfigTestOverride,
+        hintGrantOverride(),
       ],
       child: const MaterialApp(home: HomePage()),
     );

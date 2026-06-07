@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_result.dart';
 import '../../../../core/network/dio_client.dart';
@@ -64,12 +65,15 @@ final historyRepositoryProvider = Provider<HistoryRepository>((ref) {
   return HistoryRepository(ref.watch(sharedPreferencesProvider));
 });
 
-/// Stable, opaque per-install device id. Sent as the `x-device-id` header so the
-/// backend can rate-limit per device (hints are a device-local counter now, so
-/// this is the only abuse signal). Created lazily and persisted.
+/// Stable, opaque per-device id. Sent as the `x-device-id` header so the backend
+/// can rate-limit per device AND decide the install-grant (free hints can't be
+/// farmed by reinstalling). Seeded at startup from a reinstall-stable id
+/// (`persistent_device_id`, MediaDrm on Android — see `resolveStableDeviceId` in
+/// main.dart); this provider just reads that persisted value, generating a random
+/// fallback only if startup couldn't resolve one.
 final deviceIdProvider = Provider<String>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
-  const key = 'device.id';
+  const key = AppConstants.deviceIdPrefKey;
   final existing = prefs.getString(key);
   if (existing != null && existing.length >= 8) return existing;
   final rng = Random.secure();
@@ -615,7 +619,10 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
       final own = await analyzer.extractBoardOwnKey(
         file,
         sideToMove: s.mySide,
-        visionModel: s.onDeviceVisionModel,
+        // User override if set, else the backend-configured default (gpt-5.4).
+        visionModel: s.onDeviceVisionModelOr(
+          _ref.read(remoteConfigProvider).onDeviceVisionModel,
+        ),
       );
       final ownVision = own.valueOrNull;
       if (ownVision != null) {

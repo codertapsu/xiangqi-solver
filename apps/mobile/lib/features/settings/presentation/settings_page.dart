@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -288,6 +289,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// The personal OpenAI key field (always, when AI key = own) plus the optional
   /// vision-model field (shown only when [showVisionModel] is enabled remotely).
   Widget _buildOwnKeyFields(ThemeData theme, {required bool showVisionModel}) {
+    final backendModel = ref.watch(remoteConfigProvider).onDeviceVisionModel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -331,14 +333,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             controller: _visionModelController,
             autocorrect: false,
             enableSuggestions: false,
-            decoration: const InputDecoration(
-              labelText: 'Vision model',
-              hintText: 'gpt-5.4',
-              prefixIcon: Icon(Icons.visibility_outlined),
+            decoration: InputDecoration(
+              labelText: 'Vision model (OpenAI)',
+              hintText: backendModel,
+              prefixIcon: const Icon(Icons.visibility_outlined),
               helperMaxLines: 3,
               helperText:
-                  'Reads the board from your screenshot. Use a capable model. Avoid '
-                  'gpt-4o-mini: it misreads pieces and produces illegal boards.',
+                  'OpenAI model that reads the board from your screenshot. Leave '
+                  'blank to use the recommended model ($backendModel). Avoid '
+                  'gpt-4o-mini — it misreads pieces and produces illegal boards.',
             ),
             onChanged: (v) => _notifier.patch((s) => s.copyWith(onDeviceVisionModel: v.trim())),
           ),
@@ -649,8 +652,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 applicationName: AppConstants.appName,
               ),
             ),
+          _buildDeviceIdTile(),
         ],
       ),
+    );
+  }
+
+  /// Shows this device's stable ID (copyable) — share it with support to receive
+  /// a custom hint grant on (re)install.
+  Widget _buildDeviceIdTile() {
+    final deviceId = ref.watch(deviceIdProvider);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.fingerprint_outlined),
+      title: const Text('Device ID'),
+      subtitle: Text(
+        deviceId,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontFamily: 'monospace',
+        ),
+      ),
+      trailing: const Icon(Icons.copy_outlined, size: 18),
+      onTap: () async {
+        await Clipboard.setData(ClipboardData(text: deviceId));
+        _snack('Device ID copied.');
+      },
     );
   }
 

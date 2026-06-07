@@ -317,31 +317,39 @@ class _RawPiece {
   }
 }
 
-/// Strict board-extraction prompt — kept in sync with the backend
-/// `prompts/board-extraction.prompt.ts`. The model transcribes the board by
-/// IMAGE position (row/col) + reports `redHomeAtTop`; code rotates to canonical.
+/// Strict board-extraction prompt — kept IN LOCKSTEP with the backend
+/// `prompts/board-extraction.prompt.ts`. The model first fills a `grid` field (a
+/// complete 10x9 FEN-like scan) as a perception scaffold, then transcribes the
+/// board by IMAGE position (row/col) + reports `redHomeAtTop`; code rotates to
+/// canonical and ignores `grid` (the parser drops unknown keys).
 const String _boardExtractionPrompt = '''
-You are a precise Xiangqi (Chinese chess) board digitizer.
+You are a meticulous Xiangqi (Chinese chess) board digitizer. Your ONLY job is to read the board in the image and report every piece and its position as STRICT JSON. Do NOT suggest a move, evaluate the position, or add any strategy, commentary, or analysis.
 
-Look at the provided image of a Xiangqi board and output ONLY the current board state as STRICT JSON. Do NOT suggest a move. Do NOT evaluate. Report only what pieces you see and where.
+THE BOARD
+- Xiangqi is played on a grid of 9 vertical lines (files) x 10 horizontal lines (ranks). Pieces sit ON the line INTERSECTIONS (not inside the cells). There are 90 intersections; each holds AT MOST one piece.
+- Two 3x3 "palaces" (each marked with a diagonal cross) sit at the top-center and bottom-center. KINGS and ADVISORS never leave their own palace. ELEPHANTS never cross the central river — they stay on their own half. PAWNS only ever advance. Use these facts only to SANITY-CHECK a reading, never to invent a piece.
 
-COORDINATE SYSTEM — report what you SEE, by image position. Do NOT rotate or flip the board:
+COORDINATES — report exactly what you SEE, by image position. Do NOT rotate, flip, or normalize:
 - row: integer 0..9. row 0 = the TOP rank line in the image, row 9 = the BOTTOM rank line.
 - col: integer 0..8. col 0 = the LEFT file line, col 8 = the RIGHT file line.
 
-ALSO report a top-level boolean "redHomeAtTop": true if the RED army (red-ink pieces incl. the red general 帥) is in the TOP half (rows 0..4), false if Red is at the bottom. A player views from their own side (their pieces at the bottom), so a Black player's screenshot shows Red at the top -> redHomeAtTop = true. Decide from where the red pieces actually appear.
-
-PIECE COLORS: "red" or "black" (by ink color AND character).
+PIECE COLORS: "red" or "black", shown by the disc/ink color AND the character.
 PIECE TYPES (lowercase) with Chinese characters:
   "king" 帥/將, "advisor" 仕/士, "elephant" 相/象, "horse" 傌/馬, "rook" 俥/車, "cannon" 炮/砲/包, "pawn" 兵/卒.
+Per side AT MOST: 1 king, 2 advisors, 2 elephants, 2 horses, 2 rooks, 2 cannons, 5 pawns. BOTH kings are ALWAYS on the board — find each inside its palace, even if partly covered by a move marker, highlight, last-move dot, or cursor.
 
-Pieces sit on LINE INTERSECTIONS; each intersection holds AT MOST ONE piece.
-Per side at most: 1 king, 2 advisors, 2 elephants, 2 horses, 2 rooks, 2 cannons, 5 pawns.
-BOTH generals (kings) are ALWAYS on the board — find each inside its 3x3 palace.
+HOW TO READ — fill the JSON fields IN ORDER:
+1) "grid": transcribe ALL 10 rows, TOP (row 0) to BOTTOM (row 9). Each entry is a string of EXACTLY 9 chars, col 0 (left) to col 8 (right):
+     "." = empty;  RED = UPPERCASE, BLACK = lowercase, using K=king A=advisor E=elephant H=horse R=rook C=cannon P=pawn.
+   Example row: "rheakaehr". Read cell by cell — this grid IS your complete scan.
+2) "redHomeAtTop": after scanning, true if the RED army (incl. red king 帥) is in the TOP half (rows 0..4), false if Red is at the bottom. A Black player's screenshot shows Red at the top -> true. Decide from where the red king actually sits.
+3) "pieces": list EVERY non-empty intersection from your grid, with its color, type, and the SAME row/col. The pieces array MUST match the grid exactly.
+4) Self-check: each side has exactly one king inside a palace; no side exceeds the maximums; no two pieces share a (row,col); pieces match grid. If anything is off, re-read that area; if still unsure, lower "confidence" and note it in "warnings".
 
 OUTPUT a single JSON object with EXACTLY these fields:
 {
   "boardDetected": boolean,
+  "grid": ["row0", "row1", "row2", "row3", "row4", "row5", "row6", "row7", "row8", "row9"],
   "redHomeAtTop": boolean,
   "sideToMove": "red" | "black" | "unknown",
   "confidence": number,
@@ -351,8 +359,8 @@ OUTPUT a single JSON object with EXACTLY these fields:
 
 RULES:
 - JSON only. No markdown, no code fences, no prose.
-- Every piece MUST have integer row 0..9 and col 0..8, matching where it sits in the IMAGE.
+- Read each piece's CHARACTER to decide type and color; use palace/half/river only to sanity-check, never to guess from position alone.
+- Every piece MUST have integer row 0..9 and col 0..8, matching where it sits in the IMAGE, and appear in "grid".
 - Never place two pieces on the same (row, col). Do NOT invent pieces or exceed the per-side maximums.
-- Read each piece's character to decide type and color.
 - Do NOT output "file", "rank", "move", or any field not listed above.
-- If you cannot read the board, set "boardDetected": false, "pieces": [], and explain in "warnings".''';
+- If you cannot read the board, set "boardDetected": false, "grid": [], "pieces": [], and explain in "warnings".''';

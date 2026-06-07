@@ -6,6 +6,7 @@ import 'package:xiangqi_solver/app/theme/app_theme.dart';
 import 'package:xiangqi_solver/features/monetization/presentation/get_more_hints_sheet.dart';
 import 'package:xiangqi_solver/features/solver/presentation/providers/solver_providers.dart';
 
+import '../support/hint_grant_test_override.dart';
 import '../support/remote_config_test_override.dart';
 
 void main() {
@@ -25,6 +26,7 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
           remoteConfigTestOverride,
+          hintGrantOverride(),
         ],
         child: _Harness(textScale: textScale),
       ),

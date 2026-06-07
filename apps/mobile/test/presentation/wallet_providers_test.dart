@@ -1,11 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:xiangqi_solver/core/remote_config/remote_config.dart';
 import 'package:xiangqi_solver/features/monetization/data/billing_service.dart';
 import 'package:xiangqi_solver/features/monetization/presentation/wallet_providers.dart';
 import 'package:xiangqi_solver/features/solver/presentation/providers/solver_providers.dart';
 
+import '../support/hint_grant_test_override.dart';
 import '../support/remote_config_test_override.dart';
 
 /// Billing that never touches platform channels, so the device-local wallet can
@@ -21,6 +23,7 @@ void main() {
   Future<ProviderContainer> boot({
     Map<String, Object> seed = const {},
     Override? remoteConfig,
+    Override? hintGrant,
   }) async {
     SharedPreferences.setMockInitialValues(seed);
     final prefs = await SharedPreferences.getInstance();
@@ -29,28 +32,47 @@ void main() {
         sharedPreferencesProvider.overrideWithValue(prefs),
         billingServiceProvider.overrideWithValue(_FakeBilling()),
         remoteConfig ?? remoteConfigTestOverride,
+        hintGrant ?? hintGrantOverride(grant: 10),
       ],
     );
     addTearDown(container.dispose);
     return container;
   }
 
-  test('seeds the BACKEND free-hints count on first launch', () async {
-    final c = await boot(
-      remoteConfig: remoteConfigOverrideWith(
-        RemoteConfig.defaults.copyWith(freeHintsOnInstall: 1000),
-      ),
-    );
+  test('seeds the backend install-grant amount on first launch', () async {
+    final c = await boot(hintGrant: hintGrantOverride(grant: 1000));
     c.read(walletProvider); // construct → kicks off the async first-launch seed
     await pumpEventQueue();
     expect(c.read(walletProvider), 1000);
   });
 
-  test('falls back to the default free-hints count when uncached/offline', () async {
-    final c = await boot(); // defaults → freeHintsOnInstall = 10
+  test('a returning device gets 0 (no re-grant on reinstall)', () async {
+    final c = await boot(hintGrant: hintGrantOverride(grant: 0));
     c.read(walletProvider);
     await pumpEventQueue();
-    expect(c.read(walletProvider), RemoteConfig.defaults.freeHintsOnInstall);
+    expect(c.read(walletProvider), 0);
+  });
+
+  test('offline first launch banks nothing and stays unseeded (retries next launch)', () async {
+    final c = await boot(hintGrant: hintGrantOfflineOverride());
+    c.read(walletProvider);
+    await pumpEventQueue();
+    // No free hints banked offline (would let an airplane-mode reinstall farm),
+    // and not marked seeded, so a later online launch re-claims.
+    expect(c.read(walletProvider), 0);
+    expect((await SharedPreferences.getInstance()).getBool('hints.seeded'), isNull);
+  });
+
+  test('a credit landing during the install claim is not clobbered by the seed', () async {
+    final pending = Completer<int>();
+    final c = await boot(hintGrant: hintGrantPendingOverride(pending.future));
+    final w = c.read(walletProvider.notifier);
+    await pumpEventQueue(); // _load suspends on the in-flight claim
+    w.add(5); // a purchase / ad reward credits while the claim is still pending
+    expect(c.read(walletProvider), 5);
+    pending.complete(10); // claim resolves with a grant of 10
+    await pumpEventQueue();
+    expect(c.read(walletProvider), 15, reason: '10 granted + 5 credited mid-claim');
   });
 
   test('does not re-seed when already seeded (keeps the stored balance)', () async {

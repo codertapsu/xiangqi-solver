@@ -31,10 +31,14 @@ export const envSchema = z.object({
   ENGINE_PROVIDER: engineProviderSchema.default('mock'),
 
   // AI credentials (optional; required only by the matching real provider).
+  // Default real provider is OpenAI (gpt-5.4). To switch the cloud vision to
+  // Gemini 3 Flash, set AI_PROVIDER=gemini + GEMINI_API_KEY (GEMINI_MODEL
+  // already defaults to the Gemini 3 Flash id). Both providers return the
+  // SAME parsed board, so the app behaves identically either way.
   GEMINI_API_KEY: z.string().default(''),
   OPENAI_API_KEY: z.string().default(''),
   OPENAI_MODEL: z.string().default('gpt-5.4'),
-  GEMINI_MODEL: z.string().default('gemini-1.5-flash'),
+  GEMINI_MODEL: z.string().default('gemini-3-flash-preview'),
 
   // Engine settings.
   PIKAFISH_BINARY_PATH: z.string().default(''),
@@ -67,6 +71,12 @@ export const envSchema = z.object({
   RATE_LIMIT_DEVICE_WINDOW_SECONDS: intFromEnv(86400, 1, 2592000),
   RATE_LIMIT_DEVICE_LIMIT: intFromEnv(100, 1, 100000),
 
+  // Install-grant data dir (POST /api/hints/claim). Holds `installs.json` (the
+  // ledger that stops a reinstall from re-granting the free starter hints) and
+  // `grants.json` (the manual per-device "Hint Grants" allowlist). Simple JSON
+  // files; gitignored. Put it on a persistent volume in production.
+  HINTS_DATA_DIR: z.string().default('./data'),
+
   // ---------------------------------------------------------------------------
   // Remote config / feature flags — served by GET /api/config so the app's
   // behavior is tunable WITHOUT a new release. Change these on the server and
@@ -95,6 +105,11 @@ export const envSchema = z.object({
       'https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue',
     ),
   ONDEVICE_NET_BYTES: intFromEnv(50760458, 0, 1024 * 1024 * 1024),
+  // Default OpenAI model the app uses for the on-device (BYO-key) board reading.
+  // On-device vision is OpenAI-only; this is the model used when the user hasn't
+  // overridden it in Settings. Keep it a capable model (gpt-4o-mini misreads the
+  // small glyphs). Tunable from the server without an app release.
+  ONDEVICE_VISION_MODEL: z.string().default('gpt-5.4'),
   // Which OPTIONAL settings sections the app exposes. All default OFF (hidden)
   // so a shipped build shows only the core flow; flip per environment to reveal
   // these power-user / debug sections WITHOUT a new release.

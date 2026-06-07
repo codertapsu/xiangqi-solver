@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart'
     show LicenseEntryWithLineBreaks, LicenseRegistry;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:persistent_device_id/persistent_device_id.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
+import 'core/constants/app_constants.dart';
 import 'features/solver/presentation/providers/solver_providers.dart';
 
 /// App entry point.
@@ -37,6 +39,7 @@ Future<void> main() async {
   });
 
   final prefs = await SharedPreferences.getInstance();
+  await _resolveStableDeviceId(prefs);
 
   runApp(
     ProviderScope(
@@ -46,4 +49,21 @@ Future<void> main() async {
       child: const XiangqiSolverApp(),
     ),
   );
+}
+
+/// Seeds a reinstall-stable device id into [AppConstants.deviceIdPrefKey], so the
+/// install-grant (free hints can't be farmed by reinstalling) and the per-device
+/// rate limit both key off one stable value. `persistent_device_id` derives it
+/// from MediaDrm on Android (survives uninstall/reinstall and re-signing). On an
+/// unsupported platform or DRM failure it leaves whatever's stored — the
+/// `deviceIdProvider` then falls back to a persisted random id.
+Future<void> _resolveStableDeviceId(SharedPreferences prefs) async {
+  try {
+    final id = (await PersistentDeviceId.getDeviceId() ?? '').trim();
+    if (id.length >= 8) {
+      await prefs.setString(AppConstants.deviceIdPrefKey, id);
+    }
+  } catch (_) {
+    // Unsupported platform / DRM unavailable → keep the existing/random id.
+  }
 }

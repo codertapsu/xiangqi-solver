@@ -94,6 +94,13 @@ class AppConstants {
   static const String analyzeScreenshotPath = '$apiPrefix/analysis/screenshot';
   static const String analyzeExtractPath = '$apiPrefix/analysis/extract';
 
+  /// Install-grant: starting hint balance for this device on (re)install.
+  static const String hintsClaimPath = '$apiPrefix/hints/claim';
+
+  /// SharedPreferences key for the stable per-device id (also sent as the
+  /// `x-device-id` header). Seeded from a reinstall-stable id at startup.
+  static const String deviceIdPrefKey = 'device.id';
+
   /// Maximum screenshot upload size accepted by the backend (8 MB).
   static const int maxUploadBytes = 8 * 1024 * 1024;
 }
