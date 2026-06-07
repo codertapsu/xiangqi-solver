@@ -14,6 +14,7 @@ class RemoteConfig extends Equatable {
     required this.onDeviceEnabled,
     required this.onDeviceNetUrl,
     required this.onDeviceNetBytes,
+    required this.onDeviceVisionModel,
     required this.showBackendSection,
     required this.showProvidersSection,
     required this.showEngineTuning,
@@ -48,6 +49,10 @@ class RemoteConfig extends Equatable {
   /// Expected net size in bytes (used to verify a complete download).
   final int onDeviceNetBytes;
 
+  /// Default OpenAI model for on-device (BYO-key) board reading, unless the user
+  /// overrides it in Settings. On-device vision is OpenAI-only.
+  final String onDeviceVisionModel;
+
   /// Whether the "Backend" URL / connection-test section is shown.
   final bool showBackendSection;
 
@@ -74,6 +79,7 @@ class RemoteConfig extends Equatable {
     onDeviceNetUrl:
         'https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue',
     onDeviceNetBytes: 50760458,
+    onDeviceVisionModel: 'gpt-5.4',
     // Optional settings sections are HIDDEN by default; the server reveals them.
     showBackendSection: false,
     showProvidersSection: false,
@@ -99,6 +105,7 @@ class RemoteConfig extends Equatable {
       onDeviceEnabled: od['enabled'] as bool? ?? defaults.onDeviceEnabled,
       onDeviceNetUrl: od['netUrl'] as String? ?? defaults.onDeviceNetUrl,
       onDeviceNetBytes: (od['netBytes'] as num?)?.toInt() ?? defaults.onDeviceNetBytes,
+      onDeviceVisionModel: od['visionModel'] as String? ?? defaults.onDeviceVisionModel,
       showBackendSection: ui['backend'] as bool? ?? defaults.showBackendSection,
       showProvidersSection: ui['providers'] as bool? ?? defaults.showProvidersSection,
       showEngineTuning: ui['engineTuning'] as bool? ?? defaults.showEngineTuning,
@@ -119,6 +126,7 @@ class RemoteConfig extends Equatable {
       'enabled': onDeviceEnabled,
       'netUrl': onDeviceNetUrl,
       'netBytes': onDeviceNetBytes,
+      'visionModel': onDeviceVisionModel,
     },
     'ui': {
       'backend': showBackendSection,
@@ -139,6 +147,7 @@ class RemoteConfig extends Equatable {
     bool? onDeviceEnabled,
     String? onDeviceNetUrl,
     int? onDeviceNetBytes,
+    String? onDeviceVisionModel,
     bool? showBackendSection,
     bool? showProvidersSection,
     bool? showEngineTuning,
@@ -155,6 +164,7 @@ class RemoteConfig extends Equatable {
       onDeviceEnabled: onDeviceEnabled ?? this.onDeviceEnabled,
       onDeviceNetUrl: onDeviceNetUrl ?? this.onDeviceNetUrl,
       onDeviceNetBytes: onDeviceNetBytes ?? this.onDeviceNetBytes,
+      onDeviceVisionModel: onDeviceVisionModel ?? this.onDeviceVisionModel,
       showBackendSection: showBackendSection ?? this.showBackendSection,
       showProvidersSection: showProvidersSection ?? this.showProvidersSection,
       showEngineTuning: showEngineTuning ?? this.showEngineTuning,
@@ -174,6 +184,7 @@ class RemoteConfig extends Equatable {
     onDeviceEnabled,
     onDeviceNetUrl,
     onDeviceNetBytes,
+    onDeviceVisionModel,
     showBackendSection,
     showProvidersSection,
     showEngineTuning,

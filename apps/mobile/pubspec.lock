@@ -616,6 +616,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.1"
+  persistent_device_id:
+    dependency: "direct main"
+    description:
+      name: persistent_device_id
+      sha256: b9f95798a551a85d0781d24f2acbb9e443e3802c6a49c59f725ec4d4537ac8ac
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
   platform:
     dependency: transitive
     description:

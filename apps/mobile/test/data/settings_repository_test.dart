@@ -62,6 +62,16 @@ void main() {
       expect(reloaded.engineMoveTimeMs, 50);
     });
 
+    test('on-device vision model: blank override follows the backend default', () {
+      final s = AppSettings.defaults();
+      // Default is an empty OVERRIDE → resolves to the backend-provided value.
+      expect(s.onDeviceVisionModel, isEmpty);
+      expect(s.onDeviceVisionModelOr('gpt-5.4'), 'gpt-5.4');
+      // A user override wins over the backend default.
+      final overridden = s.copyWith(onDeviceVisionModel: 'gpt-5.4-mini');
+      expect(overridden.onDeviceVisionModelOr('gpt-5.4'), 'gpt-5.4-mini');
+    });
+
     test('falls back to defaults for malformed stored values', () async {
       final repo = await buildRepo({
         'settings.aiProvider': 'not-a-provider',

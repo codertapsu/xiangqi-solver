@@ -1,0 +1,4 @@
+{
+  "_comment": "Manual Hint Grants allowlist. Copy this to $HINTS_DATA_DIR/grants.json (default ./data/grants.json) and map a device's stable ID (from the app's Settings -> Device ID) to the number of hints it should start with on every (re)install. Higher priority than the install ledger; edits apply live (no restart). Keys starting with _ are ignored.",
+  "REPLACE_WITH_DEVICE_ID": 1000
+}

@@ -7,7 +7,12 @@ describe('RemoteConfigController', () => {
   const features: AppConfig['features'] = {
     ads: { rewarded: false, banner: true, appOpen: false, useReal: false },
     hints: { freeOnInstall: 10, ownKeyDivisor: 3 },
-    onDevice: { enabled: true, netUrl: 'https://example/pikafish.nnue', netBytes: 50760458 },
+    onDevice: {
+      enabled: true,
+      netUrl: 'https://example/pikafish.nnue',
+      netBytes: 50760458,
+      visionModel: 'gpt-5.4',
+    },
     ui: {
       backend: false,
       providers: false,

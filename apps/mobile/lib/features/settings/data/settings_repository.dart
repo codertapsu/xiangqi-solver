@@ -59,12 +59,15 @@ class AppSettings extends Equatable {
   /// [SideToMove.red] or [SideToMove.black] are ever stored here.
   final SideToMove mySide;
 
-  /// OpenAI vision model used by the On-device (BYO-key) path. Defaults to a
-  /// capable model; `gpt-4o-mini` is too weak to read the small piece glyphs
-  /// reliably (it misplaces advisors/elephants → illegal boards).
+  /// User OVERRIDE for the OpenAI vision model on the On-device (BYO-key) path.
+  /// Empty means "use the backend default" ([RemoteConfig.onDeviceVisionModel],
+  /// default gpt-5.4). On-device vision is OpenAI-only. `gpt-4o-mini` is too weak
+  /// to read the small piece glyphs reliably (it misplaces advisors/elephants).
+  /// Resolve the effective model with [onDeviceVisionModelOr].
   final String onDeviceVisionModel;
 
-  static const String _defaultOnDeviceVisionModel = 'gpt-5.4';
+  /// Empty default = follow the backend's `RemoteConfig.onDeviceVisionModel`.
+  static const String _defaultOnDeviceVisionModel = '';
 
   /// True when ANY part of the analysis runs on our backend (vision with our
   /// key, OR the cloud engine). Drives hint metering + whether the hint UI shows.
@@ -73,6 +76,13 @@ class AppSettings extends Equatable {
 
   /// True only for `own` key + `onDevice` engine — no backend, no hints.
   bool get isFullyLocal => !usesBackend;
+
+  /// The effective on-device vision model: the user's override if they set one,
+  /// otherwise the backend-provided [fallback] (`RemoteConfig.onDeviceVisionModel`).
+  String onDeviceVisionModelOr(String fallback) {
+    final m = onDeviceVisionModel.trim();
+    return m.isEmpty ? fallback : m;
+  }
 
   /// Zero-config defaults derived from compile-time env (see [AppConstants]).
   factory AppSettings.defaults() => const AppSettings(
@@ -245,12 +255,8 @@ class SettingsRepository {
       _prefs.setString(_kLanguage, settings.language),
       _prefs.setBool(_kStoreScreenshots, settings.storeScreenshots),
       _prefs.setString(_kMySide, settings.mySide.wireValue),
-      _prefs.setString(
-        _kOnDeviceVisionModel,
-        settings.onDeviceVisionModel.trim().isEmpty
-            ? AppSettings.defaults().onDeviceVisionModel
-            : settings.onDeviceVisionModel.trim(),
-      ),
+      // Stored as-is (empty = "follow the backend default"); resolved at use.
+      _prefs.setString(_kOnDeviceVisionModel, settings.onDeviceVisionModel.trim()),
     ]);
     return settings;
   }

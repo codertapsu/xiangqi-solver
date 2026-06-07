@@ -29,6 +29,10 @@ export interface AppConfig {
   upload: {
     maxBytes: number;
   };
+  /** Install-grant store (JSON files). */
+  hints: {
+    dataDir: string;
+  };
   rateLimit: {
     ttlSeconds: number;
     limit: number;
@@ -41,7 +45,7 @@ export interface AppConfig {
   features: {
     ads: { rewarded: boolean; banner: boolean; appOpen: boolean; useReal: boolean };
     hints: { freeOnInstall: number; ownKeyDivisor: number };
-    onDevice: { enabled: boolean; netUrl: string; netBytes: number };
+    onDevice: { enabled: boolean; netUrl: string; netBytes: number; visionModel: string };
     /** Visibility of optional settings sections (all default OFF). */
     ui: {
       backend: boolean;
@@ -85,6 +89,9 @@ export function configuration(): { app: AppConfig } {
     upload: {
       maxBytes: env.MAX_UPLOAD_BYTES,
     },
+    hints: {
+      dataDir: env.HINTS_DATA_DIR,
+    },
     rateLimit: {
       ttlSeconds: env.RATE_LIMIT_TTL,
       limit: env.RATE_LIMIT_LIMIT,
@@ -106,6 +113,7 @@ export function configuration(): { app: AppConfig } {
         enabled: env.ONDEVICE_ENABLED,
         netUrl: env.ONDEVICE_NET_URL,
         netBytes: env.ONDEVICE_NET_BYTES,
+        visionModel: env.ONDEVICE_VISION_MODEL,
       },
       ui: {
         backend: env.FEATURE_UI_BACKEND,

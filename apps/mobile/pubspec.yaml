@@ -28,6 +28,11 @@ dependencies:
   # Secure storage for the user's own API key (on-device / BYO-key mode).
   flutter_secure_storage: ^9.2.4
 
+  # Stable per-device id that survives uninstall/reinstall (MediaDrm on Android),
+  # used for the install-grant flow so the free hints can't be farmed by
+  # reinstalling. Falls back to a persisted random id when unavailable.
+  persistent_device_id: ^1.1.0
+
   # Platform / file utilities.
   path_provider: ^2.1.5
   permission_handler: ^11.3.1
