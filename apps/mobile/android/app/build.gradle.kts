@@ -72,17 +72,29 @@ android {
                 signingConfigs.getByName("debug")
             }
 
-            // Disable R8 code/resource shrinking. AGP 9 enables minification by
-            // DEFAULT for release; with no keep rules it strips Room's
-            // reflectively-loaded WorkDatabase_Impl. WorkManager (pulled in by
-            // google_mobile_ads via androidx.startup) then fails to initialize
-            // and the app CRASHES on launch ("Failed to create an instance of
-            // androidx.work.impl.WorkDatabase") — release-only, since debug never
-            // minifies. Matches the other codertapsu apps. To re-enable R8 later
-            // for a smaller APK, flip these to true and add keep rules for
-            // androidx.work / androidx.room / the plugins in proguard-rules.pro.
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // R8 code + resource shrinking ON (smaller app + a mapping file that
+            // resolves Play's "no deobfuscation file" warning). AGP 9 / R8 full
+            // mode would otherwise strip Room's reflectively-loaded
+            // WorkDatabase_Impl — pulled in via google_mobile_ads →
+            // androidx.startup → WorkManager → Room — and the app would CRASH on
+            // launch ("Failed to create an instance of
+            // androidx.work.impl.WorkDatabase"). proguard-rules.pro keeps
+            // WorkManager/Room/startup (+ Tink/Billing/Ads + the native bridge)
+            // so the shrunk release runs. Release-only; debug never minifies.
+            // VERIFY any plugin/dependency change with a real-device release
+            // launch — a missing keep crashes only in the minified build.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+
+            // Bundle native debug symbols (the Pikafish libpikafish.so and
+            // friends) so Play can symbolicate native crashes/ANRs.
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 }
