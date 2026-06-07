@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../../../core/remote_config/remote_config_provider.dart';
 import '../domain/hint_pack.dart';
@@ -72,15 +73,16 @@ class _GetMoreHintsSheetState extends ConsumerState<GetMoreHintsSheet> {
       _snack('Mock: +1 hint (no real ad).');
       return;
     }
+    final l10n = AppLocalizations.of(context);
     setState(() => _watchingAd = true);
     final shown = await ref.read(rewardedAdServiceProvider).show(
       onEarned: () {
         ref.read(walletProvider.notifier).add(1);
-        _snack('+1 hint — thanks for watching!');
+        _snack(l10n.hintsAdReward);
       },
     );
     if (mounted) setState(() => _watchingAd = false);
-    if (!shown) _snack('No ad is ready yet — please try again shortly.');
+    if (!shown) _snack(l10n.hintsNoAdReady);
   }
 
   /// Buy a consumable pack; hints are credited LOCALLY when Play confirms the
@@ -96,6 +98,7 @@ class _GetMoreHintsSheetState extends ConsumerState<GetMoreHintsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final balance = ref.watch(walletProvider);
     final billing = ref.read(billingServiceProvider);
     final theme = Theme.of(context);
@@ -111,14 +114,13 @@ class _GetMoreHintsSheetState extends ConsumerState<GetMoreHintsSheet> {
           children: [
             // ---- Header ----
             Text(
-              'Get more hints',
+              l10n.hintsGetMore,
               style: theme.textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
-              'You have $balance hint${balance == 1 ? '' : 's'}. '
-              'Each board analysis on our server uses one hint.',
+              l10n.hintsBalance(balance),
               style: theme.textTheme.bodySmall,
               textAlign: TextAlign.center,
             ),
@@ -136,13 +138,13 @@ class _GetMoreHintsSheetState extends ConsumerState<GetMoreHintsSheet> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.ondemand_video_outlined),
-                label: const Text('Watch an ad for +1 hint'),
+                label: Text(l10n.hintsWatchAd),
               ),
               const SizedBox(height: 20),
             ],
 
             // ---- Buy a pack ----
-            Text('Buy a hint pack', style: theme.textTheme.titleMedium),
+            Text(l10n.hintsBuyPack, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             for (final pack in kHintPacks)
               Padding(
@@ -159,8 +161,7 @@ class _GetMoreHintsSheetState extends ConsumerState<GetMoreHintsSheet> {
               ),
             if (!kUseMockMonetization && available.isEmpty)
               Text(
-                'Packs aren\'t available yet — create the products in Play Console '
-                '(or sign in to the Play Store) to enable purchases.',
+                l10n.hintsPacksUnavailable,
                 style: theme.textTheme.bodySmall,
               ),
           ],
@@ -182,6 +183,7 @@ class _PackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return OutlinedButton(
       onPressed: onBuy,
@@ -205,7 +207,7 @@ class _PackButton extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$hints hints', style: theme.textTheme.titleMedium),
+                Text(l10n.hintsPackTitle(hints), style: theme.textTheme.titleMedium),
                 const SizedBox(height: 2),
                 Text(
                   price ?? '—',

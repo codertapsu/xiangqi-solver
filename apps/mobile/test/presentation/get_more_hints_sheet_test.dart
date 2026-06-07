@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xiangqi_solver/app/theme/app_theme.dart';
 import 'package:xiangqi_solver/features/monetization/presentation/get_more_hints_sheet.dart';
 import 'package:xiangqi_solver/features/solver/presentation/providers/solver_providers.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../support/hint_grant_test_override.dart';
 import '../support/remote_config_test_override.dart';
@@ -58,6 +59,8 @@ class _Harness extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: AppTheme.light, // the real theme — full-width FilledButton, etc.
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
         child: child!,

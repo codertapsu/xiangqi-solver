@@ -35,6 +35,50 @@
 - A verified **release AAB builds** (`flutter build appbundle --release`).
 - **Dev mock mode** — run with `--dart-define=MOCK_MONETIZATION=true` to demo the wallet/ads/store UI with
   dummy data (local balance, instant 'watch ad'/'buy'), no AdMob/Play needed. Default off; never ship it on.
+- **Localized, Vietnamese-first** — the whole UI + the launcher name ship in Vietnamese and English
+  (see the next section). The bundle id is unchanged (`com.codertapsu.xiangqi_solver`).
+
+## App name & localization (Vietnamese-first)
+
+**Dynamic app name (launcher + in-app).** The app shows two names, chosen by device locale:
+
+| Device language | App name |
+|---|---|
+| Vietnamese (primary market) | **Quân Sư Cờ Tướng** |
+| Everything else | **Xiangqi Strategist** |
+
+How it's wired (already done — don't re-do):
+- `AndroidManifest.xml` uses `android:label="@string/app_name"` (no hardcoded name).
+- `android/app/src/main/res/values/strings.xml` → `app_name = "Xiangqi Strategist"` (default/fallback) + the
+  English overlay/notification strings.
+- `android/app/src/main/res/values-vi/strings.xml` → `app_name = "Quân Sư Cờ Tướng"` + the Vietnamese
+  overlay/notification strings. (Android picks this automatically on vi-locale devices.)
+- The **in-app** title (Home app bar, OS task switcher, the open-source-licenses page) uses the localized
+  `AppLocalizations.appTitle` via `onGenerateTitle`, so it matches the chosen UI language.
+- `applicationId` / namespace stay `com.codertapsu.xiangqi_solver` (a launcher-name change is NOT an id change).
+
+**UI localization (i18n).** The entire app UI is localized with Flutter `gen_l10n`:
+- Strings live in `apps/mobile/lib/l10n/app_en.arb` (template) and `app_vi.arb` (Vietnamese). The generated
+  `AppLocalizations` is written to `lib/l10n/gen/` — run `flutter gen-l10n` (or it regenerates on build because
+  `generate: true` is set in `pubspec.yaml`). `l10n.yaml` holds the config.
+- **Locale resolution:** the app follows the device locale among {vi, en} and **falls back to Vietnamese** for
+  any other device language (the default market) via the `localeResolutionCallback` in `lib/app/app.dart`.
+  Users can override it in **Settings → Language → App language** (System / Tiếng Việt / English); the choice is
+  persisted in `settings.appLanguage` and re-localizes the app live.
+- Code with no `BuildContext` (network / on-device / data-layer error messages) reads the active locale via
+  `AppL10n.current` (`lib/core/l10n/app_l10n.dart`), kept in sync by the app root.
+- "Move-notation language" (chess-notation OUTPUT — en/vi/zh) is a **separate** setting and is unchanged.
+- **Add a language later:** drop a translated `app_<code>.arb` beside the others, add `<code>` to
+  `kSupportedLanguageCodes` in `lib/core/l10n/locale_providers.dart`, add a `res/values-<code>/strings.xml`
+  for the launcher name, and `flutter gen-l10n`. No other code changes.
+
+**In Play Console (store listing — separate from the launcher label):**
+- Set the listing's **default language to Vietnamese (vi-VN)** (primary market), then **add English (en-US)** as
+  an additional listing language.
+- Title per listing language: **"Quân Sư Cờ Tướng"** for vi-VN, **"Xiangqi Strategist"** for en-US (Play's title
+  is per-language, ≤ 30 chars — both fit). For en-US discoverability, lean on "Xiangqi / Chinese Chess" in the
+  short/long description (Western users search "Chinese Chess" far more than "Xiangqi").
+- Localize the **in-app product** names/descriptions to vi-VN as well (see the IAP section).
 
 ## Release checklist (overview)
 
@@ -116,7 +160,7 @@ App identity (already set, confirm before first upload): `applicationId = com.co
 
 
 ### 2a. Create the app
-1. https://play.google.com/console → **Create app**. App name, default language (set Vietnamese if VN is the primary market), App/Game = App, Free/Paid = **Free** (monetization is via IAP/ads).
+1. https://play.google.com/console → **Create app**. **Default language = Vietnamese (vi-VN)** (primary market — see [App name & localization](#app-name--localization-vietnamese-first)); app name **"Quân Sư Cờ Tướng"** for the vi-VN listing (add an en-US listing titled "Xiangqi Strategist"); App/Game = App, Free/Paid = **Free** (monetization is via IAP/ads).
 2. Accept the developer program & US export declarations. The package name `com.codertapsu.xiangqi_solver` is fixed at first upload — it must match `applicationId` in `build.gradle.kts`.
 
 ### 2b. App signing (Play App Signing + your upload key)

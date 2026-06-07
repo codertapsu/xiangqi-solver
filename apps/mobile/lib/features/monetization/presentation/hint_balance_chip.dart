@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import 'get_more_hints_sheet.dart';
 import 'wallet_providers.dart';
@@ -11,13 +12,14 @@ class HintBalanceChip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final balance = ref.watch(walletProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
       child: ActionChip(
         avatar: const Icon(Icons.lightbulb_outline, size: 18),
         label: Text('$balance'),
-        tooltip: 'Hints — tap to get more',
+        tooltip: l10n.hintsChipTooltip,
         onPressed: () => showGetMoreHintsSheet(context),
       ),
     );

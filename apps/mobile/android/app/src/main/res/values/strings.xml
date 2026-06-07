@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Default (fallback) strings — used for every device language except those with
+  a values-<lang> override. The Vietnamese launcher name + native UI live in
+  values-vi/strings.xml ("Quân Sư Cờ Tướng").
+-->
 <resources>
-    <string name="app_name">Xiangqi Solver</string>
+    <string name="app_name">Xiangqi Strategist</string>
 
     <!-- Foreground-service notification (honest, non-misleading). -->
     <string name="notification_channel_name">Solver Mode</string>
-    <string name="notification_channel_description">Shown while Xiangqi Solver is capturing the screen for analysis.</string>
-    <string name="notification_title">Xiangqi Solver — Solver Mode active</string>
+    <string name="notification_channel_description">Shown while Xiangqi Strategist is capturing the screen for analysis.</string>
+    <string name="notification_title">Xiangqi Strategist — Solver Mode active</string>
     <string name="notification_text">Screen capture is enabled for board analysis. Tap the floating button to analyze.</string>
 
     <!-- Floating overlay widget. -->
@@ -18,5 +23,5 @@
     <string name="overlay_side_black">Black</string>
     <!-- %1$s = current side name; spoken by TalkBack on the toggle. -->
     <string name="overlay_switch_side_current">Switch side, playing as %1$s</string>
-    <string name="overlay_content_description">Xiangqi Solver floating analysis button</string>
+    <string name="overlay_content_description">Xiangqi Strategist floating analysis button</string>
 </resources>

@@ -11,6 +11,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Localization (gen_l10n) — generates AppLocalizations from lib/l10n/*.arb.
+  flutter_localizations:
+    sdk: flutter
+
   cupertino_icons: ^1.0.8
 
   # State management (no codegen).
@@ -59,6 +63,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Generate AppLocalizations from the ARB files (see l10n.yaml).
+  generate: true
 
   # NOTE: the on-device engine (Pikafish .so + NNUE) is NOT a Flutter asset and
   # is NOT bundled in release builds — it's GPLv3 + a non-commercial net, so it

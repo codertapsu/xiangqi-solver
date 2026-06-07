@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../features/history/presentation/history_page.dart';
 import '../features/settings/presentation/settings_page.dart';
@@ -46,9 +47,12 @@ GoRouter buildRouter() {
         },
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(title: const Text('Not found')),
-      body: Center(child: Text('No route for ${state.uri}')),
-    ),
+    errorBuilder: (context, state) {
+      final l10n = AppLocalizations.of(context);
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.routeNotFound)),
+        body: Center(child: Text(l10n.routeNoRoute(state.uri.toString()))),
+      );
+    },
   );
 }

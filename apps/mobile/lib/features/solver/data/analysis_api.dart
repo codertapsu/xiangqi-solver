@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:xiangqi_solver/core/l10n/app_l10n.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/exceptions.dart';
@@ -121,14 +122,14 @@ class AnalysisApi {
   }) async {
     if (!await screenshot.exists()) {
       throw FileException(
-        'Screenshot file not found at ${screenshot.path}.',
+        AppL10n.current.apiFileNotFound(screenshot.path),
         code: 'FILE_NOT_FOUND',
       );
     }
     final length = await screenshot.length();
     if (length > AppConstants.maxUploadBytes) {
-      throw const FileException(
-        'Image is larger than the 8 MB upload limit.',
+      throw FileException(
+        AppL10n.current.apiFileTooLarge,
         code: 'FILE_TOO_LARGE',
       );
     }
@@ -164,7 +165,7 @@ class AnalysisApi {
   }) async {
     if (!await screenshot.exists()) {
       throw FileException(
-        'Screenshot file not found at ${screenshot.path}.',
+        AppL10n.current.apiFileNotFound(screenshot.path),
         code: 'FILE_NOT_FOUND',
       );
     }
@@ -205,8 +206,8 @@ class AnalysisApi {
     }
     final data = body['data'];
     if (data is! Map) {
-      throw const ParseException(
-        'Response envelope is missing a data object.',
+      throw ParseException(
+        AppL10n.current.apiMissingData,
         code: 'MISSING_DATA',
       );
     }
@@ -214,8 +215,8 @@ class AnalysisApi {
       return fromJson(data.cast<String, dynamic>());
     } catch (e) {
       _log.warn('Failed to parse response data: $e');
-      throw const ParseException(
-        'Could not understand the server response.',
+      throw ParseException(
+        AppL10n.current.apiParseError,
         code: 'PARSE_ERROR',
       );
     }
@@ -228,14 +229,14 @@ class AnalysisApi {
     final error = body['error'];
     if (error is Map) {
       return ServerException(
-        error['message']?.toString() ?? 'The server reported an error.',
+        error['message']?.toString() ?? AppL10n.current.apiServerError,
         code: error['code']?.toString(),
         statusCode: statusCode,
         details: error['details'],
       );
     }
     return ServerException(
-      'The server returned an error (HTTP ${statusCode ?? '?'}).',
+      AppL10n.current.apiServerHttpError('${statusCode ?? '?'}'),
       code: 'HTTP_$statusCode',
       statusCode: statusCode,
     );
@@ -245,7 +246,7 @@ class AnalysisApi {
     final code = response.statusCode ?? 0;
     if (code < 200 || code >= 300) {
       throw ServerException(
-        'Health check failed (HTTP $code).',
+        AppL10n.current.apiHealthFailed(code),
         code: 'HTTP_$code',
         statusCode: code,
       );
@@ -255,7 +256,7 @@ class AnalysisApi {
   Map<String, dynamic> _asMap(dynamic data, {required String context}) {
     if (data is Map) return data.cast<String, dynamic>();
     throw ParseException(
-      'Expected a JSON object for $context but got ${data.runtimeType}.',
+      AppL10n.current.apiParseContext(context, data.runtimeType.toString()),
       code: 'NOT_AN_OBJECT',
     );
   }

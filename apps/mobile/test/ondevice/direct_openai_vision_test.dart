@@ -207,6 +207,6 @@ void main() {
       apiKey: 'sk-test',
     );
     expect(result.pieces, hasLength(1));
-    expect(result.warnings.any((w) => w.contains('malformed')), isTrue);
+    expect(result.warnings.any((w) => w.contains('unreadable')), isTrue);
   });
 }

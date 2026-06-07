@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:xiangqi_solver/core/l10n/app_l10n.dart';
 
 import '../../../../core/remote_config/remote_config_provider.dart';
 import '../../../../core/utils/logger.dart';
@@ -138,7 +139,7 @@ class EngineNetNotifier extends StateNotifier<EngineNetState> {
         if (t.existsSync()) await t.delete();
       } catch (_) {}
       if (mounted) {
-        state = EngineNetFailed('Could not download the on-device engine. $e');
+        state = EngineNetFailed(AppL10n.current.engineDownloadFailed('$e'));
       }
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../../solver/presentation/providers/solver_providers.dart';
 import '../../solver/presentation/widgets/section_card.dart';
@@ -16,14 +17,15 @@ class HistoryPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final entries = ref.watch(historyListProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('History'),
+        title: Text(l10n.historyTitle),
         actions: [
           if (entries.isNotEmpty)
             IconButton(
-              tooltip: 'Clear history',
+              tooltip: l10n.historyClear,
               icon: const Icon(Icons.delete_outline),
               onPressed: () => _confirmClear(context, ref),
             ),
@@ -49,19 +51,20 @@ class HistoryPage extends ConsumerWidget {
   }
 
   Future<void> _confirmClear(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear history?'),
-        content: const Text('This removes all locally stored analysis records.'),
+        title: Text(l10n.historyClearTitle),
+        content: Text(l10n.historyClearBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.actionCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            child: Text(l10n.actionClear),
           ),
         ],
       ),
@@ -82,32 +85,37 @@ class _HistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final formatted = DateFormat.yMMMd().add_Hms().format(entry.timestamp);
-    final pct = (entry.confidence.clamp(0, 1) * 100).toStringAsFixed(0);
+    final pctValue = (entry.confidence.clamp(0, 1) * 100).round();
+    final pct = l10n.percentValue(pctValue);
     return Card(
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
         shape: const Border(),
         leading: const Icon(Icons.history),
-        title: Text(entry.bestMoveUci ?? 'No move'),
-        subtitle: Text('$formatted • ${entry.aiProvider} • $pct%'),
+        title: Text(entry.bestMoveUci ?? l10n.historyNoMove),
+        subtitle: Text('$formatted • ${entry.aiProvider} • $pct'),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          _DetailRow(label: 'Analysis ID', value: entry.analysisId),
-          _DetailRow(label: 'Side to move', value: entry.sideToMove),
+          _DetailRow(label: l10n.historyAnalysisId, value: entry.analysisId),
+          _DetailRow(label: l10n.historySideToMove, value: entry.sideToMove),
           _DetailRow(
-            label: 'Best move (UCI)',
+            label: l10n.historyBestMoveUci,
             value: entry.bestMoveUci ?? '—',
           ),
           _DetailRow(
-            label: 'Best move',
+            label: l10n.historyBestMove,
             value: entry.bestMoveHuman ?? '—',
           ),
-          _DetailRow(label: 'Vision provider', value: entry.aiProvider),
-          _DetailRow(label: 'Engine provider', value: entry.engineProvider),
-          _DetailRow(label: 'Confidence', value: '$pct%'),
+          _DetailRow(label: l10n.historyVisionProvider, value: entry.aiProvider),
+          _DetailRow(
+            label: l10n.historyEngineProvider,
+            value: entry.engineProvider,
+          ),
+          _DetailRow(label: l10n.historyConfidence, value: pct),
           if (entry.screenshotPath != null)
-            _DetailRow(label: 'Screenshot', value: entry.screenshotPath!),
+            _DetailRow(label: l10n.historyScreenshot, value: entry.screenshotPath!),
         ],
       ),
     );
@@ -151,15 +159,15 @@ class _EmptyHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: SectionCard(
-          title: 'No history yet',
+          title: l10n.historyEmptyTitle,
           icon: Icons.history_toggle_off,
           child: Text(
-            'Analyses you run will appear here as local metadata '
-            '(timestamp, provider, best move, confidence).',
+            l10n.historyEmptyBody,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),
