@@ -25,6 +25,7 @@ class AppSettings extends Equatable {
     required this.engineThreads,
     required this.engineHashMb,
     required this.language,
+    required this.appLanguage,
     required this.storeScreenshots,
     required this.mySide,
     required this.onDeviceVisionModel,
@@ -51,7 +52,14 @@ class AppSettings extends Equatable {
 
   /// Pikafish transposition-table size in MB (16..1024). Ignored by the mock engine.
   final int engineHashMb;
+
+  /// Move-notation language code ('en' | 'vi' | 'zh') for chess-notation output.
   final String language;
+
+  /// App UI language: 'system' (follow the device), 'vi', or 'en'. See
+  /// [AppConstants.defaultAppLanguage] and the locale providers.
+  final String appLanguage;
+
   final bool storeScreenshots;
 
   /// The side the user is playing. Sent to the backend as the authoritative
@@ -97,6 +105,7 @@ class AppSettings extends Equatable {
     engineThreads: AppConstants.defaultEngineThreads,
     engineHashMb: AppConstants.defaultEngineHashMb,
     language: AppConstants.defaultLanguage,
+    appLanguage: AppConstants.defaultAppLanguage,
     storeScreenshots: false,
     mySide: _defaultMySide,
     onDeviceVisionModel: _defaultOnDeviceVisionModel,
@@ -131,6 +140,7 @@ class AppSettings extends Equatable {
     int? engineThreads,
     int? engineHashMb,
     String? language,
+    String? appLanguage,
     bool? storeScreenshots,
     SideToMove? mySide,
     String? onDeviceVisionModel,
@@ -147,6 +157,7 @@ class AppSettings extends Equatable {
       engineThreads: engineThreads ?? this.engineThreads,
       engineHashMb: engineHashMb ?? this.engineHashMb,
       language: language ?? this.language,
+      appLanguage: appLanguage ?? this.appLanguage,
       storeScreenshots: storeScreenshots ?? this.storeScreenshots,
       mySide: mySide ?? this.mySide,
       onDeviceVisionModel: onDeviceVisionModel ?? this.onDeviceVisionModel,
@@ -166,6 +177,7 @@ class AppSettings extends Equatable {
     engineThreads,
     engineHashMb,
     language,
+    appLanguage,
     storeScreenshots,
     mySide,
     onDeviceVisionModel,
@@ -194,6 +206,7 @@ class SettingsRepository {
   static const String _kEngineThreads = 'settings.engineThreads';
   static const String _kEngineHashMb = 'settings.engineHashMb';
   static const String _kLanguage = 'settings.language';
+  static const String _kAppLanguage = 'settings.appLanguage';
   static const String _kStoreScreenshots = 'settings.storeScreenshots';
   static const String _kMySide = 'settings.mySide';
   static const String _kOnDeviceVisionModel = 'settings.onDeviceVisionModel';
@@ -233,6 +246,7 @@ class SettingsRepository {
       engineThreads: _clampInt(_prefs.getInt(_kEngineThreads) ?? defaults.engineThreads, 1, 8),
       engineHashMb: _clampInt(_prefs.getInt(_kEngineHashMb) ?? defaults.engineHashMb, 16, 1024),
       language: _readString(_kLanguage, defaults.language),
+      appLanguage: _readAppLanguage(defaults.appLanguage),
       storeScreenshots: _prefs.getBool(_kStoreScreenshots) ?? defaults.storeScreenshots,
       mySide: _readSide(_prefs.getString(_kMySide), defaults.mySide),
       onDeviceVisionModel: _readString(_kOnDeviceVisionModel, defaults.onDeviceVisionModel),
@@ -253,6 +267,7 @@ class SettingsRepository {
       _prefs.setInt(_kEngineThreads, _clampInt(settings.engineThreads, 1, 8)),
       _prefs.setInt(_kEngineHashMb, _clampInt(settings.engineHashMb, 16, 1024)),
       _prefs.setString(_kLanguage, settings.language),
+      _prefs.setString(_kAppLanguage, settings.appLanguage),
       _prefs.setBool(_kStoreScreenshots, settings.storeScreenshots),
       _prefs.setString(_kMySide, settings.mySide.wireValue),
       // Stored as-is (empty = "follow the backend default"); resolved at use.
@@ -265,6 +280,13 @@ class SettingsRepository {
     final value = _prefs.getString(key);
     if (value == null || value.trim().isEmpty) return fallback;
     return value;
+  }
+
+  /// Reads the app UI language, constraining it to a supported value; anything
+  /// missing or unknown falls back to [fallback] (default 'system').
+  String _readAppLanguage(String fallback) {
+    final value = _prefs.getString(_kAppLanguage);
+    return (value == 'system' || value == 'vi' || value == 'en') ? value! : fallback;
   }
 
   /// Parses a stored side, constraining it to the two playable sides; anything

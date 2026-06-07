@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:xiangqi_solver/core/l10n/enum_l10n.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../../domain/solver_enums.dart';
 
@@ -15,15 +17,16 @@ class AiProviderDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return DropdownButtonFormField<AiProvider>(
       initialValue: value,
-      decoration: const InputDecoration(
-        labelText: 'AI provider',
-        prefixIcon: Icon(Icons.visibility_outlined),
+      decoration: InputDecoration(
+        labelText: l10n.providerAiLabel,
+        prefixIcon: const Icon(Icons.visibility_outlined),
       ),
       items: [
         for (final p in AiProvider.values)
-          DropdownMenuItem(value: p, child: Text(p.label)),
+          DropdownMenuItem(value: p, child: Text(p.localizedLabel(l10n))),
       ],
       onChanged: (v) {
         if (v != null) onChanged(v);
@@ -45,15 +48,16 @@ class EngineProviderDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return DropdownButtonFormField<EngineProvider>(
       initialValue: value,
-      decoration: const InputDecoration(
-        labelText: 'Engine provider',
-        prefixIcon: Icon(Icons.memory_outlined),
+      decoration: InputDecoration(
+        labelText: l10n.providerEngineLabel,
+        prefixIcon: const Icon(Icons.memory_outlined),
       ),
       items: [
         for (final p in EngineProvider.values)
-          DropdownMenuItem(value: p, child: Text(p.label)),
+          DropdownMenuItem(value: p, child: Text(p.localizedLabel(l10n))),
       ],
       onChanged: (v) {
         if (v != null) onChanged(v);

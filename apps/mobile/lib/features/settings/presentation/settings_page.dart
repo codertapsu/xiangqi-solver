@@ -5,6 +5,8 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
+
 import '../../../core/constants/app_constants.dart';
 import '../../../core/remote_config/remote_config_provider.dart';
 import '../../monetization/presentation/banner_ad.dart';
@@ -57,12 +59,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   SettingsNotifier get _notifier => ref.read(settingsProvider.notifier);
 
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final remoteConfig = ref.watch(remoteConfigProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(_l10n.settingsTitle)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -99,6 +103,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// option) the API-key + vision-model fields.
   Widget _buildModeCard(AppSettings settings) {
     final theme = Theme.of(context);
+    final l10n = _l10n;
     final netState = ref.watch(engineNetProvider);
     final onDeviceUnavailable =
         netState is EngineNetUnsupported || netState is EngineNetFailed;
@@ -111,30 +116,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         if (!mounted) return;
         if (ref.read(settingsProvider).engineLocation != EngineLocation.onDevice) return;
         _notifier.patch((s) => s.copyWith(engineLocation: EngineLocation.cloud));
-        _snack('On-device engine unavailable — switched the engine to Cloud.');
+        _snack(_l10n.settingsEngineSwitchedCloud);
       });
     }
 
     return SectionCard(
-      title: 'Analysis mode',
+      title: l10n.settingsAnalysisMode,
       icon: Icons.dns_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Board reading (AI key)', style: theme.textTheme.titleSmall),
+          Text(l10n.settingsBoardReading, style: theme.textTheme.titleSmall),
           const SizedBox(height: 6),
           SegmentedButton<AiKeySource>(
             showSelectedIcon: false,
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: AiKeySource.ours,
-                label: Text('Our key'),
-                icon: Icon(Icons.cloud_outlined),
+                label: Text(l10n.settingsOurKeyShort),
+                icon: const Icon(Icons.cloud_outlined),
               ),
               ButtonSegment(
                 value: AiKeySource.own,
-                label: Text('My key'),
-                icon: Icon(Icons.key_outlined),
+                label: Text(l10n.settingsMyKeyShort),
+                icon: const Icon(Icons.key_outlined),
               ),
             ],
             selected: {settings.aiKeySource},
@@ -143,9 +148,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 4),
           Text(
             settings.aiKeySource == AiKeySource.own
-                ? 'Your own OpenAI key reads the board on this device — usually '
-                      'cheaper, and your key never leaves your phone.'
-                : 'We read the board for you using our OpenAI key.',
+                ? l10n.settingsBoardReadingOwnDesc
+                : l10n.settingsBoardReadingOursDesc,
             style: theme.textTheme.bodySmall,
           ),
 
@@ -160,19 +164,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
 
           const SizedBox(height: 16),
-          Text('Best move (engine)', style: theme.textTheme.titleSmall),
+          Text(l10n.settingsBestMoveEngine, style: theme.textTheme.titleSmall),
           const SizedBox(height: 6),
           SegmentedButton<EngineLocation>(
             showSelectedIcon: false,
             segments: [
-              const ButtonSegment(
+              ButtonSegment(
                 value: EngineLocation.cloud,
-                label: Text('Cloud'),
-                icon: Icon(Icons.cloud_outlined),
+                label: Text(l10n.engineLocationCloud),
+                icon: const Icon(Icons.cloud_outlined),
               ),
               ButtonSegment(
                 value: EngineLocation.onDevice,
-                label: const Text('On-device'),
+                label: Text(l10n.engineLocationOnDevice),
                 icon: const Icon(Icons.smartphone_outlined),
                 enabled: !onDeviceUnavailable,
               ),
@@ -183,9 +187,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 4),
           Text(
             settings.engineLocation == EngineLocation.onDevice
-                ? 'On-device engine is faster, but its move may be weaker or less '
-                      'accurate than our cloud engine.'
-                : 'Our cloud engine computes the best move.',
+                ? l10n.settingsEngineOnDeviceDesc
+                : l10n.settingsEngineCloudDesc,
             style: theme.textTheme.bodySmall,
           ),
 
@@ -201,6 +204,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// Download progress / ready / failed status for the on-device engine net.
   Widget _buildEngineNetStatus(EngineNetState state) {
     final theme = Theme.of(context);
+    final l10n = _l10n;
     switch (state) {
       case EngineNetDownloading(:final progress):
         return Padding(
@@ -218,8 +222,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   const SizedBox(width: 8),
                   Text(
                     progress == null
-                        ? 'Downloading on-device engine…'
-                        : 'Downloading on-device engine ${(progress * 100).round()}%',
+                        ? l10n.settingsDownloadingEngine
+                        : l10n.settingsDownloadingEnginePct((progress * 100).round()),
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
@@ -236,7 +240,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               Icon(Icons.check_circle_outline, size: 16, color: theme.colorScheme.primary),
               const SizedBox(width: 6),
-              Text('On-device engine ready.', style: theme.textTheme.bodySmall),
+              Text(l10n.settingsEngineReady, style: theme.textTheme.bodySmall),
             ],
           ),
         );
@@ -254,7 +258,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 alignment: Alignment.centerLeft,
                 child: TextButton(
                   onPressed: () => ref.read(engineNetProvider.notifier).retry(),
-                  child: const Text('Retry download'),
+                  child: Text(l10n.settingsRetryDownload),
                 ),
               ),
             ],
@@ -268,17 +272,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   /// One-line summary of what the current mode costs in hints.
   Widget _buildCostHint(AppSettings settings, ThemeData theme) {
+    final l10n = _l10n;
     final String text;
     if (settings.isFullyLocal) {
       final n = ref.watch(remoteConfigProvider).ownKeyHintDivisor;
-      text =
-          'Runs on your device — no hints used, unless the on-device engine '
-          'can\'t solve and we finish on our cloud (1 hint per $n).';
+      text = l10n.costHintOwnOnDevice(n);
     } else if (settings.aiKeySource == AiKeySource.ours) {
-      text = 'Uses our key — 1 hint per analysis.';
+      text = l10n.costHintOurs;
     } else {
       final n = ref.watch(remoteConfigProvider).ownKeyHintDivisor;
-      text = 'Your key + our cloud engine — 1 hint per $n analyses.';
+      text = l10n.costHintOwnCloud(n);
     }
     return Text(
       text,
@@ -289,6 +292,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// The personal OpenAI key field (always, when AI key = own) plus the optional
   /// vision-model field (shown only when [showVisionModel] is enabled remotely).
   Widget _buildOwnKeyFields(ThemeData theme, {required bool showVisionModel}) {
+    final l10n = _l10n;
     final backendModel = ref.watch(remoteConfigProvider).onDeviceVisionModel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -299,11 +303,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           autocorrect: false,
           enableSuggestions: false,
           decoration: InputDecoration(
-            labelText: 'Your OpenAI API key',
+            labelText: l10n.settingsApiKeyLabel,
             hintText: 'sk-…',
             prefixIcon: const Icon(Icons.key_outlined),
             suffixIcon: IconButton(
-              tooltip: _apiKeyObscured ? 'Show' : 'Hide',
+              tooltip: _apiKeyObscured ? l10n.actionShow : l10n.actionHide,
               icon: Icon(_apiKeyObscured ? Icons.visibility : Icons.visibility_off),
               onPressed: () => setState(() => _apiKeyObscured = !_apiKeyObscured),
             ),
@@ -316,15 +320,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               child: FilledButton.tonalIcon(
                 onPressed: _saveApiKey,
                 icon: const Icon(Icons.save_outlined),
-                label: const Text('Save key'),
+                label: Text(l10n.settingsSaveKey),
               ),
             ),
             const SizedBox(width: 12),
-            TextButton(onPressed: _clearApiKey, child: const Text('Clear')),
+            TextButton(onPressed: _clearApiKey, child: Text(l10n.actionClear)),
           ],
         ),
         Text(
-          'Stored only on this device (secure storage); never sent to our backend.',
+          l10n.settingsApiKeyHelp,
           style: theme.textTheme.bodySmall,
         ),
         if (showVisionModel) ...[
@@ -334,14 +338,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             autocorrect: false,
             enableSuggestions: false,
             decoration: InputDecoration(
-              labelText: 'Vision model (OpenAI)',
+              labelText: l10n.settingsVisionModelLabel,
               hintText: backendModel,
               prefixIcon: const Icon(Icons.visibility_outlined),
               helperMaxLines: 3,
-              helperText:
-                  'OpenAI model that reads the board from your screenshot. Leave '
-                  'blank to use the recommended model ($backendModel). Avoid '
-                  'gpt-4o-mini — it misreads pieces and produces illegal boards.',
+              helperText: l10n.settingsVisionModelHelp(backendModel),
             ),
             onChanged: (v) => _notifier.patch((s) => s.copyWith(onDeviceVisionModel: v.trim())),
           ),
@@ -372,35 +373,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       case ModeCheckOutcome.ready:
         break;
       case ModeCheckOutcome.switchedToOnDevice:
-        _snack('Server unavailable — switched to your own key + on-device engine.');
+        _snack(_l10n.settingsServerSwitchedOwn);
       case ModeCheckOutcome.noModeAvailable:
-        _snack('Server unavailable. Add your own OpenAI key to analyze on-device.');
+        _snack(_l10n.settingsServerAddKey);
     }
   }
 
   Future<void> _saveApiKey() async {
     await ref.read(secureKeyStoreProvider).writeOpenAiKey(_apiKeyController.text);
-    _snack('API key saved on this device.');
+    _snack(_l10n.settingsApiKeySaved);
   }
 
   Future<void> _clearApiKey() async {
     await ref.read(secureKeyStoreProvider).clearOpenAiKey();
     _apiKeyController.clear();
-    _snack('API key cleared.');
+    _snack(_l10n.settingsApiKeyCleared);
   }
 
   Widget _buildBackendCard() {
     return SectionCard(
-      title: 'Backend',
+      title: _l10n.backendTitle,
       icon: Icons.cloud_outlined,
       child: TextField(
         controller: _backendController,
         keyboardType: TextInputType.url,
         autocorrect: false,
-        decoration: const InputDecoration(
-          labelText: 'Base URL',
+        decoration: InputDecoration(
+          labelText: _l10n.backendBaseUrlLabel,
           hintText: 'http://10.0.2.2:3000',
-          prefixIcon: Icon(Icons.link),
+          prefixIcon: const Icon(Icons.link),
         ),
         onChanged: (value) =>
             _notifier.patch((s) => s.copyWith(backendUrl: value.trim())),
@@ -410,14 +411,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildSideCard(AppSettings settings) {
     return SectionCard(
-      title: 'Your side',
+      title: _l10n.homeYourSide,
       icon: Icons.flag_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Pick the side you are playing. The backend treats this as the side '
-            'to move, so the engine always solves for your turn.',
+            _l10n.settingsYourSideDesc,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
@@ -433,7 +433,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildProvidersCard(AppSettings settings) {
     return SectionCard(
-      title: 'Providers',
+      title: _l10n.providersTitle,
       icon: Icons.tune,
       child: Column(
         children: [
@@ -453,13 +453,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildEngineCard(AppSettings settings) {
+    final l10n = _l10n;
     return SectionCard(
-      title: 'Engine tuning',
+      title: l10n.settingsEngineTuning,
       icon: Icons.memory_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Search depth: ${settings.engineDepth}'),
+          Text(l10n.settingsSearchDepth(settings.engineDepth)),
           Slider(
             value: settings.engineDepth.toDouble(),
             min: 1,
@@ -470,7 +471,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _notifier.patch((s) => s.copyWith(engineDepth: v.round())),
           ),
           const SizedBox(height: 8),
-          Text('Move time: ${settings.engineMoveTimeMs} ms'),
+          Text(l10n.settingsMoveTime(settings.engineMoveTimeMs)),
           Slider(
             value: settings.engineMoveTimeMs
                 .toDouble()
@@ -483,7 +484,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 .patch((s) => s.copyWith(engineMoveTimeMs: v.round())),
           ),
           const SizedBox(height: 8),
-          Text('Top moves to show: ${settings.engineMultiPv}'),
+          Text(l10n.settingsTopMoves(settings.engineMultiPv)),
           Slider(
             value: settings.engineMultiPv.toDouble().clamp(1, 5),
             min: 1,
@@ -494,7 +495,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _notifier.patch((s) => s.copyWith(engineMultiPv: v.round())),
           ),
           const SizedBox(height: 8),
-          Text('Threads: ${settings.engineThreads}'),
+          Text(l10n.settingsThreads(settings.engineThreads)),
           Slider(
             value: settings.engineThreads.toDouble().clamp(1, 8),
             min: 1,
@@ -505,7 +506,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _notifier.patch((s) => s.copyWith(engineThreads: v.round())),
           ),
           const SizedBox(height: 8),
-          Text('Hash: ${settings.engineHashMb} MB'),
+          Text(l10n.settingsHash(settings.engineHashMb)),
           Slider(
             value: settings.engineHashMb.toDouble().clamp(16, 1024),
             min: 16,
@@ -516,9 +517,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _notifier.patch((s) => s.copyWith(engineHashMb: v.round())),
           ),
           Text(
-            'Threads & Hash make the engine faster. "Top moves" shows several of '
-            'its best options. For a quicker answer, lower the search depth or '
-            'move time — this won\'t make it play weaker.',
+            l10n.settingsEngineTuningHelp,
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -532,18 +531,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildCaptureAreaCard() {
     final native = ref.read(nativeSolverProvider);
     if (!native.isSupported) return const SizedBox.shrink();
+    final l10n = _l10n;
     return Column(
       children: [
         SectionCard(
-          title: 'Capture area',
+          title: l10n.settingsCaptureArea,
           icon: Icons.crop_free,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'By default the whole screen is captured. In Solver Mode you can '
-                'draw a focus box (e.g. just the board) from the floating '
-                'widget’s “Select capture area”, or start it here.',
+                l10n.settingsCaptureAreaDesc,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 12),
@@ -553,7 +551,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     child: OutlinedButton.icon(
                       onPressed: _selectCaptureArea,
                       icon: const Icon(Icons.crop),
-                      label: const Text('Select area'),
+                      label: Text(l10n.settingsSelectArea),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -561,7 +559,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     child: TextButton.icon(
                       onPressed: _resetCaptureArea,
                       icon: const Icon(Icons.fullscreen),
-                      label: const Text('Use full screen'),
+                      label: Text(l10n.settingsUseFullScreen),
                     ),
                   ),
                 ],
@@ -578,13 +576,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     try {
       await ref.read(nativeSolverProvider).startRegionSelection();
     } catch (_) {
-      _snack('Start Solver Mode first, then select the capture area.');
+      _snack(_l10n.settingsStartSolverFirst);
     }
   }
 
   Future<void> _resetCaptureArea() async {
     await ref.read(nativeSolverProvider).clearCaptureRegion();
-    _snack('Capture area reset to full screen.');
+    _snack(_l10n.settingsCaptureReset);
   }
 
   void _snack(String message) {
@@ -595,29 +593,53 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildLanguageCard(AppSettings settings) {
+    final l10n = _l10n;
     return SectionCard(
-      title: 'Language',
+      title: l10n.settingsLanguageCard,
       icon: Icons.language_outlined,
-      child: DropdownButtonFormField<String>(
-        initialValue: settings.language,
-        decoration: const InputDecoration(
-          labelText: 'Move-notation language',
-        ),
-        items: const [
-          DropdownMenuItem(value: 'en', child: Text('English')),
-          DropdownMenuItem(value: 'vi', child: Text('Tiếng Việt')),
-          DropdownMenuItem(value: 'zh', child: Text('中文')),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // App UI language. Changing this re-localizes the whole app live.
+          DropdownButtonFormField<String>(
+            initialValue: settings.appLanguage,
+            decoration: InputDecoration(
+              labelText: l10n.settingsAppLanguage,
+            ),
+            items: [
+              DropdownMenuItem(value: 'system', child: Text(l10n.languageSystem)),
+              const DropdownMenuItem(value: 'vi', child: Text('Tiếng Việt')),
+              const DropdownMenuItem(value: 'en', child: Text('English')),
+            ],
+            onChanged: (v) {
+              if (v != null) _notifier.patch((s) => s.copyWith(appLanguage: v));
+            },
+          ),
+          const SizedBox(height: 12),
+          // Chess move-notation output language (independent of the UI language).
+          DropdownButtonFormField<String>(
+            initialValue: settings.language,
+            decoration: InputDecoration(
+              labelText: l10n.settingsMoveNotationLanguage,
+            ),
+            items: const [
+              DropdownMenuItem(value: 'en', child: Text('English')),
+              DropdownMenuItem(value: 'vi', child: Text('Tiếng Việt')),
+              DropdownMenuItem(value: 'zh', child: Text('中文')),
+            ],
+            onChanged: (v) {
+              if (v != null) _notifier.patch((s) => s.copyWith(language: v));
+            },
+          ),
         ],
-        onChanged: (v) {
-          if (v != null) _notifier.patch((s) => s.copyWith(language: v));
-        },
       ),
     );
   }
 
   Widget _buildPrivacyCard(AppSettings settings) {
+    final l10n = _l10n;
     return SectionCard(
-      title: 'Privacy',
+      title: l10n.settingsPrivacy,
       icon: Icons.privacy_tip_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -625,18 +647,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: settings.storeScreenshots,
-            title: const Text('Store screenshots locally'),
-            subtitle: const Text(
-              'Off by default. When on, analyzed images are kept on this device '
-              'and shown in history.',
-            ),
+            title: Text(l10n.settingsStoreScreenshots),
+            subtitle: Text(l10n.settingsStoreScreenshotsDesc),
             onChanged: (v) =>
                 _notifier.patch((s) => s.copyWith(storeScreenshots: v)),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.policy_outlined),
-            title: const Text('Privacy Policy'),
+            title: Text(l10n.settingsPrivacyPolicy),
             trailing: const Icon(Icons.open_in_new, size: 18),
             onTap: _openPrivacyPolicy,
           ),
@@ -644,12 +663,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.description_outlined),
-              title: const Text('Open-source licenses'),
-              // subtitle: const Text('Incl. the GPLv3 Pikafish on-device engine'),
+              title: Text(l10n.settingsLicenses),
               trailing: const Icon(Icons.chevron_right, size: 18),
               onTap: () => showLicensePage(
                 context: context,
-                applicationName: AppConstants.appName,
+                applicationName: _l10n.appTitle,
               ),
             ),
           _buildDeviceIdTile(),
@@ -665,7 +683,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.fingerprint_outlined),
-      title: const Text('Device ID'),
+      title: Text(_l10n.settingsDeviceId),
       subtitle: Text(
         deviceId,
         maxLines: 1,
@@ -677,7 +695,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       trailing: const Icon(Icons.copy_outlined, size: 18),
       onTap: () async {
         await Clipboard.setData(ClipboardData(text: deviceId));
-        _snack('Device ID copied.');
+        _snack(_l10n.settingsDeviceIdCopied);
       },
     );
   }
@@ -689,7 +707,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
-          const SnackBar(content: Text('Could not open the privacy policy.')),
+          SnackBar(content: Text(_l10n.settingsPrivacyOpenFailed)),
         );
     }
   }

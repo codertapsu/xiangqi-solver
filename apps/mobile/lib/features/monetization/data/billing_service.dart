@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:xiangqi_solver/core/l10n/app_l10n.dart';
 
 import '../../../core/utils/logger.dart';
 
@@ -59,7 +60,7 @@ class BillingService {
   Future<void> buy(String productId) async {
     final details = _products[productId];
     if (details == null) {
-      onError?.call('That pack isn\'t available right now.');
+      onError?.call(AppL10n.current.billingPackUnavailable);
       return;
     }
     // Consumable so packs can be re-bought. autoConsume=true is the standard path.
@@ -77,7 +78,7 @@ class BillingService {
           onPurchased?.call(purchase.productID);
           if (purchase.pendingCompletePurchase) await _iap.completePurchase(purchase);
         case PurchaseStatus.error:
-          onError?.call(purchase.error?.message ?? 'Purchase failed.');
+          onError?.call(purchase.error?.message ?? AppL10n.current.billingPurchaseFailed);
           if (purchase.pendingCompletePurchase) await _iap.completePurchase(purchase);
         case PurchaseStatus.canceled:
           if (purchase.pendingCompletePurchase) await _iap.completePurchase(purchase);

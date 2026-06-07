@@ -1,0 +1,18 @@
+# Flutter gen_l10n configuration.
+#
+# Source ARB files live in lib/l10n (app_en.arb is the template / source of
+# truth for keys + metadata; app_vi.arb is the Vietnamese translation). The
+# generated AppLocalizations is written into source (synthetic packages are
+# removed in modern Flutter) at lib/l10n/gen/app_localizations.dart.
+#
+# Regenerate with `flutter gen-l10n` (also runs automatically on build because
+# `generate: true` is set in pubspec.yaml).
+arb-dir: lib/l10n
+output-dir: lib/l10n/gen
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
+# Vietnamese is the primary market, but English is the metadata template; a
+# device locale we don't translate falls back via the resolution callback in
+# app.dart (→ Vietnamese, the default market).

@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/failure.dart';
+import '../../../../core/l10n/app_l10n.dart';
+import '../../../../core/l10n/enum_l10n.dart';
 import '../../../../core/network/api_result.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/platform/method_channel_native_solver.dart';
@@ -306,7 +308,7 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
           isRunning: true,
           isBusy: false,
           lastEvent: event,
-          message: 'Solver mode started.',
+          message: AppL10n.current.solverStarted,
         );
         // Mirror the current side onto the overlay's toggle.
         unawaited(_pushSideToOverlay());
@@ -315,7 +317,7 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
           isRunning: false,
           isBusy: false,
           lastEvent: event,
-          message: 'Solver mode stopped.',
+          message: AppL10n.current.solverStopped,
         );
       case ScreenshotCapturedEvent(:final path):
         state = state.copyWith(lastEvent: event, isBusy: false);
@@ -324,13 +326,13 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
         state = state.copyWith(
           isBusy: false,
           lastEvent: event,
-          message: 'Screenshot failed: $reason',
+          message: AppL10n.current.solverScreenshotFailed(reason),
         );
       case PermissionDeniedEvent(:final permission):
         state = state.copyWith(
           isBusy: false,
           lastEvent: event,
-          message: '${permission.name} permission was denied.',
+          message: AppL10n.current.solverPermissionDenied(permission.name),
         );
       case OverlayActionAnalyzeEvent():
         // The native overlay already captured one frame (captureOnce) and will
@@ -340,7 +342,7 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
         state = state.copyWith(
           lastEvent: event,
           isBusy: true,
-          message: 'Analyzing…',
+          message: AppL10n.current.statusAnalyzing,
         );
       case OverlayActionStopEvent():
         state = state.copyWith(lastEvent: event);
@@ -379,7 +381,8 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
     await _ref
         .read(settingsProvider.notifier)
         .patch((s) => s.copyWith(mySide: next));
-    state = state.copyWith(message: 'Side set to ${next.label}.');
+    final l10n = AppL10n.current;
+    state = state.copyWith(message: l10n.solverSideSet(next.localizedLabel(l10n)));
     await _pushSideToOverlay();
   }
 
@@ -403,7 +406,7 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
   Future<void> start() async {
     if (!_native.isSupported) {
       state = state.copyWith(
-        message: 'Solver mode requires a physical Android device.',
+        message: AppL10n.current.solverNeedsPhysicalDevice,
       );
       return;
     }
@@ -414,7 +417,7 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
         await _native.requestOverlayPermission();
         state = state.copyWith(
           isBusy: false,
-          message: 'Grant the overlay permission, then press Start again.',
+          message: AppL10n.current.solverGrantOverlay,
         );
         return;
       }
@@ -422,14 +425,17 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
       if (!projection) {
         state = state.copyWith(
           isBusy: false,
-          message: 'Screen-capture permission is required to start.',
+          message: AppL10n.current.solverNeedCapturePermission,
         );
         return;
       }
       await _native.startSolverMode();
       // Final state is confirmed by the solverModeStarted event.
     } catch (e) {
-      state = state.copyWith(isBusy: false, message: 'Failed to start: $e');
+      state = state.copyWith(
+        isBusy: false,
+        message: AppL10n.current.solverFailedStart('$e'),
+      );
     }
   }
 
@@ -442,7 +448,10 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
     try {
       await _native.stopSolverMode();
     } catch (e) {
-      state = state.copyWith(isBusy: false, message: 'Failed to stop: $e');
+      state = state.copyWith(
+        isBusy: false,
+        message: AppL10n.current.solverFailedStop('$e'),
+      );
     }
   }
 
@@ -452,7 +461,7 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
     try {
       return await _native.captureScreenshot();
     } catch (e) {
-      state = state.copyWith(message: 'Capture failed: $e');
+      state = state.copyWith(message: AppL10n.current.solverCaptureFailed('$e'));
       return null;
     }
   }
@@ -543,9 +552,9 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     final wallet = _ref.read(walletProvider.notifier);
 
     if (s.usesBackend && !wallet.canSpend()) {
-      state = const AnalysisError(
+      state = AnalysisError(
         UnknownFailure(
-          'You\'re out of hints — watch an ad or buy a pack to keep analyzing.',
+          AppL10n.current.hintsOutOfHints,
           code: 'NO_HINTS',
         ),
       );
@@ -651,7 +660,7 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
         }
         board = v.board;
         visionWarnings = [
-          'Couldn\'t use your OpenAI key, so we read the board with ours (1 hint).',
+          AppL10n.current.fallbackOwnKeyVision,
           ...v.warnings,
         ];
         visionStatus = _ourServerVision;
@@ -695,8 +704,9 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
             : r.map(
                 (res) => res.copyWith(
                   warnings: [
-                    'On-device engine couldn\'t find a move, so we used our cloud '
-                        'engine (1 hint per ${_ref.read(remoteConfigProvider).ownKeyHintDivisor}).',
+                    AppL10n.current.fallbackOnDeviceEngine(
+                      _ref.read(remoteConfigProvider).ownKeyHintDivisor,
+                    ),
                     ...res.warnings,
                   ],
                 ),
@@ -770,7 +780,7 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     final native = _ref.read(nativeSolverProvider);
     if (!native.isSupported) return;
     final move = value.bestMove;
-    final title = move != null ? move.human : 'No move found';
+    final title = move != null ? move.human : AppL10n.current.statusNoMove;
     final detail = move != null
         ? '${move.notation}  •  ${move.score}'
         : (value.warnings.isNotEmpty ? value.warnings.first : null);
@@ -787,7 +797,7 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     unawaited(
       native
           .updateOverlay(
-            title: 'Analysis failed',
+            title: AppL10n.current.statusAnalysisFailed,
             detail: failure.message,
             kind: 'error',
           )

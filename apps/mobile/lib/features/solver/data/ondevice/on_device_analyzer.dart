@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:xiangqi_solver/core/l10n/app_l10n.dart';
+
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_result.dart';
 import '../../../../core/security/secure_key_store.dart';
@@ -44,9 +46,9 @@ class OnDeviceAnalyzer {
   }) async {
     final apiKey = await _keys.readOpenAiKey();
     if (apiKey == null || apiKey.trim().isEmpty) {
-      return const ApiResult<VisionResult>.failure(
+      return ApiResult<VisionResult>.failure(
         OnDeviceFailure(
-          'Using your own key needs an OpenAI API key. Add it in Settings.',
+          AppL10n.current.ondeviceMissingApiKey,
           code: 'MISSING_API_KEY',
         ),
       );
@@ -66,7 +68,9 @@ class OnDeviceAnalyzer {
       return ApiResult.failure(OnDeviceFailure(e.message, code: e.code ?? 'VISION_ERROR'));
     } catch (e) {
       _log.warn('On-device vision failed: $e');
-      return ApiResult.failure(OnDeviceFailure('On-device vision failed: $e', code: 'VISION_ERROR'));
+      return ApiResult.failure(
+        OnDeviceFailure(AppL10n.current.ondeviceVisionFailed('$e'), code: 'VISION_ERROR'),
+      );
     }
 
     final repaired = repairBoard(extraction.pieces);
@@ -103,17 +107,11 @@ class OnDeviceAnalyzer {
     final allWarnings = [...warnings];
 
     if (!engine.isAvailable) {
-      allWarnings.add(
-        'The on-device engine is not ready, so the best move was not computed. '
-        'Switch the engine to Cloud in Settings to finish.',
-      );
+      allWarnings.add(AppL10n.current.ondeviceEngineNotReady);
       return _boardOnly(board, allWarnings, visionStatus, engineOk: false);
     }
     if (!hasBothGenerals(pieces)) {
-      allWarnings.add(
-        'Could not locate both generals, so the best move was not computed. '
-        'Try re-capturing with a clearer view of the board.',
-      );
+      allWarnings.add(AppL10n.current.ondeviceMissingGenerals);
       return _boardOnly(board, allWarnings, visionStatus, engineOk: false);
     }
 
@@ -144,10 +142,8 @@ class OnDeviceAnalyzer {
     } on OnDeviceEngineException catch (e) {
       _log.warn('On-device engine failed: ${e.message}');
       allWarnings.add(_isIllegalPosition(e.message)
-          ? 'The recognized board isn\'t a legal Xiangqi position — some pieces '
-                'were misread onto impossible squares, so no move was computed. '
-                'Re-capture with a clearer view, or use a stronger Vision model.'
-          : 'On-device engine failed: ${e.message}');
+          ? AppL10n.current.ondeviceIllegalPosition
+          : AppL10n.current.ondeviceEngineFailed(e.message));
       return _boardOnly(board, allWarnings, visionStatus, engineOk: false);
     }
   }
@@ -218,7 +214,7 @@ class OnDeviceAnalyzer {
         analysisId: '',
         board: board,
         bestMove: null,
-        explanation: 'Board recognized. No move was computed.',
+        explanation: AppL10n.current.ondeviceBoardOnly,
         warnings: warnings,
         engine: ProviderStatus(provider: 'On-device engine', ok: engineOk),
         vision: visionStatus,

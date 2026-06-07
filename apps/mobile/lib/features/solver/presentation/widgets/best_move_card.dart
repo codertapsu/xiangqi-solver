@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../../domain/best_move.dart';
 
@@ -12,10 +13,11 @@ class BestMoveCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final m = move;
     if (m == null) {
       return Text(
-        'No move available for this position.',
+        l10n.bestMoveNone,
         style: theme.textTheme.bodyMedium,
       );
     }
@@ -41,15 +43,16 @@ class BestMoveCard extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (m.notation.isNotEmpty) _Chip(label: 'WXF', value: m.notation),
-            _Chip(label: 'UCI', value: m.uci),
-            _Chip(label: 'Score', value: m.score),
-            _Chip(label: 'Depth', value: '${m.depth}'),
+            if (m.notation.isNotEmpty)
+              _Chip(label: l10n.labelWxf, value: m.notation),
+            _Chip(label: l10n.labelUci, value: m.uci),
+            _Chip(label: l10n.labelScore, value: m.score),
+            _Chip(label: l10n.labelDepth, value: '${m.depth}'),
             _Chip(
-              label: 'From',
+              label: l10n.labelFrom,
               value: '(${m.from.file},${m.from.rank})',
             ),
-            _Chip(label: 'To', value: '(${m.to.file},${m.to.rank})'),
+            _Chip(label: l10n.labelTo, value: '(${m.to.file},${m.to.rank})'),
           ],
         ),
       ],

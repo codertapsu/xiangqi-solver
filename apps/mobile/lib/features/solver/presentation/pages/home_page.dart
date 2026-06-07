@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../../../../app/router.dart';
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/remote_config/remote_config_provider.dart';
 import '../../../monetization/presentation/banner_ad.dart';
 import '../../../monetization/presentation/get_more_hints_sheet.dart';
@@ -73,41 +73,38 @@ class _HomePageState extends ConsumerState<HomePage> {
       case ModeCheckOutcome.ready:
         break;
       case ModeCheckOutcome.switchedToOnDevice:
-        _snack('Server unavailable — switched to On-device Mode.');
+        _snack(AppLocalizations.of(context).homeServerSwitchedOnDevice);
       case ModeCheckOutcome.noModeAvailable:
         await _showNoModeDialog();
     }
   }
 
   Future<void> _showNoModeDialog() {
+    final l10n = AppLocalizations.of(context);
     return showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.cloud_off_outlined),
-        title: const Text('No analysis mode available'),
-        content: const Text(
-          'The server is unreachable, and On-device Mode isn’t set up yet.\n\n'
-          'Add your own OpenAI API key in Settings to analyze on-device, or try '
-          'again when the server is back online.',
-        ),
+        title: Text(l10n.homeNoModeTitle),
+        content: Text(l10n.homeNoModeBody),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
               unawaited(_checkModeHealth());
             },
-            child: const Text('Retry'),
+            child: Text(l10n.actionRetry),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Close'),
+            child: Text(l10n.actionClose),
           ),
           FilledButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
               if (mounted) context.push(AppRoutes.settings);
             },
-            child: const Text('Open Settings'),
+            child: Text(l10n.actionOpenSettings),
           ),
         ],
       ),
@@ -145,18 +142,22 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
     final result = await ref.read(analysisRepositoryProvider).checkHealth();
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     setState(() {
       _testingConnection = false;
       _healthLine = result.when(
-        success: (HealthStatus h) =>
-            'OK • v${h.version} • ${h.latency.inMilliseconds} ms '
-            '• uptime ${h.uptimeSeconds.toStringAsFixed(0)}s',
-        failure: (f) => 'Error: ${f.message}',
+        success: (HealthStatus h) => l10n.backendHealthOk(
+          h.version,
+          h.latency.inMilliseconds,
+          h.uptimeSeconds.toStringAsFixed(0),
+        ),
+        failure: (f) => l10n.backendHealthFailedShort,
       );
     });
   }
 
   Future<void> _pickAndAnalyze() async {
+    final l10n = AppLocalizations.of(context);
     final XFile? picked;
     try {
       picked = await _picker.pickImage(
@@ -164,7 +165,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         maxWidth: 2048,
       );
     } catch (e) {
-      _snack('Could not open image picker: $e');
+      _snack(l10n.homeImagePickerError('$e'));
       return;
     }
     if (picked == null) return;
@@ -181,6 +182,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final settings = ref.watch(settingsProvider);
     final solverMode = ref.watch(solverModeProvider);
     final analysisStatus = ref.watch(analysisProvider);
@@ -207,18 +209,18 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppConstants.appName),
+        title: Text(l10n.appTitle),
         actions: [
           // Hint balance + "get more hints" — only when the backend is used
           // (our key OR cloud engine). Fully-local mode consumes no hints.
           if (settings.usesBackend) const HintBalanceChip(),
           IconButton(
-            tooltip: 'History',
+            tooltip: l10n.tooltipHistory,
             icon: const Icon(Icons.history),
             onPressed: () => context.push(AppRoutes.history),
           ),
           IconButton(
-            tooltip: 'Settings',
+            tooltip: l10n.tooltipSettings,
             icon: const Icon(Icons.settings),
             onPressed: () => context.push(AppRoutes.settings),
           ),
@@ -251,9 +253,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildSolverModeCard(SolverModeState state, bool isSupported) {
+    final l10n = AppLocalizations.of(context);
     final notifier = ref.read(solverModeProvider.notifier);
     return SectionCard(
-      title: 'Solver Mode',
+      title: l10n.homeSolverMode,
       icon: Icons.auto_awesome,
       trailing: Switch(
         value: state.isRunning,
@@ -266,10 +269,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         children: [
           Text(
             isSupported
-                ? 'Starts a floating overlay and screen capture so you can '
-                      'analyze the board in any app.'
-                : 'Solver mode needs a physical Android device. The rest of '
-                      'the app still works for testing.',
+                ? l10n.homeSolverModeDesc
+                : l10n.homeSolverModeUnsupported,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           if (state.isBusy) ...[
@@ -285,7 +286,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ? null
                       : notifier.start,
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start'),
+                  label: Text(l10n.actionStart),
                 ),
               ),
               const SizedBox(width: 12),
@@ -295,7 +296,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ? null
                       : notifier.stop,
                   icon: const Icon(Icons.stop),
-                  label: const Text('Stop'),
+                  label: Text(l10n.actionStop),
                 ),
               ),
             ],
@@ -306,8 +307,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildBackendCard(AppSettings settings) {
+    final l10n = AppLocalizations.of(context);
     return SectionCard(
-      title: 'Backend',
+      title: l10n.backendTitle,
       icon: Icons.cloud_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,10 +318,10 @@ class _HomePageState extends ConsumerState<HomePage> {
             controller: _backendController,
             keyboardType: TextInputType.url,
             autocorrect: false,
-            decoration: const InputDecoration(
-              labelText: 'Backend URL',
+            decoration: InputDecoration(
+              labelText: l10n.backendUrlLabel,
               hintText: 'http://10.0.2.2:3000',
-              prefixIcon: Icon(Icons.link),
+              prefixIcon: const Icon(Icons.link),
             ),
             onSubmitted: (value) => ref
                 .read(settingsProvider.notifier)
@@ -338,7 +340,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.network_check),
-                  label: const Text('Test Backend Connection'),
+                  label: Text(l10n.backendTestConnection),
                 ),
               ),
               const SizedBox(width: 12),
@@ -351,9 +353,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     ),
                   );
-                  _snack('Backend URL saved.');
+                  _snack(l10n.backendUrlSaved);
                 },
-                child: const Text('Save'),
+                child: Text(l10n.actionSave),
               ),
             ],
           ),
@@ -370,16 +372,17 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildSideCard(AppSettings settings) {
+    final l10n = AppLocalizations.of(context);
     final notifier = ref.read(settingsProvider.notifier);
     return SectionCard(
-      title: 'Your side',
+      title: l10n.homeYourSide,
       icon: Icons.flag_outlined,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Flexible(
             child: Text(
-              'Whose move it is when you solve.',
+              l10n.homeYourSideDesc,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
@@ -395,9 +398,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildProvidersCard(AppSettings settings) {
+    final l10n = AppLocalizations.of(context);
     final notifier = ref.read(settingsProvider.notifier);
     return SectionCard(
-      title: 'Providers',
+      title: l10n.providersTitle,
       icon: Icons.tune,
       child: Column(
         children: [
@@ -417,15 +421,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildMockTestCard(bool isAnalyzing) {
+    final l10n = AppLocalizations.of(context);
     return SectionCard(
-      title: 'Try it (mock test)',
+      title: l10n.homeTryMockTitle,
       icon: Icons.image_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Pick an image to exercise the full upload + analysis pipeline '
-            'without native screen capture.',
+            l10n.homeTryMockDesc,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
@@ -439,7 +443,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   )
                 : const Icon(Icons.photo_library_outlined),
             label: Text(
-              isAnalyzing ? 'Analyzing…' : 'Pick image & analyze (mock test)',
+              isAnalyzing ? l10n.statusAnalyzing : l10n.homePickImage,
             ),
           ),
         ],

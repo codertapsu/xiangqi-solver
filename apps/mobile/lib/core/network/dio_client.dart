@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:xiangqi_solver/core/l10n/app_l10n.dart';
 
 import '../constants/app_constants.dart';
 import '../errors/exceptions.dart';
@@ -103,18 +104,15 @@ class DioClient {
   String _describe(DioException e) {
     return switch (e.type) {
       DioExceptionType.connectionTimeout =>
-        'Connection timed out. Is the backend reachable at $baseUrl?',
-      DioExceptionType.sendTimeout => 'Upload timed out. Try a smaller image.',
-      DioExceptionType.receiveTimeout =>
-        'The server took too long to respond.',
+        AppL10n.current.netConnectTimeout(baseUrl),
+      DioExceptionType.sendTimeout => AppL10n.current.netSendTimeout,
+      DioExceptionType.receiveTimeout => AppL10n.current.netReceiveTimeout,
       DioExceptionType.connectionError =>
-        'Could not reach the backend at $baseUrl.',
-      DioExceptionType.badCertificate => 'The server certificate is invalid.',
-      DioExceptionType.cancel => 'The request was cancelled.',
-      DioExceptionType.badResponse =>
-        'The server returned an unexpected response.',
-      DioExceptionType.unknown =>
-        e.message ?? 'An unknown network error occurred.',
+        AppL10n.current.netConnectError(baseUrl),
+      DioExceptionType.badCertificate => AppL10n.current.netBadCert,
+      DioExceptionType.cancel => AppL10n.current.netCancelled,
+      DioExceptionType.badResponse => AppL10n.current.netBadResponse,
+      DioExceptionType.unknown => e.message ?? AppL10n.current.netUnknown,
     };
   }
 }

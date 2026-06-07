@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Vietnamese (primary market) overrides. The launcher name shows as
+  "Quân Sư Cờ Tướng" on Vietnamese-locale devices; everyone else gets the
+  default (English) values/strings.xml ("Xiangqi Strategist").
+-->
+<resources>
+    <string name="app_name">Quân Sư Cờ Tướng</string>
+
+    <!-- Foreground-service notification. -->
+    <string name="notification_channel_name">Chế độ Quân Sư</string>
+    <string name="notification_channel_description">Hiển thị khi Quân Sư Cờ Tướng đang chụp màn hình để phân tích.</string>
+    <string name="notification_title">Quân Sư Cờ Tướng — Chế độ Quân Sư đang bật</string>
+    <string name="notification_text">Đã bật chụp màn hình để phân tích bàn cờ. Chạm nút nổi để phân tích.</string>
+
+    <!-- Floating overlay widget. -->
+    <string name="overlay_menu_analyze">Phân tích màn hình hiện tại</string>
+    <string name="overlay_menu_more">Thao tác khác</string>
+    <string name="overlay_menu_select_area">Chọn vùng chụp</string>
+    <string name="overlay_menu_stop">Tắt Chế độ Quân Sư</string>
+    <string name="overlay_menu_switch_side">Đổi bên (Đỏ / Đen)</string>
+    <string name="overlay_side_red">Đỏ</string>
+    <string name="overlay_side_black">Đen</string>
+    <!-- %1$s = tên bên hiện tại; TalkBack đọc khi chạm nút đổi bên. -->
+    <string name="overlay_switch_side_current">Đổi bên, đang chơi bên %1$s</string>
+    <string name="overlay_content_description">Nút nổi phân tích của Quân Sư Cờ Tướng</string>
+</resources>

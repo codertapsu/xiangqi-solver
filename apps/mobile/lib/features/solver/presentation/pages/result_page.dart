@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:xiangqi_solver/core/l10n/enum_l10n.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../../domain/analysis_result.dart';
 import '../providers/solver_providers.dart';
@@ -15,28 +17,30 @@ class ResultPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final status = ref.watch(analysisProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Analysis Result')),
+      appBar: AppBar(title: Text(l10n.resultTitle)),
       body: SafeArea(child: _buildBody(context, status)),
     );
   }
 
   Widget _buildBody(BuildContext context, AnalysisStatus status) {
+    final l10n = AppLocalizations.of(context);
     return switch (status) {
-      AnalysisIdle() => const _CenteredMessage(
+      AnalysisIdle() => _CenteredMessage(
         icon: Icons.info_outline,
-        message: 'No analysis yet. Run one from the Home screen.',
+        message: l10n.resultIdle,
       ),
-      AnalysisLoading() => const _CenteredMessage(
+      AnalysisLoading() => _CenteredMessage(
         icon: Icons.hourglass_top,
-        message: 'Analyzing…',
+        message: l10n.statusAnalyzing,
         showSpinner: true,
       ),
       AnalysisError(:final failure) => _CenteredMessage(
         icon: Icons.error_outline,
         message: failure.message,
-        detail: failure.code == null ? null : 'Code: ${failure.code}',
+        detail: failure.code == null ? null : l10n.resultErrorCode(failure.code!),
       ),
       AnalysisSuccess(:final result, :final screenshotPath) => _ResultContent(
         result: result,
@@ -54,6 +58,7 @@ class _ResultContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final board = result.board;
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -65,14 +70,14 @@ class _ResultContent extends StatelessWidget {
         _buildPipelineStatus(context),
         const SizedBox(height: 16),
         SectionCard(
-          title: 'Best move',
+          title: l10n.resultBestMove,
           icon: Icons.flag,
           child: BestMoveCard(move: result.bestMove),
         ),
         if (result.candidates.length > 1) ...[
           const SizedBox(height: 16),
           SectionCard(
-            title: 'Top moves',
+            title: l10n.resultTopMoves,
             icon: Icons.format_list_numbered,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,32 +114,34 @@ class _ResultContent extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         SectionCard(
-          title: 'Explanation',
+          title: l10n.resultExplanation,
           icon: Icons.lightbulb_outline,
           child: Text(
             result.explanation.isEmpty
-                ? 'No explanation provided.'
+                ? l10n.resultNoExplanation
                 : result.explanation,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),
         const SizedBox(height: 16),
         SectionCard(
-          title: 'Board',
+          title: l10n.resultBoard,
           icon: Icons.grid_on,
           trailing: _ConfidenceBadge(confidence: board.confidence),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Side to move: ${board.sideToMove.label} • '
-                '${board.pieces.length} pieces',
+                l10n.resultBoardInfo(
+                  board.sideToMove.localizedLabel(l10n),
+                  board.pieces.length,
+                ),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               if (board.fen.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 SelectableText(
-                  'FEN: ${board.fen}',
+                  l10n.resultFen(board.fen),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -152,23 +159,24 @@ class _ResultContent extends StatelessWidget {
   }
 
   Widget _buildPipelineStatus(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return SectionCard(
-      title: 'Pipeline',
+      title: l10n.resultPipeline,
       icon: Icons.account_tree_outlined,
       child: Row(
         children: [
           Expanded(
             child: _ProviderStatusTile(
-              label: 'Vision',
-              provider: _prettyProvider(result.vision.provider),
+              label: l10n.pipelineVision,
+              provider: _prettyProvider(l10n, result.vision.provider),
               ok: result.vision.ok,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: _ProviderStatusTile(
-              label: 'Engine',
-              provider: _prettyProvider(result.engine.provider),
+              label: l10n.pipelineEngine,
+              provider: _prettyProvider(l10n, result.engine.provider),
               ok: result.engine.ok,
             ),
           ),
@@ -179,11 +187,11 @@ class _ResultContent extends StatelessWidget {
 
   /// Friendly, brand-neutral provider name for display (hides the internal
   /// engine name from end users).
-  String _prettyProvider(String raw) {
+  String _prettyProvider(AppLocalizations l10n, String raw) {
     if (raw.toLowerCase().contains('pikafish')) {
       return raw.toLowerCase().contains('on-device')
-          ? 'On-device engine'
-          : 'Cloud engine';
+          ? l10n.engineOnDevice
+          : l10n.engineCloud;
     }
     return raw;
   }
@@ -240,11 +248,12 @@ class _ConfidenceBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pct = (confidence.clamp(0, 1) * 100).toStringAsFixed(0);
+    final l10n = AppLocalizations.of(context);
+    final pct = (confidence.clamp(0, 1) * 100).round();
     return Chip(
       visualDensity: VisualDensity.compact,
       avatar: const Icon(Icons.verified_outlined, size: 16),
-      label: Text('$pct%'),
+      label: Text(l10n.percentValue(pct)),
     );
   }
 }
@@ -278,9 +287,10 @@ class _WarningsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return SectionCard(
-      title: 'Warnings',
+      title: l10n.resultWarnings,
       icon: Icons.warning_amber_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,7 +336,7 @@ class _Thumbnail extends StatelessWidget {
             height: 120,
             alignment: Alignment.center,
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: const Text('Screenshot preview unavailable'),
+            child: Text(AppLocalizations.of(context).resultScreenshotUnavailable),
           ),
         ),
       ),

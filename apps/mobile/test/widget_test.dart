@@ -9,6 +9,7 @@ import 'package:xiangqi_solver/features/solver/data/analysis_api.dart';
 import 'package:xiangqi_solver/features/solver/data/analysis_repository.dart';
 import 'package:xiangqi_solver/features/solver/presentation/pages/home_page.dart';
 import 'package:xiangqi_solver/features/solver/presentation/providers/solver_providers.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import 'support/hint_grant_test_override.dart';
 import 'support/remote_config_test_override.dart';
@@ -43,7 +44,11 @@ void main() {
         remoteConfig ?? remoteConfigTestOverride,
         hintGrantOverride(),
       ],
-      child: const MaterialApp(home: HomePage()),
+      child: const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HomePage(),
+      ),
     );
   }
 
@@ -63,10 +68,10 @@ void main() {
     expect(find.text('Test Backend Connection'), findsNothing);
 
     // Privacy banner.
-    expect(find.text('Privacy & AI use'), findsOneWidget);
+    expect(find.text('Privacy & AI'), findsOneWidget);
 
     // The mock-test button lives at the bottom of the scroll view.
-    final mockTestButton = find.text('Pick image & analyze (mock test)');
+    final mockTestButton = find.text('Pick an image & analyze (test)');
     await tester.scrollUntilVisible(
       mockTestButton,
       200,

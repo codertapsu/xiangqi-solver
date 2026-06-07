@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:xiangqi_solver/core/l10n/app_l10n.dart';
 
 import '../../domain/board_piece.dart';
 import '../../domain/solver_enums.dart';
@@ -72,8 +73,8 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
     String? model,
   }) async {
     if (apiKey.trim().isEmpty) {
-      throw const OnDeviceVisionException(
-        'No OpenAI API key configured. Add yours in Settings.',
+      throw OnDeviceVisionException(
+        AppL10n.current.visionMissingKey,
         code: 'MISSING_API_KEY',
       );
     }
@@ -115,7 +116,7 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
       );
     } on DioException catch (e) {
       throw OnDeviceVisionException(
-        'Could not reach OpenAI: ${e.message ?? e.type.name}.',
+        AppL10n.current.visionNetwork(e.message ?? e.type.name),
         code: 'NETWORK',
       );
     }
@@ -124,19 +125,22 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
     if (status < 200 || status >= 300) {
       final apiError = _parseApiError(res.data);
       final hint = apiError.code == 'image_parse_error'
-          ? ' The screenshot may be too small, corrupted, or not a real image.'
+          ? AppL10n.current.visionApiErrorImageHint
           : '';
+      final base = AppL10n.current.visionApiError(status);
+      final withDetail = apiError.message != null
+          ? '${base.replaceFirst(RegExp(r'\.$'), '')}: ${apiError.message}'
+          : base;
       throw OnDeviceVisionException(
-        'OpenAI request failed (HTTP $status)'
-        '${apiError.message != null ? ': ${apiError.message}' : '.'}$hint',
+        '$withDetail$hint',
         code: apiError.code ?? 'VISION_API_ERROR',
       );
     }
 
     final content = _content(res.data);
     if (content == null || content.trim().isEmpty) {
-      throw const OnDeviceVisionException(
-        'OpenAI returned an empty response.',
+      throw OnDeviceVisionException(
+        AppL10n.current.visionEmpty,
         code: 'VISION_EMPTY_RESPONSE',
       );
     }
@@ -173,8 +177,8 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
     try {
       obj = jsonDecode(jsonText) as Map<String, dynamic>;
     } catch (_) {
-      throw const OnDeviceVisionException(
-        'Could not understand the model response (invalid JSON).',
+      throw OnDeviceVisionException(
+        AppL10n.current.visionBadJson,
         code: 'VISION_BAD_JSON',
       );
     }
@@ -233,7 +237,7 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
       ));
     }
     if (dropped > 0) {
-      warnings.add('Ignored $dropped malformed piece(s) from the vision response.');
+      warnings.add(AppL10n.current.visionDroppedPieces(dropped));
     }
 
     return BoardExtraction(

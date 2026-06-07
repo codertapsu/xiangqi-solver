@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:xiangqi_solver/core/l10n/enum_l10n.dart';
+import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../../domain/solver_enums.dart';
 
@@ -18,21 +20,22 @@ class SideSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final selected = value == SideToMove.black
         ? SideToMove.black
         : SideToMove.red;
     return SegmentedButton<SideToMove>(
       showSelectedIcon: false,
-      segments: const [
+      segments: [
         ButtonSegment<SideToMove>(
           value: SideToMove.red,
-          label: Text('Red'),
-          icon: Icon(Icons.circle, color: Color(0xFFD32F2F), size: 14),
+          label: Text(SideToMove.red.localizedLabel(l10n)),
+          icon: const Icon(Icons.circle, color: Color(0xFFD32F2F), size: 14),
         ),
         ButtonSegment<SideToMove>(
           value: SideToMove.black,
-          label: Text('Black'),
-          icon: Icon(Icons.circle, color: Color(0xFF424242), size: 14),
+          label: Text(SideToMove.black.localizedLabel(l10n)),
+          icon: const Icon(Icons.circle, color: Color(0xFF424242), size: 14),
         ),
       ],
       selected: {selected},

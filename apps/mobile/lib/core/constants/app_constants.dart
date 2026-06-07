@@ -7,8 +7,11 @@ library;
 class AppConstants {
   const AppConstants._();
 
-  /// Human-readable app name (also the Home title).
-  static const String appName = 'Xiangqi Solver';
+  /// Non-localized app name fallback (international brand). The visible title is
+  /// localized at runtime via `AppLocalizations.appTitle` (Vietnamese market:
+  /// "Quân Sư Cờ Tướng"); this is only the MaterialApp default before the first
+  /// localized frame and the value used where no [BuildContext] is available.
+  static const String appName = 'Xiangqi Strategist';
 
   /// Public privacy policy (hosted on the codertapsu Firebase site). Generated
   /// from codertapsu-web/apps.json (slug `xiangqi-solver`).
@@ -68,8 +71,13 @@ class AppConstants {
   /// Default Pikafish transposition-table size in MB (16..1024 in the UI).
   static const int defaultEngineHashMb = 128;
 
-  /// Default UI language code.
+  /// Default move-notation language code (chess notation output, not the UI).
   static const String defaultLanguage = 'en';
+
+  /// Default app UI language: 'system' (follow the device), 'vi', or 'en'.
+  /// 'system' resolves to the device language when supported, else Vietnamese
+  /// (the primary market). Override in Settings → Language → App language.
+  static const String defaultAppLanguage = 'system';
 
   /// Default side the user plays (whose move it is when solving): red | black.
   static const String defaultMySide = String.fromEnvironment(
