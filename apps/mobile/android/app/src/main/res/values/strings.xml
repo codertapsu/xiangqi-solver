@@ -14,5 +14,9 @@
     <string name="overlay_menu_select_area">Select capture area</string>
     <string name="overlay_menu_stop">Stop Solver Mode</string>
     <string name="overlay_menu_switch_side">Switch side (Red / Black)</string>
+    <string name="overlay_side_red">Red</string>
+    <string name="overlay_side_black">Black</string>
+    <!-- %1$s = current side name; spoken by TalkBack on the toggle. -->
+    <string name="overlay_switch_side_current">Switch side, playing as %1$s</string>
     <string name="overlay_content_description">Xiangqi Solver floating analysis button</string>
 </resources>

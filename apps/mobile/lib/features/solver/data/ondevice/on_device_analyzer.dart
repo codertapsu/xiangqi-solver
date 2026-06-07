@@ -137,7 +137,7 @@ class OnDeviceAnalyzer {
           explanation:
               '${best.human} (${best.notation}) — eval ${best.score}, depth ${best.depth}.',
           warnings: allWarnings,
-          engine: const ProviderStatus(provider: 'pikafish (on-device)', ok: true),
+          engine: const ProviderStatus(provider: 'On-device engine', ok: true),
           vision: visionStatus,
         ),
       );
@@ -220,7 +220,7 @@ class OnDeviceAnalyzer {
         bestMove: null,
         explanation: 'Board recognized. No move was computed.',
         warnings: warnings,
-        engine: ProviderStatus(provider: 'pikafish (on-device)', ok: engineOk),
+        engine: ProviderStatus(provider: 'On-device engine', ok: engineOk),
         vision: visionStatus,
       ),
     );

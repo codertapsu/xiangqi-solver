@@ -150,7 +150,7 @@ describe('AnalysisService', () => {
       });
       expect(result.engine).toEqual({ provider: 'pikafish', ok: false });
       expect(result.bestMove).toBeNull();
-      expect(result.warnings.some((w) => /engine "pikafish" failed/i.test(w))).toBe(true);
+      expect(result.warnings.some((w) => /couldn't compute a move/i.test(w))).toBe(true);
     });
   });
 

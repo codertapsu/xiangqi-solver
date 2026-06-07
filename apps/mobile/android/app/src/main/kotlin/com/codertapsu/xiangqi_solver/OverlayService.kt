@@ -250,7 +250,12 @@ class OverlayService : Service() {
     private fun applySide() {
         val button = switchSideButton ?: return
         val isRed = currentSide != Constants.SIDE_BLACK
-        button.text = if (isRed) "R" else "B"
+        val sideLabel = getString(
+            if (isRed) R.string.overlay_side_red else R.string.overlay_side_black,
+        )
+        button.text = sideLabel
+        button.contentDescription =
+            getString(R.string.overlay_switch_side_current, sideLabel)
         button.backgroundTintList = ColorStateList.valueOf(
             if (isRed) 0xFFE53935.toInt() else 0xFF455A64.toInt(),
         )

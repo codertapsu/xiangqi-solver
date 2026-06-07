@@ -266,7 +266,11 @@ export class AnalysisService {
         });
       } catch (err) {
         engineOk = false;
-        warnings.push(`Engine "${engineName}" failed: ${(err as Error).message}`);
+        // User-facing warning is brand-neutral and actionable; the engine name +
+        // raw error stay in the server log for debugging.
+        warnings.push(
+          "The engine couldn't compute a move for this position. Try re-capturing the board.",
+        );
         this.logger.warn(`Engine "${engineName}" failed: ${(err as Error).message}`);
       }
     }

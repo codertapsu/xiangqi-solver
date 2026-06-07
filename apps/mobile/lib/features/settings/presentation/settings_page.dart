@@ -142,11 +142,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 4),
           Text(
             settings.aiKeySource == AiKeySource.own
-                ? 'Your OpenAI key reads the board on this device — usually cheaper '
-                      'than ours, and your key never leaves the phone.'
-                : 'We read the board on the server with our key.',
+                ? 'Your own OpenAI key reads the board on this device — usually '
+                      'cheaper, and your key never leaves your phone.'
+                : 'We read the board for you using our OpenAI key.',
             style: theme.textTheme.bodySmall,
           ),
+
+          // The API-key field appears right here, so picking "My key" immediately
+          // reveals where to enter it.
+          if (settings.aiKeySource == AiKeySource.own) ...[
+            const Divider(height: 28),
+            _buildOwnKeyFields(
+              theme,
+              showVisionModel: ref.watch(remoteConfigProvider).showVisionModel,
+            ),
+          ],
 
           const SizedBox(height: 16),
           Text('Best move (engine)', style: theme.textTheme.titleSmall),
@@ -172,7 +182,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 4),
           Text(
             settings.engineLocation == EngineLocation.onDevice
-                ? 'On-device Pikafish is faster, but its move may be weaker / less '
+                ? 'On-device engine is faster, but its move may be weaker or less '
                       'accurate than our cloud engine.'
                 : 'Our cloud engine computes the best move.',
             style: theme.textTheme.bodySmall,
@@ -182,14 +192,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
           const SizedBox(height: 12),
           _buildCostHint(settings, theme),
-
-          if (settings.aiKeySource == AiKeySource.own) ...[
-            const Divider(height: 28),
-            _buildOwnKeyFields(
-              theme,
-              showVisionModel: ref.watch(remoteConfigProvider).showVisionModel,
-            ),
-          ],
         ],
       ),
     );
@@ -511,9 +513,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _notifier.patch((s) => s.copyWith(engineHashMb: v.round())),
           ),
           Text(
-            'Threads & Hash speed up Pikafish (ignored by the mock engine). '
-            'MultiPV ranks its best moves. Pikafish has no skill level — lower '
-            'the depth/time to make it play faster, not weaker.',
+            'Threads & Hash make the engine faster. "Top moves" shows several of '
+            'its best options. For a quicker answer, lower the search depth or '
+            'move time — this won\'t make it play weaker.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -640,7 +642,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.description_outlined),
               title: const Text('Open-source licenses'),
-              subtitle: const Text('Incl. the GPLv3 Pikafish on-device engine'),
+              // subtitle: const Text('Incl. the GPLv3 Pikafish on-device engine'),
               trailing: const Icon(Icons.chevron_right, size: 18),
               onTap: () => showLicensePage(
                 context: context,

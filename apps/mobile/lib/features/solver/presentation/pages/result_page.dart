@@ -160,7 +160,7 @@ class _ResultContent extends StatelessWidget {
           Expanded(
             child: _ProviderStatusTile(
               label: 'Vision',
-              provider: result.vision.provider,
+              provider: _prettyProvider(result.vision.provider),
               ok: result.vision.ok,
             ),
           ),
@@ -168,13 +168,24 @@ class _ResultContent extends StatelessWidget {
           Expanded(
             child: _ProviderStatusTile(
               label: 'Engine',
-              provider: result.engine.provider,
+              provider: _prettyProvider(result.engine.provider),
               ok: result.engine.ok,
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Friendly, brand-neutral provider name for display (hides the internal
+  /// engine name from end users).
+  String _prettyProvider(String raw) {
+    if (raw.toLowerCase().contains('pikafish')) {
+      return raw.toLowerCase().contains('on-device')
+          ? 'On-device engine'
+          : 'Cloud engine';
+    }
+    return raw;
   }
 }
 

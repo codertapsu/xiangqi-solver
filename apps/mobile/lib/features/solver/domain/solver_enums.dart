@@ -120,7 +120,7 @@ enum EngineProvider {
   }
 
   String get label => switch (this) {
-    EngineProvider.pikafish => 'Pikafish',
+    EngineProvider.pikafish => 'Standard',
     EngineProvider.mock => 'Mock',
   };
 }

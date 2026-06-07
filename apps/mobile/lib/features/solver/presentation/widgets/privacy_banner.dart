@@ -35,11 +35,10 @@ class PrivacyBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Screenshots you analyze are uploaded to your configured '
-                  'backend and may be sent to third-party AI providers '
-                  '(e.g. Gemini, OpenAI) to read the board. Images are not '
-                  'stored on this device unless you enable that in Settings. '
-                  'Avoid capturing sensitive content.',
+                  'To read the board, the screenshot you analyze is sent to '
+                  'OpenAI — through our service, or directly if you use your own '
+                  'API key. Images aren\'t saved on this device unless you turn '
+                  'on history in Settings. Avoid capturing sensitive content.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: scheme.onTertiaryContainer,
                   ),
