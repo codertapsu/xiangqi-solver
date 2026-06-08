@@ -1,6 +1,8 @@
 package com.codertapsu.xiangqi_solver
 
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -95,6 +97,11 @@ class MainActivity : FlutterActivity() {
                 OverlayService.instance?.showSide(
                     call.argument<String>(Constants.KEY_SIDE) ?: Constants.SIDE_RED,
                 )
+                result.success(null)
+            }
+
+            Constants.METHOD_SET_APP_ICON -> {
+                setAppIcon(call.argument<String>(Constants.KEY_VARIANT))
                 result.success(null)
             }
 
@@ -274,6 +281,66 @@ class MainActivity : FlutterActivity() {
         }
         overlay.beginRegionSelection()
         result.success(null)
+    }
+
+    // --- Dynamic launcher icon + name (activity-alias) ---
+
+    /**
+     * Switches the launcher icon + name to the [variant] ('vi' | 'en') by
+     * enabling the matching activity-alias and disabling the other. Idempotent:
+     * if the target is already the active launcher it does nothing, so a launch
+     * with the variant already correct never causes the brief icon flash some
+     * launchers show on a component-state change. [PackageManager.DONT_KILL_APP]
+     * keeps the running app alive across the switch.
+     */
+    private fun setAppIcon(variant: String?) {
+        val target = when (variant) {
+            Constants.VARIANT_VI -> Constants.ALIAS_LAUNCHER_VI
+            Constants.VARIANT_EN -> Constants.ALIAS_LAUNCHER_EN
+            else -> return // unknown variant → leave the current launcher as-is
+        }
+        val pm = packageManager
+        if (isAliasActive(pm, target)) return
+        for (alias in listOf(Constants.ALIAS_LAUNCHER_VI, Constants.ALIAS_LAUNCHER_EN)) {
+            val state = if (alias == target) {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            }
+            pm.setComponentEnabledSetting(
+                aliasComponent(alias),
+                state,
+                PackageManager.DONT_KILL_APP,
+            )
+        }
+    }
+
+    /**
+     * Whether [alias] is the currently-active launcher. A never-toggled
+     * component reports STATE_DEFAULT, which means "use the manifest value" — so
+     * the VI alias (android:enabled="true") is active when DEFAULT, the EN alias
+     * (android:enabled="false") is not.
+     */
+    private fun isAliasActive(pm: PackageManager, alias: String): Boolean {
+        return when (pm.getComponentEnabledSetting(aliasComponent(alias))) {
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> true
+            PackageManager.COMPONENT_ENABLED_STATE_DEFAULT -> alias == Constants.ALIAS_LAUNCHER_VI
+            else -> false
+        }
+    }
+
+    /**
+     * Resolves an activity-alias [ComponentName]. The alias CLASS names live under
+     * the manifest namespace (com.codertapsu.xiangqi_solver), which can differ
+     * from the applicationId/`packageName` when a build sets an
+     * applicationIdSuffix (e.g. `.dev`). We derive the namespace from this
+     * activity's own class so the lookup is correct in every build variant;
+     * `ComponentName(this, ...)` still uses the runtime applicationId as the
+     * package, which is what `setComponentEnabledSetting` expects.
+     */
+    private fun aliasComponent(alias: String): ComponentName {
+        val namespace = javaClass.name.substringBeforeLast('.')
+        return ComponentName(this, "$namespace.$alias")
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {

@@ -21,6 +21,7 @@ class RemoteConfig extends Equatable {
     required this.showVisionModel,
     required this.showLicenses,
     required this.showDeviceId,
+    required this.appIconVariant,
   });
 
   /// Whether to OFFER rewarded ads (a capped loss-leader) — default off.
@@ -72,6 +73,11 @@ class RemoteConfig extends Equatable {
   /// Whether the "Device ID" tile (shared to receive a Hint Grant) is shown.
   final bool showDeviceId;
 
+  /// Which launcher icon + name variant to show: `'auto'` (follow the in-app
+  /// App-language), or force `'vi'` / `'en'`. Lets the backend switch among the
+  /// BUNDLED icon variants (it can't push a brand-new image — Android limitation).
+  final String appIconVariant;
+
   static const RemoteConfig defaults = RemoteConfig(
     rewardedAds: false,
     bannerAds: true,
@@ -91,6 +97,7 @@ class RemoteConfig extends Equatable {
     showVisionModel: false,
     showLicenses: false,
     showDeviceId: false,
+    appIconVariant: 'auto',
   );
 
   factory RemoteConfig.fromJson(Map<String, dynamic> json) {
@@ -98,6 +105,7 @@ class RemoteConfig extends Equatable {
     final hints = (json['hints'] as Map?)?.cast<String, dynamic>() ?? const {};
     final od = (json['onDevice'] as Map?)?.cast<String, dynamic>() ?? const {};
     final ui = (json['ui'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final appIcon = (json['appIcon'] as Map?)?.cast<String, dynamic>() ?? const {};
     return RemoteConfig(
       rewardedAds: ads['rewarded'] as bool? ?? defaults.rewardedAds,
       bannerAds: ads['banner'] as bool? ?? defaults.bannerAds,
@@ -117,6 +125,7 @@ class RemoteConfig extends Equatable {
       showVisionModel: ui['visionModel'] as bool? ?? defaults.showVisionModel,
       showLicenses: ui['licenses'] as bool? ?? defaults.showLicenses,
       showDeviceId: ui['deviceId'] as bool? ?? defaults.showDeviceId,
+      appIconVariant: appIcon['variant'] as String? ?? defaults.appIconVariant,
     );
   }
 
@@ -142,6 +151,7 @@ class RemoteConfig extends Equatable {
       'licenses': showLicenses,
       'deviceId': showDeviceId,
     },
+    'appIcon': {'variant': appIconVariant},
   };
 
   RemoteConfig copyWith({
@@ -161,6 +171,7 @@ class RemoteConfig extends Equatable {
     bool? showVisionModel,
     bool? showLicenses,
     bool? showDeviceId,
+    String? appIconVariant,
   }) {
     return RemoteConfig(
       rewardedAds: rewardedAds ?? this.rewardedAds,
@@ -179,6 +190,7 @@ class RemoteConfig extends Equatable {
       showVisionModel: showVisionModel ?? this.showVisionModel,
       showLicenses: showLicenses ?? this.showLicenses,
       showDeviceId: showDeviceId ?? this.showDeviceId,
+      appIconVariant: appIconVariant ?? this.appIconVariant,
     );
   }
 
@@ -200,5 +212,6 @@ class RemoteConfig extends Equatable {
     showVisionModel,
     showLicenses,
     showDeviceId,
+    appIconVariant,
   ];
 }

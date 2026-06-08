@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English launcher icon variant ("Xiangqi Strategist"). Uses the EN foreground
+     art (ic_launcher_en_foreground.png) over a background colour matched to the
+     icon's gradient edge, so masked corners blend in. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+  <background android:drawable="@color/ic_launcher_background_en"/>
+  <foreground android:drawable="@mipmap/ic_launcher_en_foreground"/>
+</adaptive-icon>

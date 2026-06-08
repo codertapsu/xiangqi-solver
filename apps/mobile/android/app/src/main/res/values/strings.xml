@@ -7,6 +7,12 @@
 <resources>
     <string name="app_name">Xiangqi Strategist</string>
 
+    <!-- FIXED, locale-INDEPENDENT launcher names for the two activity-alias
+         icons. The active alias is chosen at runtime by the in-app App-language
+         setting, so these must NOT be overridden per-locale (no values-vi copy). -->
+    <string name="app_name_vi">Quân Sư Cờ Tướng</string>
+    <string name="app_name_en">Xiangqi Strategist</string>
+
     <!-- Foreground-service notification (honest, non-misleading). -->
     <string name="notification_channel_name">Solver Mode</string>
     <string name="notification_channel_description">Shown while Xiangqi Strategist is capturing the screen for analysis.</string>

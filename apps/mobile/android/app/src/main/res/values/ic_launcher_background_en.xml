@@ -1,0 +1,7 @@
+<resources>
+  <!-- Background colour for the English launcher-icon variant. The EN foreground
+       is full-bleed (its red→orange gradient is baked in), so this only shows in
+       the corners a launcher mask leaves uncovered — matched to the gradient's
+       red edge (same as the Vietnamese icon) so it blends in. -->
+  <color name="ic_launcher_background_en">#be140a</color>
+</resources>

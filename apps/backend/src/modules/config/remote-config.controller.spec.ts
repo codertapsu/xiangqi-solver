@@ -21,6 +21,7 @@ describe('RemoteConfigController', () => {
       licenses: false,
       deviceId: false,
     },
+    appIcon: { variant: 'auto' },
   };
 
   it('returns the feature config from app.features', async () => {

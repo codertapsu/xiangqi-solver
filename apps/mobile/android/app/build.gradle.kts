@@ -96,6 +96,18 @@ android {
                 debugSymbolLevel = "SYMBOL_TABLE"
             }
         }
+
+        debug {
+            // Give local/dev builds a separate applicationId so a debug build can
+            // be installed SIDE-BY-SIDE with the Play release (which is signed by
+            // Google's app-signing key — a different signer, so it can't be
+            // replaced by a locally upload-key-signed build). The namespace is
+            // unchanged, so the manifest's `.LauncherVi`/`.MainActivity` class
+            // names stay under `com.codertapsu.xiangqi_solver` — the native
+            // alias-switch resolves them against the namespace, not this id.
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
     }
 }
 

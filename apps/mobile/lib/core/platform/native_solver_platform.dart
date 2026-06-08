@@ -65,6 +65,11 @@ abstract interface class NativeSolverPlatform {
   /// overlay is showing.
   Future<void> setOverlaySide(String side);
 
+  /// Switches the launcher icon + name to the [variant] (`'vi'` | `'en'`) by
+  /// toggling the activity-aliases. Idempotent native-side (no-op when already
+  /// active); a no-op entirely off Android.
+  Future<void> setAppIcon(String variant);
+
   /// Releases any resources (e.g. the event subscription). Idempotent.
   Future<void> dispose();
 }
