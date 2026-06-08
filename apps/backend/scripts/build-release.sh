@@ -9,7 +9,8 @@
 #     package.json              + package-lock.json
 #     .env                      production env (engine paths pinned to the server)
 #     engine/Linux/pikafish-*   all Linux engine binaries (made executable)
-#     engine/pikafish.nnue      the NNUE net
+#     engine/pikafish.nnue      the SERVER engine's NNUE net (PIKAFISH_NNUE_PATH)
+#     engine/master-net.nnue    the ON-DEVICE net served to the app at /api/engine/net
 #     DEPLOY.md                 server-side steps
 #
 # Deploy + run (from your machine, then on the server):
@@ -24,6 +25,11 @@
 #   PIKAFISH_BIN  which Linux binary the server CPU supports (default pikafish-avx2;
 #                 use pikafish-sse41-popcnt for old CPUs that lack AVX2).
 #   PIKAFISH_SRC  path to the unpacked Pikafish.2026-01-02 dir.
+#   ONDEVICE_NET_SRC  the master-net the Android app downloads (served at
+#                 /api/engine/net); MUST be 50,760,458 bytes — a DIFFERENT net
+#                 from the server engine's pikafish.nnue.
+#   PUBLIC_BASE_URL  the URL the app reaches this backend at (default the prod
+#                 host) — pins ONDEVICE_NET_URL=<it>/api/engine/net in the .env.
 set -euo pipefail
 
 BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,6 +39,11 @@ RELEASE_DIR="$BACKEND_DIR/release"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/xiangqi-solver/apps/backend}"
 PIKAFISH_BIN="${PIKAFISH_BIN:-pikafish-avx2}"
 PIKAFISH_SRC="${PIKAFISH_SRC:-$REPO_ROOT/Pikafish.2026-01-02}"
+# Public base URL the APP reaches this backend at — used to pin ONDEVICE_NET_URL
+# so the app downloads the on-device net from us (GET /api/engine/net).
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-http://103.157.205.175:3000}"
+ONDEVICE_NET_SRC="${ONDEVICE_NET_SRC:-}"
+ONDEVICE_NET_BYTES=50760458   # master-net size; MUST match backend ONDEVICE_NET_BYTES
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 
@@ -46,6 +57,23 @@ cd "$BACKEND_DIR"
 [ -d "$PIKAFISH_SRC/Linux" ] || { echo "ERROR: $PIKAFISH_SRC/Linux not found." >&2; exit 1; }
 [ -f "$PIKAFISH_SRC/Linux/$PIKAFISH_BIN" ] || { echo "ERROR: engine binary $PIKAFISH_SRC/Linux/$PIKAFISH_BIN not found (set PIKAFISH_BIN)." >&2; exit 1; }
 [ -f "$PIKAFISH_SRC/pikafish.nnue" ] || { echo "ERROR: $PIKAFISH_SRC/pikafish.nnue not found." >&2; exit 1; }
+
+# On-device master-net (served at /api/engine/net) — a DIFFERENT net from the
+# server engine's pikafish.nnue above; the app verifies its size, so check it here.
+if [ -z "$ONDEVICE_NET_SRC" ]; then
+  echo "ERROR: ONDEVICE_NET_SRC is not set — the master-net the app downloads must be provided." >&2
+  echo "       Fetch it once from:" >&2
+  echo "         https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue" >&2
+  echo "       then rebuild: ONDEVICE_NET_SRC=/path/to/pikafish.nnue bash scripts/build-release.sh" >&2
+  exit 1
+fi
+[ -f "$ONDEVICE_NET_SRC" ] || { echo "ERROR: ONDEVICE_NET_SRC not found: $ONDEVICE_NET_SRC" >&2; exit 1; }
+ondevice_net_size=$(stat -f %z "$ONDEVICE_NET_SRC" 2>/dev/null || stat -c %s "$ONDEVICE_NET_SRC")
+[ "$ondevice_net_size" = "$ONDEVICE_NET_BYTES" ] || {
+  echo "ERROR: ONDEVICE_NET_SRC is $ondevice_net_size bytes, expected $ONDEVICE_NET_BYTES (the master-net)." >&2
+  echo "       That's the WRONG net (e.g. the 53MB Jan release) — the app checks the size and would reject it." >&2
+  exit 1
+}
 
 # --- 1. install build deps + compile --------------------------------------
 bold "==> Installing build deps + compiling (nest build -> dist/)..."
@@ -65,19 +93,24 @@ cp package.json "$RELEASE_DIR/package.json"
 # engine: ALL Linux binaries (so the arch can be switched server-side) + the net
 cp -R "$PIKAFISH_SRC/Linux" "$RELEASE_DIR/engine/Linux"
 cp "$PIKAFISH_SRC/pikafish.nnue" "$RELEASE_DIR/engine/pikafish.nnue"
+cp "$ONDEVICE_NET_SRC" "$RELEASE_DIR/engine/master-net.nnue"   # served at GET /api/engine/net
 chmod +x "$RELEASE_DIR/engine/Linux/"pikafish-*
 
 # --- 3. production .env: copy, then PIN engine paths to the server layout ---
 bold "==> Writing release .env (engine paths -> $DEPLOY_DIR/engine)..."
 # Keep every other var (API keys, etc.); drop the engine path/provider/variant
 # lines and re-add them pinned to where the bundle lands on the server.
-grep -vE '^(ENGINE_PROVIDER|PIKAFISH_BINARY_PATH|PIKAFISH_NNUE_PATH|ENGINE_UCI_VARIANT)=' .env > "$RELEASE_DIR/.env"
+grep -vE '^(ENGINE_PROVIDER|PIKAFISH_BINARY_PATH|PIKAFISH_NNUE_PATH|ENGINE_UCI_VARIANT|ONDEVICE_NET_URL|ONDEVICE_NET_PATH)=' .env > "$RELEASE_DIR/.env"
 {
   echo ""
   echo "# --- engine: pinned for the server bundle by scripts/build-release.sh ---"
   echo "ENGINE_PROVIDER=pikafish"
   echo "PIKAFISH_BINARY_PATH=$DEPLOY_DIR/engine/Linux/$PIKAFISH_BIN"
   echo "PIKAFISH_NNUE_PATH=$DEPLOY_DIR/engine/pikafish.nnue"
+  # On-device net: the app downloads it from THIS backend (GET /api/engine/net),
+  # streamed from the pinned master-net file — not GitHub.
+  echo "ONDEVICE_NET_URL=$PUBLIC_BASE_URL/api/engine/net"
+  echo "ONDEVICE_NET_PATH=$DEPLOY_DIR/engine/master-net.nnue"
   # Pikafish is xiangqi-native — UCI_Variant must stay empty (only set it for
   # Fairy-Stockfish). Left unset here so the backend defaults to empty.
 } >> "$RELEASE_DIR/.env"
@@ -116,6 +149,17 @@ The bundled CPU build is **$PIKAFISH_BIN**. If the server prints
 \`\`\`sh
 echo quit | ./engine/Linux/$PIKAFISH_BIN   # should print the Pikafish banner
 \`\`\`
+
+## On-device engine net
+The Android app downloads its NNUE net from THIS backend at \`GET /api/engine/net\`
+(served from \`$DEPLOY_DIR/engine/master-net.nnue\`, pinned in \`.env\`) — no GitHub
+dependency. Verify after starting:
+\`\`\`sh
+curl -sI http://127.0.0.1:\${PORT:-3000}/api/engine/net | grep -i content-length   # = $ONDEVICE_NET_BYTES
+\`\`\`
+If it 404s, the master-net file is missing on the server (re-run the build with
+\`ONDEVICE_NET_SRC\` set, then redeploy).
+
 Requires Node.js 20+ on the server.
 EOF
 

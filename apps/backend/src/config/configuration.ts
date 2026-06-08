@@ -18,6 +18,10 @@ export interface AppConfig {
     provider: 'pikafish' | 'mock';
     pikafishBinaryPath: string;
     pikafishNnuePath: string;
+    /** File served at GET /api/engine/net — the Pikafish master-net the ON-DEVICE
+     *  app downloads (must be the ONDEVICE_NET_BYTES-sized net, NOT the server
+     *  engine's own pikafishNnuePath). Copied to the host on each release. */
+    onDeviceNetPath: string;
     uciVariant: string;
     defaultDepth: number;
     defaultMoveTimeMs: number;
@@ -81,6 +85,7 @@ export function configuration(): { app: AppConfig } {
       provider: env.ENGINE_PROVIDER,
       pikafishBinaryPath: env.PIKAFISH_BINARY_PATH,
       pikafishNnuePath: env.PIKAFISH_NNUE_PATH,
+      onDeviceNetPath: env.ONDEVICE_NET_PATH,
       uciVariant: env.ENGINE_UCI_VARIANT,
       defaultDepth: env.ENGINE_DEFAULT_DEPTH,
       defaultMoveTimeMs: env.ENGINE_DEFAULT_MOVE_TIME_MS,
