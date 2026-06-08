@@ -99,11 +99,16 @@ export const envSchema = z.object({
   // downloaded at runtime from this URL (default = the official master-net, which
   // matches the bundled binary). netBytes lets the app verify a complete download.
   ONDEVICE_ENABLED: boolFromEnv(true),
-  ONDEVICE_NET_URL: z
-    .string()
-    .default(
-      'https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue',
-    ),
+  // Absolute URL the app downloads the on-device net from (returned to the app in
+  // /api/config). Defaults to THIS backend's own GET /api/engine/net endpoint
+  // (served from ONDEVICE_NET_PATH) so the app downloads the net from us, not
+  // GitHub (which 504'd). Override per host; the release build pins it.
+  ONDEVICE_NET_URL: z.string().default('http://103.157.205.175:3000/api/engine/net'),
+  // Server-side path to the Pikafish master-net file served at GET /api/engine/net.
+  // MUST be the ONDEVICE_NET_BYTES-sized master-net — a DIFFERENT file from the
+  // server engine's PIKAFISH_NNUE_PATH (release/engine/pikafish.nnue). Staged by
+  // scripts/build-release.sh (with a size check) and pinned in the release .env.
+  ONDEVICE_NET_PATH: z.string().default('./release/engine/master-net.nnue'),
   ONDEVICE_NET_BYTES: intFromEnv(50760458, 0, 1024 * 1024 * 1024),
   // Default OpenAI model the app uses for the on-device (BYO-key) board reading.
   // On-device vision is OpenAI-only; this is the model used when the user hasn't
