@@ -126,6 +126,10 @@ class MethodChannelNativeSolver implements NativeSolverPlatform {
       _invokeVoidArgs('setOverlaySide', {'side': side});
 
   @override
+  Future<void> setAppIcon(String variant) =>
+      _invokeVoidArgs('setAppIcon', {'variant': variant});
+
+  @override
   Future<void> dispose() async {
     _events = null;
   }

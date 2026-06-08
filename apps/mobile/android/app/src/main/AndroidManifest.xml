@@ -40,9 +40,13 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-6124263664453069~3920691029" />
 
+        <!-- Host activity. NOT a launcher entry itself — the two activity-aliases
+             below are the launcher entries (so the icon + name can be switched at
+             runtime to follow the in-app language). It stays exported=false; the
+             aliases are the public entry points. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
@@ -57,11 +61,43 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+        </activity>
+
+        <!-- DYNAMIC LAUNCHER ICON + NAME. Two aliases, each with a FIXED
+             (locale-independent) label + its own icon. Exactly ONE is enabled at a
+             time; the app enables the one matching the in-app App-language setting
+             (or a backend override) via PackageManager.setComponentEnabledSetting.
+             VI is enabled by default (primary market); the app corrects it on
+             launch. Switching may briefly flash the launcher icon on some launchers. -->
+        <activity-alias
+            android:name=".LauncherVi"
+            android:enabled="true"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:label="@string/app_name_vi"
+            android:icon="@mipmap/ic_launcher_vi"
+            android:roundIcon="@mipmap/ic_launcher_vi"
+            android:theme="@style/LaunchTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherEn"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:label="@string/app_name_en"
+            android:icon="@mipmap/ic_launcher_en"
+            android:roundIcon="@mipmap/ic_launcher_en"
+            android:theme="@style/LaunchTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
 
         <!-- Transparent activity that launches the OFFICIAL MediaProjection
              consent dialog. The user must explicitly grant capture. -->

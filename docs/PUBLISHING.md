@@ -111,20 +111,23 @@ even to internal tracks. Currently `1.0.0+2`. Bump the `+N` for each new upload.
 
 ## 3. App name & localization (Vietnamese-first)
 
-**Dynamic launcher + in-app name** (chosen by device locale):
+**Dynamic launcher icon + name** (chosen by the **in-app App-language**, not the
+device locale):
 
-| Device language | App name |
-|---|---|
-| Vietnamese (primary market) | **Quân Sư Cờ Tướng** |
-| Everything else | **Xiangqi Strategist** |
+| App language | App name | Launcher icon |
+|---|---|---|
+| Vietnamese (primary market) | **Quân Sư Cờ Tướng** | red |
+| Everything else | **Xiangqi Strategist** | (English) |
 
-Already wired:
-- `AndroidManifest.xml` uses `android:label="@string/app_name"`.
-- `res/values/strings.xml` → `app_name = "Xiangqi Strategist"` (default) + English
-  overlay/notification strings.
-- `res/values-vi/strings.xml` → `app_name = "Quân Sư Cờ Tướng"` + Vietnamese
-  overlay/notification strings (Android picks this on vi-locale devices).
+Already wired — full details + "how to add a variant" in
+**[APP_ICON_VARIANTS.md](APP_ICON_VARIANTS.md)**:
+- Two `<activity-alias>` launcher entries (`.LauncherVi` default-enabled,
+  `.LauncherEn`), each with a fixed label + its own adaptive icon; the app enables
+  the one matching `settings.appLanguage` at startup / on background (never live).
+- `res/values/strings.xml` → `app_name_vi` / `app_name_en` (fixed, locale-independent).
 - The in-app title uses `AppLocalizations.appTitle` via `MaterialApp.onGenerateTitle`.
+- A backend `APP_ICON_VARIANT` (`auto`|`vi`|`en`) can override which bundled variant
+  shows (Android can't apply a runtime-downloaded icon — new art needs a release).
 
 **UI localization (Flutter gen_l10n):** the whole UI is translated — `lib/l10n/app_en.arb`
 (template) + `app_vi.arb`, generated into `lib/l10n/gen/`. The app follows the device
@@ -132,7 +135,9 @@ locale among {vi, en} and **falls back to Vietnamese** for any other language. U
 override it in **Settings → Language → App language** (System / Tiếng Việt / English).
 To add a language later: drop a translated `app_<code>.arb`, add `<code>` to
 `kSupportedLanguageCodes` (`lib/core/l10n/locale_providers.dart`), add a
-`res/values-<code>/strings.xml` for the launcher name, and run `flutter gen-l10n`.
+`res/values-<code>/strings.xml` for the native overlay/notification strings, and
+run `flutter gen-l10n`. (A localized *launcher icon/name* is a separate, optional
+step — see [APP_ICON_VARIANTS.md](APP_ICON_VARIANTS.md).)
 
 **In the Play Console store listing** (separate from the launcher label):
 - Set the **default listing language to Vietnamese (vi-VN)** (primary market), then
@@ -372,6 +377,16 @@ adb logcat -d | grep -iE "FATAL EXCEPTION|WorkDatabase|AndroidRuntime: .*E"
 Expect `Displayed …/MainActivity` in logcat, a live PID, and **no** `FATAL` /
 `WorkDatabase` lines. Then manually exercise: launch → Solver Mode (grant overlay +
 MediaProjection) → analyze a board → buy/restore a test pack → settings/language toggle.
+
+> **Signature mismatch installing over a Play build?** Once a device has a
+> **Play-installed** copy (signed by Google's app-signing key), a locally built
+> APK (signed by your *upload* key) can't replace it — `adb install` fails with
+> `INSTALL_FAILED_UPDATE_INCOMPATIBLE`. Either `adb uninstall com.codertapsu.xiangqi_solver`
+> first (wipes that build's data), **or** install a **debug** build — the `debug`
+> buildType sets `applicationIdSuffix = ".dev"`, so `com.codertapsu.xiangqi_solver.dev`
+> installs **side-by-side** with the Play release (no conflict, no data loss). The
+> dynamic launcher-icon switch works under the `.dev` id too (the native code
+> resolves the aliases against the namespace, not the applicationId).
 
 ---
 

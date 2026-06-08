@@ -60,5 +60,8 @@ class NoopNativeSolver implements NativeSolverPlatform {
   Future<void> setOverlaySide(String side) async {}
 
   @override
+  Future<void> setAppIcon(String variant) async {}
+
+  @override
   Future<void> dispose() async {}
 }

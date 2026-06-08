@@ -27,6 +27,9 @@ class _FakeNative implements NativeSolverPlatform {
   Future<void> setOverlaySide(String side) async => sidesPushed.add(side);
 
   @override
+  Future<void> setAppIcon(String variant) async {}
+
+  @override
   Future<bool> isSolverModeRunning() async => false;
 
   // --- Unused in this test: benign defaults. ---
