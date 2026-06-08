@@ -31,6 +31,9 @@
   "homeTryMockDesc": "Chọn một ảnh để chạy toàn bộ quy trình tải lên và phân tích mà không cần chụp màn hình.",
   "homePickImage": "Chọn ảnh & phân tích (thử)",
 
+  "homeShareInTitle": "Phân tích ảnh bàn cờ",
+  "homeShareInDesc": "Chụp màn hình ván cờ trong bất kỳ ứng dụng nào, rồi chia sẻ ảnh vào ứng dụng này — hoặc chọn ảnh bên dưới. Chúng tôi sẽ đọc bàn cờ và chỉ ra nước đi tốt nhất.",
+
   "backendTitle": "Máy chủ",
   "backendUrlLabel": "Địa chỉ máy chủ",
   "backendBaseUrlLabel": "Địa chỉ gốc",
@@ -134,6 +137,7 @@
   "settingsPrivacy": "Quyền riêng tư",
   "settingsStoreScreenshots": "Lưu ảnh chụp trên thiết bị này",
   "settingsStoreScreenshotsDesc": "Mặc định tắt. Khi bật, các ảnh đã phân tích sẽ được giữ trên máy và hiển thị trong Lịch sử.",
+  "settingsStoreScreenshotsOnDesc": "Đang giữ {count} ảnh phân tích gần nhất trên thiết bị này — các ảnh cũ hơn sẽ tự động bị xóa.",
   "settingsPrivacyPolicy": "Chính sách quyền riêng tư",
   "settingsLicenses": "Giấy phép nguồn mở",
   "settingsDeviceId": "Mã thiết bị",

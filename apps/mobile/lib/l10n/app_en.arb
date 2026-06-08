@@ -33,6 +33,9 @@
   "homeTryMockDesc": "Pick an image to run the full upload and analysis flow without screen capture.",
   "homePickImage": "Pick an image & analyze (test)",
 
+  "homeShareInTitle": "Analyze a board photo",
+  "homeShareInDesc": "Screenshot your Xiangqi game in any app, then share it into this app — or pick a photo below. We'll read the board and show the best move.",
+
   "backendTitle": "Backend",
   "backendUrlLabel": "Backend URL",
   "backendBaseUrlLabel": "Base URL",
@@ -150,6 +153,8 @@
   "settingsPrivacy": "Privacy",
   "settingsStoreScreenshots": "Store screenshots on this device",
   "settingsStoreScreenshotsDesc": "Off by default. When on, analyzed images are kept on this device and shown in History.",
+  "settingsStoreScreenshotsOnDesc": "Keeping the last {count} analyzed screenshots on this device — older ones are removed automatically.",
+  "@settingsStoreScreenshotsOnDesc": { "placeholders": { "count": { "type": "int" } } },
   "settingsPrivacyPolicy": "Privacy Policy",
   "settingsLicenses": "Open-source licenses",
   "settingsDeviceId": "Device ID",
