@@ -1,365 +1,578 @@
-# Publishing to Google Play — step-by-step
+# Publishing to Google Play — end-to-end guide
 
-> Companion to [MONETIZATION.md](MONETIZATION.md). This is the end-to-end guide to take the app
-> from its current **test-wired** state to a live Play listing. The code is monetization-complete;
-> publishing is mostly replacing test identifiers with real ones and satisfying Play policy.
-> **Not legal advice** — review the policy/Data-Safety/privacy items with someone qualified.
+Ship **Quân Sư Cờ Tướng / Xiangqi Strategist** (`com.codertapsu.xiangqi_solver`) to
+the Google Play Console. Targets Play's 2026 baseline: target API 35 (Android 15),
+AAB delivery, Play App Signing, Data Safety, AdMob + UMP consent.
 
-> **⚠️ Hints are now DEVICE-LOCAL.** The server-side hint wallet, AdMob **SSV**, and server-side IAP
-> validation were **removed**. A rewarded ad credits +1 hint in the client callback; a confirmed Play
-> purchase credits the pack's hints locally; the client spends one hint per cloud analysis. **No SSV
-> callback to configure, no Play Developer service account needed for hints, no `WALLET_*` env.** The
-> backend only protects the analysis endpoints with a per-IP throttle + a per-device daily cap
-> (`x-device-id`, `RATE_LIMIT_DEVICE_*`). Any step below mentioning **SSV**, a **server wallet/account
-> token**, `WALLET_ENABLED`, `/api/ads/ssv`, `/api/accounts/register`, `/api/iap/validate`, or a
-> **Play Developer service account** is **obsolete** — skip it. The bundle id, keystore, AdMob ids,
-> network config, privacy policy, IAP product creation, and Data Safety steps still apply.
+> ✦ This is a **process** guide, not a copy-paste recipe. Read each section, confirm
+> the assumptions for your account, and replace placeholders with real values. **Not
+> legal advice** — review the policy / Data-Safety / GPLv3 items with someone qualified.
 
-## Already done in the codebase (you don't re-do these)
+> **Companion docs:** [MONETIZATION.md](MONETIZATION.md) (hint economics),
+> [ON_DEVICE_ENGINE.md](ON_DEVICE_ENGINE.md) (the GPLv3 engine), and the live
+> backend env reference in `apps/backend/.env.example`.
 
-- **Final bundle id** `com.codertapsu.xiangqi_solver` (gradle namespace + applicationId; Kotlin package).
-- **Shared upload keystore cloned** into `android/key.properties` + `android/app/upload-keystore.jks`
-  (same `upload` key as the other codertapsu apps; gitignored). Release signing wired in `build.gradle.kts`.
-- **Real AdMob ids wired**: manifest app-id `ca-app-pub-6124263664453069~3920691029`; rewarded unit
-  `ca-app-pub-6124263664453069/8730164575` (Android) in `ad_helper.dart`; iOS stays on Google's test unit;
-  `kUsingRealAds = true`.
-- **Local hint wallet** (`SharedPreferences`): 10 free on install; rewarded ad → +1; purchase → +pack;
-  one spent per cloud analysis. Ads are always offered (test units until `kUsingRealAds = true`); no SSV.
-- **Network policy**: release is HTTPS-only **except** a scoped cleartext exception for the current HTTP
-  backend host (`res/xml/network_security_config.xml`); debug allows any LAN/emulator host.
-- **`BACKEND_URL` default** points at the live backend `http://103.157.205.175:3000` (override per build).
-  The app sends an `x-device-id` header so the backend can rate-limit per device.
-- **Privacy policy LIVE**: <https://codertapsu-web.web.app/xiangqi-solver/privacy> (generated from
-  `codertapsu-web/apps.json`; in-app link in Settings → Privacy). The shared `app-ads.txt` already covers it.
-- **UMP consent** gathered before ad init (`consent_manager.dart`); billing permission; wallet/ads/IAP UI.
-- A verified **release AAB builds** (`flutter build appbundle --release`).
-- **Dev mock mode** — run with `--dart-define=MOCK_MONETIZATION=true` to demo the wallet/ads/store UI with
-  dummy data (local balance, instant 'watch ad'/'buy'), no AdMob/Play needed. Default off; never ship it on.
-- **Localized, Vietnamese-first** — the whole UI + the launcher name ship in Vietnamese and English
-  (see the next section). The bundle id is unchanged (`com.codertapsu.xiangqi_solver`).
+> **⚠️ Historical note — the server-wallet era is gone.** Earlier drafts described a
+> server-side hint wallet, AdMob **SSV**, and server-side **IAP validation**
+> (`WALLET_ENABLED`, `/api/ads/ssv`, `/api/iap/validate`, a Play Developer service
+> account). All of that was **removed**: hints are now **device-local** and the
+> backend only meters abuse with rate limits. If you find any of those terms in old
+> notes, ignore them — this document is the current source of truth.
 
-## App name & localization (Vietnamese-first)
+---
 
-**Dynamic app name (launcher + in-app).** The app shows two names, chosen by device locale:
+## 0. Prerequisites & toolchain
+
+- [ ] **Google Play Console** account (one-time $25) with Owner/Admin access.
+- [ ] **Upload keystore** stored somewhere recoverable **outside** the repo — losing
+      it locks you out of future updates (§2). *(Already provisioned for this app.)*
+- [ ] **AdMob account** with the app registered and banner/rewarded/app-open ad units.
+      *(Real IDs are already wired — §5.)*
+- [ ] **Privacy policy URL** (required: the app uses the Advertising ID + uploads
+      screenshots). *(Already live — §10.)*
+- [ ] **A reachable backend** at the URL the app ships with (§7).
+- [ ] **Toolchain:** Flutter ≥ 3.44, **JDK 21**, Android SDK platform 36.
+
+```sh
+flutter doctor -v
+flutter --version            # ≥ 3.44.x
+java -version                # 21.x  (NOT 26 — Gradle 9.1 rejects JDK 26)
+```
+
+> ⚠️ **Use JDK 21**, not the system JDK 26. Gradle 9.1.0 doesn't support JDK 26;
+> Flutter normally auto-selects the Android Studio bundled JBR (21). If `JAVA_HOME`
+> points at 26, `flutter build` fails. Confirm with `flutter doctor -v` (Java section).
+
+---
+
+## 1. What's already done in this repo
+
+Listed so you don't re-do it and so a reviewer knows what the release expects.
+
+| Concern | State | Where |
+|---|---|---|
+| Application ID | `com.codertapsu.xiangqi_solver` (namespace + applicationId) | `android/app/build.gradle.kts` |
+| AGP / Gradle / Kotlin | 9.0.1 / 9.1.0 / 2.3.20 | `android/settings.gradle.kts`, `gradle-wrapper.properties` |
+| `compileSdk` / `targetSdk` / `minSdk` | 36 / 35 / 26 | `android/app/build.gradle.kts` |
+| Release signing | shared `upload` key wired (`key.properties` + `app/upload-keystore.jks`, gitignored) | §2 |
+| R8 minify + resource shrink | **ON**, with keep rules + native debug symbols | §9, `proguard-rules.pro` |
+| Dynamic app name + full i18n (vi/en) | Vietnamese-first; launcher + UI localized | §3 |
+| AdMob App ID + real ad units | `…~3920691029` + real banner/rewarded/app-open | §5 |
+| Device-local hint wallet + install-grant | no server wallet/SSV/IAP-validation | §4 |
+| On-device GPLv3 engine | `libpikafish.so` ships; NNUE downloaded at runtime | §8 |
+| Network security config | release allows cleartext to the one HTTP backend host | §7 |
+| Privacy policy | LIVE on codertapsu-web | §10 |
+| Version | `1.0.0+2` (`versionName 1.0.0`, `versionCode 2`) | `pubspec.yaml` |
+
+A verified **release AAB builds** (`flutter build appbundle --release`) and **launches
+clean on a real device** (R8 enabled — see §9).
+
+---
+
+## 2. App identity, signing & versioning
+
+### 2.1 Application ID (fixed at first upload)
+`com.codertapsu.xiangqi_solver` — set in `android/app/build.gradle.kts` (`namespace` +
+`applicationId`). It **cannot change** after the first upload. A localized app *name*
+("Quân Sư Cờ Tướng") is NOT an id change (§3).
+
+### 2.2 Upload key & Play App Signing
+Play App Signing is the model: you sign the AAB with an **upload key**; Google re-signs
+with the **app signing key** it manages.
+
+This app already has the shared codertapsu `upload` key wired:
+- `android/app/upload-keystore.jks` — the keystore (gitignored).
+- `android/key.properties` — `storePassword` / `keyPassword` / `keyAlias` / `storeFile`
+  (gitignored).
+- `android/app/build.gradle.kts` reads `key.properties`: present → release is signed
+  with the upload key; absent → release falls back to the **debug** key (so a local
+  build still works, but Play would reject it).
+
+**To provision from scratch** (only if the shared key is unavailable):
+```sh
+keytool -genkey -v -keystore ~/keys/xiangqi-upload.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+```
+Then create `android/key.properties` with the four properties above. **Back the
+keystore up** somewhere recoverable — you cannot rotate it without a Play support
+ticket. On first AAB upload, Play enrols you in Play App Signing automatically; record
+the upload cert SHA-1/SHA-256 from **Setup → App integrity → App signing**.
+
+> Verify a built AAB/APK is NOT debug-signed before uploading:
+> `keytool -printcert -jarfile <artifact>` (CN should be your upload key, not
+> "Android Debug").
+
+### 2.3 Versioning
+`pubspec.yaml` `version: <name>+<code>` is the source of truth (Flutter maps it to
+`versionName`+`versionCode`). **`versionCode` must strictly increase on every upload**,
+even to internal tracks. Currently `1.0.0+2`. Bump the `+N` for each new upload.
+
+---
+
+## 3. App name & localization (Vietnamese-first)
+
+**Dynamic launcher + in-app name** (chosen by device locale):
 
 | Device language | App name |
 |---|---|
 | Vietnamese (primary market) | **Quân Sư Cờ Tướng** |
 | Everything else | **Xiangqi Strategist** |
 
-How it's wired (already done — don't re-do):
-- `AndroidManifest.xml` uses `android:label="@string/app_name"` (no hardcoded name).
-- `android/app/src/main/res/values/strings.xml` → `app_name = "Xiangqi Strategist"` (default/fallback) + the
-  English overlay/notification strings.
-- `android/app/src/main/res/values-vi/strings.xml` → `app_name = "Quân Sư Cờ Tướng"` + the Vietnamese
-  overlay/notification strings. (Android picks this automatically on vi-locale devices.)
-- The **in-app** title (Home app bar, OS task switcher, the open-source-licenses page) uses the localized
-  `AppLocalizations.appTitle` via `onGenerateTitle`, so it matches the chosen UI language.
-- `applicationId` / namespace stay `com.codertapsu.xiangqi_solver` (a launcher-name change is NOT an id change).
+Already wired:
+- `AndroidManifest.xml` uses `android:label="@string/app_name"`.
+- `res/values/strings.xml` → `app_name = "Xiangqi Strategist"` (default) + English
+  overlay/notification strings.
+- `res/values-vi/strings.xml` → `app_name = "Quân Sư Cờ Tướng"` + Vietnamese
+  overlay/notification strings (Android picks this on vi-locale devices).
+- The in-app title uses `AppLocalizations.appTitle` via `MaterialApp.onGenerateTitle`.
 
-**UI localization (i18n).** The entire app UI is localized with Flutter `gen_l10n`:
-- Strings live in `apps/mobile/lib/l10n/app_en.arb` (template) and `app_vi.arb` (Vietnamese). The generated
-  `AppLocalizations` is written to `lib/l10n/gen/` — run `flutter gen-l10n` (or it regenerates on build because
-  `generate: true` is set in `pubspec.yaml`). `l10n.yaml` holds the config.
-- **Locale resolution:** the app follows the device locale among {vi, en} and **falls back to Vietnamese** for
-  any other device language (the default market) via the `localeResolutionCallback` in `lib/app/app.dart`.
-  Users can override it in **Settings → Language → App language** (System / Tiếng Việt / English); the choice is
-  persisted in `settings.appLanguage` and re-localizes the app live.
-- Code with no `BuildContext` (network / on-device / data-layer error messages) reads the active locale via
-  `AppL10n.current` (`lib/core/l10n/app_l10n.dart`), kept in sync by the app root.
-- "Move-notation language" (chess-notation OUTPUT — en/vi/zh) is a **separate** setting and is unchanged.
-- **Add a language later:** drop a translated `app_<code>.arb` beside the others, add `<code>` to
-  `kSupportedLanguageCodes` in `lib/core/l10n/locale_providers.dart`, add a `res/values-<code>/strings.xml`
-  for the launcher name, and `flutter gen-l10n`. No other code changes.
+**UI localization (Flutter gen_l10n):** the whole UI is translated — `lib/l10n/app_en.arb`
+(template) + `app_vi.arb`, generated into `lib/l10n/gen/`. The app follows the device
+locale among {vi, en} and **falls back to Vietnamese** for any other language. Users can
+override it in **Settings → Language → App language** (System / Tiếng Việt / English).
+To add a language later: drop a translated `app_<code>.arb`, add `<code>` to
+`kSupportedLanguageCodes` (`lib/core/l10n/locale_providers.dart`), add a
+`res/values-<code>/strings.xml` for the launcher name, and run `flutter gen-l10n`.
 
-**In Play Console (store listing — separate from the launcher label):**
-- Set the listing's **default language to Vietnamese (vi-VN)** (primary market), then **add English (en-US)** as
-  an additional listing language.
-- Title per listing language: **"Quân Sư Cờ Tướng"** for vi-VN, **"Xiangqi Strategist"** for en-US (Play's title
-  is per-language, ≤ 30 chars — both fit). For en-US discoverability, lean on "Xiangqi / Chinese Chess" in the
+**In the Play Console store listing** (separate from the launcher label):
+- Set the **default listing language to Vietnamese (vi-VN)** (primary market), then
+  **add English (en-US)**.
+- Title per language: **"Quân Sư Cờ Tướng"** (vi-VN), **"Xiangqi Strategist"** (en-US)
+  — Play's title is per-language, ≤ 30 chars.
+- For en-US discoverability, lean on **"Chinese Chess / Xiangqi"** in the
   short/long description (Western users search "Chinese Chess" far more than "Xiangqi").
-- Localize the **in-app product** names/descriptions to vi-VN as well (see the IAP section).
+- Localize the **in-app product** names/descriptions to vi-VN too (§6).
 
-## Release checklist (overview)
+First-version release-notes ("What's new") drafts for both languages are in the
+[Appendix](#appendix--v100-release-notes-whats-new).
 
-1. ~~Create an AdMob account, register the Android app, create one Rewarded ad unit~~ — **DONE** (real ids wired).
-2. In the Rewarded unit, enable Server-Side Verification (SSV) and set the callback to the **Firebase SSV function URL** (HTTPS) — see [SSV_FIREBASE.md](SSV_FIREBASE.md). (The backend `/api/ads/ssv` is HTTP, so Google can't call it directly; the function bridges it.)
-3. ~~Fill `_RealUnits.rewardedAndroid` in ad_helper.dart~~ — **DONE** (`ca-app-pub-6124263664453069/8730164575`).
-4. ~~Replace the AdMob APPLICATION_ID meta-data~~ — **DONE** (`ca-app-pub-6124263664453069~3920691029`).
-5. ~~Flip kUsingRealAds = true~~ — **DONE**. Which ad formats actually SHOW is gated at runtime by the remote-config flags from `GET /api/config` (`FEATURE_BANNER_ADS` on; `FEATURE_REWARDED_ADS` / `FEATURE_APP_OPEN_ADS` off by default) — there is no `kAdsEnabled` build flag.
-6. Create the app in Google Play Console (package name **`com.codertapsu.xiangqi_solver`**), choose Play App Signing, and download the signing details.
-7. ~~Generate an upload keystore + key.properties~~ — **DONE** (shared codertapsu `upload` key cloned in; `build.gradle.kts` picks it up).
-8. ~~Write + host a public Privacy Policy~~ — **DONE & LIVE**: paste <https://codertapsu-web.web.app/xiangqi-solver/privacy> into Play Console (App content > Privacy policy).
-9. Complete the Data Safety form for THIS app's data (device id, screenshots, purchase/account data, AdMob).
-10. Complete App access (login-free or provide a test login), Ads declaration (Yes), Content rating, Target audience, and the MediaProjection/overlay permission declarations.
-11. Create the three consumable in-app products hints_20 / hints_60 / hints_150, set VND prices (19,000 / 49,000 / 99,000) per country, and activate them.
-12. Create a Play Developer API service account, grant it access, and download its JSON key for server-side purchase verification.
-13. Add license testers (Play Console account list) and internal testers so IAP and ads can be tested without real charges.
-14. Stand up the production backend over HTTPS with WALLET_ENABLED=true, ADMOB_SSV_ALLOW_UNVERIFIED=false, PLAY_VERIFY_MODE=google (+ service-account wired), or keep sandbox/unverified ONLY for the test track.
-15. Build the release AAB with --dart-define=BACKEND_URL=https://<your-host> (and any other dart-defines), signed by the upload key.
-16. Upload the AAB to the Internal testing track, opt in as a tester, and run the full pre-launch verification checklist below.
-17. Promote through Closed/Open testing as desired, then submit the Production release for review.
+---
 
+## 4. Monetization model — device-local hints
 
-This guide takes the app from the current TEST-wired state to a live Play listing. The codebase is already monetization-complete; publishing is mostly about replacing test identifiers with real ones and satisfying Play policy.
+Understand this before the Data Safety form and the verification checklist, because it
+removes a lot of what older guides assumed.
 
-**What is already wired (do not re-implement):**
-- Backend wallet endpoints under the `/api` prefix: `POST /api/accounts/register`, `GET /api/wallet`, `GET /api/ads/ssv` (AdMob SSV), `POST /api/iap/validate`.
-- Flutter client: anonymous account + secure-storage token, `RewardedAdService` (sends SSV `custom_data = accountId`), `BillingService` (validate-before-complete), wallet UI, `MobileAds.initialize()` in `main.dart`.
-- Server-authoritative hint packs `hints_20 / hints_60 / hints_150` (counts live in `apps/backend/src/modules/wallet/wallet.constants.ts`).
-- Real ECDSA SSV verification (`admob-ssv.verifier.ts`) and a Play-verifier seam (`play-purchase.verifier.ts`).
+- **Hints live ONLY on the device** (`SharedPreferences`). There is **no server
+  balance**, no SSV callback, no IAP-validation endpoint to deploy or keep durable. A
+  backend restart loses nothing hint-related.
+- **Earning hints:** a rewarded ad credits +1 in the client callback; a confirmed Play
+  purchase credits the pack's hints locally (no server verification).
+- **Spending hints:** the client spends 1 hint per **cloud** analysis (board reading on
+  our key, or our cloud engine). Fully on-device + own-key analysis is free. With the
+  user's **own** OpenAI key it's metered at 1 hint per N analyses (`HINTS_OWN_KEY_DIVISOR`).
+- **Install-grant (anti-abuse):** on first launch the app calls `POST /api/hints/claim`
+  with a reinstall-stable `x-device-id`; the backend seeds the starting balance
+  (`HINTS_FREE_ON_INSTALL`, default 10) and records the device so uninstall+reinstall
+  doesn't re-grant. A manual **"Hint Grants"** allowlist (`grants.json` in
+  `HINTS_DATA_DIR`) lets you comp a specific device — users can copy their Device ID
+  from **Settings → Privacy → Device ID** and send it to support.
+- **Server-side cost guard:** the only abuse protection is the per-IP throttle
+  (`RATE_LIMIT_*`) + a per-device daily cap (`RATE_LIMIT_DEVICE_*`, keyed by
+  `x-device-id`). Tune these to bound your OpenAI spend (§7).
 
-**The exact files/flags — most are DONE; what's left to flip for release:**
-| Concern | File / location | State | Action left |
-|---|---|---|---|
-| Real ad units | `ad_helper.dart` | ✅ `kUsingRealAds = true`; real Android unit wired | none |
-| AdMob App ID | `AndroidManifest.xml` (`…ads.APPLICATION_ID`) | ✅ `ca-app-pub-6124263664453069~3920691029` | none |
-| Hint wallet | device-local (`SharedPreferences`) | ✅ ad → +1, purchase → +pack, spend per cloud solve | none (no server wallet) |
-| Backend URL | `--dart-define=BACKEND_URL=…` (`app_constants.dart`) | ✅ default `http://103.157.205.175:3000` | switch to `https://…` when the backend gets TLS |
-| Release signing | `android/key.properties` + `android/app/upload-keystore.jks` | ✅ shared `upload` key cloned in | none |
-| Cleartext HTTP | `res/xml/network_security_config.xml` | ✅ release allows cleartext to the backend host only | remove the exception once the backend is HTTPS |
-| AdMob SSV | — | ❌ removed (local rewards, no SSV) | nothing to configure |
-| Backend abuse cap | `apps/backend/.env` (`RATE_LIMIT_DEVICE_*`) | ✅ per-IP throttle + per-device daily cap (default 100/day) | tune the limits for your traffic |
+See [MONETIZATION.md](MONETIZATION.md) for the per-pack economics.
 
-App identity (already set, confirm before first upload): `applicationId = com.codertapsu.xiangqi_solver`, `versionName/versionCode` from `pubspec.yaml` `version: 1.0.0+1`, `minSdk 26`, `targetSdk 35`, `compileSdk 36`.
+---
 
-> Note: the `~` separator is an AdMob **App ID**; the `/` separator is an **ad unit ID**. Do not swap them.
+## 5. AdMob & UMP consent
 
+### 5.1 IDs (already wired)
+| Item | Value | File |
+|---|---|---|
+| AdMob **App ID** (manifest meta-data) | `ca-app-pub-6124263664453069~3920691029` | `AndroidManifest.xml` |
+| Banner unit (Android) | `ca-app-pub-6124263664453069/1354234833` | `lib/features/monetization/data/ad_helper.dart` |
+| Rewarded unit (Android) | `ca-app-pub-6124263664453069/8730164575` | same |
+| App-open unit (Android) | `ca-app-pub-6124263664453069/9041153161` | same |
 
-### 1a. Create the AdMob app
-1. Go to https://apps.admob.com → **Apps → Add app → Android**. If the app is not yet on Play, select "No, it isn't listed yet" (you can link it to the Play listing after publishing).
-2. After creation, copy the **App ID** — it looks like `ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY` (tilde). FILL IN: `<YOUR_ADMOB_APP_ID>`.
+> The `~` separator is an **App ID**; the `/` separator is an **ad unit ID**. iOS units
+> are still Google sample IDs (ship iOS only after wiring real ones).
 
-### 1b. Create the Rewarded ad unit
-1. In the app → **Ad units → Add ad unit → Rewarded**.
-2. Set the reward to **1 item** (the actual hint amount is decided server-side; AdMob's reward value is cosmetic). Save.
-3. Copy the **Ad unit ID** — `ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ` (slash). FILL IN: `<YOUR_REWARDED_UNIT_ID_ANDROID>` (and `<…_IOS>` only if you ship iOS).
+### 5.2 Which formats show — driven by the backend, not a build flag
+There is no `kUsingRealAds`/`kAdsEnabled` constant to flip. `GET /api/config` returns
+feature flags the client honors at runtime:
+- `FEATURE_USE_REAL_ADS` (env) → **use real ad units vs Google test units.** Default
+  `false`. **Set it `true` on the production backend** so the live app serves real ads.
+- `FEATURE_BANNER_ADS` (default `true`) — banners are the primary format (top of Home +
+  Settings).
+- `FEATURE_REWARDED_ADS` (default `false`) and `FEATURE_APP_OPEN_ADS` (default `false`)
+  — enable per your monetization plan.
 
-### 1c. Enable Server-Side Verification (SSV)
-1. Open the Rewarded ad unit → **Server-side verification** section → enter the callback URL:
-   `https://<YOUR_PUBLIC_HOST>/api/ads/ssv`
-   This MUST be a public HTTPS URL reachable by Google. The route is `GET` and lives in `apps/backend/src/modules/wallet/ads.controller.ts`.
-2. How the contract works (already implemented, for your verification): Google appends query params including `transaction_id`, `custom_data`, `key_id`, and `signature`. The client sets `custom_data = accountId` via `ServerSideVerificationOptions` in `rewarded_ad_service.dart`. The backend verifies the ECDSA-SHA256 signature against Google's published keys (`https://www.gstatic.com/admob/reward/verifier-keys.json`, fetched by `ssv-key-provider.ts`), then credits hints to the account in `custom_data`, capped at `MAX_AD_HINTS_PER_DAY` (3/24h). It always returns HTTP 200 so Google doesn't retry.
-3. There is no SSV "secret" to paste anywhere — verification is signature-based, so the only AdMob-side value is the callback **URL**.
+> ⚠️ Keep `FEATURE_USE_REAL_ADS=false` while testing. Real impressions on your own
+> devices are **invalid traffic** and can get the AdMob account suspended. If you must
+> see live fills, register your device as an AdMob **test device**.
 
-### 1d. Put the IDs into the app
-- **Manifest App ID** — in `apps/mobile/android/app/src/main/AndroidManifest.xml`, replace:
-  ```xml
-  android:value="ca-app-pub-3940256099942544~3347511713"
-  ```
-  with your real `<YOUR_ADMOB_APP_ID>`. (The app crashes on launch if this meta-data is missing or malformed.)
-- **Rewarded unit IDs** — in `apps/mobile/lib/features/monetization/data/ad_helper.dart`, set:
-  ```dart
-  static const rewardedAndroid = '<YOUR_REWARDED_UNIT_ID_ANDROID>';
-  static const rewardedIos     = '<YOUR_REWARDED_UNIT_ID_IOS>'; // or leave placeholder if Android-only
-  ```
-  in `_RealUnits`.
-- **Flip the flag** — set `const bool kUsingRealAds = true;` in the same file.
+### 5.3 UMP consent
+`mobile_ads_provider.dart` + `consent_manager.dart` gather UMP consent before ad init.
+Author the actual messages in **AdMob → Privacy & messaging**: a **GDPR (EEA/UK)**
+message and a **US states** message; publish both. When consent can't be obtained, ads
+don't load and the banner collapses to `SizedBox.shrink()` — by design.
 
-> Keep `kUsingRealAds = false` while developing. Showing real ads to yourself = invalid traffic and can get the AdMob account suspended. Use AdMob **test devices** (register your device's advertising ID under AdMob → Settings → Test devices) if you must see live-unit fills before launch.
+---
 
+## 6. In-app products (hint packs)
 
-### 2a. Create the app
-1. https://play.google.com/console → **Create app**. **Default language = Vietnamese (vi-VN)** (primary market — see [App name & localization](#app-name--localization-vietnamese-first)); app name **"Quân Sư Cờ Tướng"** for the vi-VN listing (add an en-US listing titled "Xiangqi Strategist"); App/Game = App, Free/Paid = **Free** (monetization is via IAP/ads).
-2. Accept the developer program & US export declarations. The package name `com.codertapsu.xiangqi_solver` is fixed at first upload — it must match `applicationId` in `build.gradle.kts`.
-
-### 2b. App signing (Play App Signing + your upload key)
-Play App Signing is the default and recommended path: you sign the AAB with an **upload key**; Google re-signs with the **app signing key** it manages.
-1. Generate an upload keystore (see §6 for the keytool command and `key.properties`).
-2. On first AAB upload Play enrolls you in Play App Signing automatically using your upload key as the registered upload certificate.
-3. **Record the SHA-1/SHA-256 of the upload cert** (Play Console → **Setup → App signing**). You'll need these if you later add Google sign-in, Firebase, or API key restrictions. Not required for the current feature set, but capture them now.
-
-### 2c. Internal testing track (do this before Production)
-1. **Testing → Internal testing → Create new release**.
-2. Upload the signed AAB (§7). Internal testing has no review delay and is the right place to validate IAP + ads + SSV end to end.
-3. Add testers by email list, copy the opt-in URL, and accept it on the test device's Google account. IAP and license-tester behavior only work for accounts on the testers/license-testers lists.
-
-> Order matters: you generally must create at least one release (even internal) and complete the Data Safety + content forms before products and store listing can go fully active. Create the consumables (§5) as soon as the app exists; they don't need a published release but do need the app's billing to be set up.
-
-
-Create three **in-app products** of type **Consumable** so they can be repurchased after being consumed. The product **IDs must exactly match** the server map in `wallet.constants.ts` and the `productId` the client sends to `POST /api/iap/validate` — a mismatch yields `IAP_UNKNOWN_PRODUCT`.
+Create three **Consumable** products so they can be re-purchased after being consumed.
+The **product IDs must exactly match** `kHintPacks` in
+`lib/features/monetization/domain/hint_pack.dart` (a mismatch means the pack won't load).
 
 **Monetize → Products → In-app products → Create product** (×3):
 
-| Product ID (exact) | Suggested name | Hints granted (server-side) | Base price (VND) |
+| Product ID (exact) | Suggested name (localize vi-VN) | Hints | Base price (VND) |
 |---|---|---|---|
-| `hints_20` | 20 Hints | 20 | ₫19,000 |
-| `hints_60` | 60 Hints | 60 | ₫49,000 |
-| `hints_150` | 150 Hints | 150 | ₫99,000 |
+| `hints_20` | 20 lượt gợi ý | 20 | ₫19,000 |
+| `hints_60` | 60 lượt gợi ý | 60 | ₫49,000 |
+| `hints_150` | 150 lượt gợi ý | 150 | ₫99,000 |
 
-Steps for each:
-1. Set the **Product ID** exactly as above (it cannot be changed later).
-2. Add a name + description (localize to vi-VN).
-3. Set the price: enter the VND base price, then review per-country pricing. Confirm the VND figures the day you list — Play applies tax-inclusive rounding and the net-after-fee economics assume these prices (see `docs/MONETIZATION.md`).
-4. **Activate** the product.
+For each: set the exact Product ID (immutable), add a localized name + description, set
+the VND base price (review per-country pricing), and **Activate**. The hint **count is
+client-side** (`hintsForProduct()` maps id → hints), so only the **ID string** must
+align. These are handled by `in_app_purchase` (no server validation).
 
-Notes:
-- The hint **count is never trusted from the client** — the server maps `productId → hints` (`hintsForProduct()`), so the only thing that must align is the **ID string**. FILL IN nothing here besides the localized names/prices.
-- These are managed by `in_app_purchase: ^3.2.3`. The client validates with the backend BEFORE calling `completePurchase`, and consumables are consumed so they can be bought again.
+> **License testers** (test purchases without being charged): Play Console → **Setup →
+> License testing** → add tester Google accounts. They must also be on the track's
+> testers list to install the build.
 
+---
 
-Production must move `PLAY_VERIFY_MODE` from `sandbox` to `google`. In `sandbox` the backend trusts the client's token (DEV ONLY — anyone could POST a fake token to mint hints). In `google` mode the backend calls the Play Developer API (`androidpublisher.purchases.products.get`) to confirm `purchaseState === 0` and return the real `orderId`. **The `google` path currently fails closed** (`play-purchase.verifier.ts` has a `TODO(prod)` and rejects until the Play Developer API client is wired) — wiring it is required before accepting real purchases.
+## 7. Backend deployment & environment
 
-### Create the service account
-1. **Google Cloud Console** (https://console.cloud.google.com) → create/select a project → **Enable APIs → Google Play Android Developer API**.
-2. **IAM & Admin → Service Accounts → Create service account** (e.g. `play-iap-verifier`). Create a **JSON key** and download it. FILL IN: store this as a secret on the backend host (e.g. `GOOGLE_SERVICE_ACCOUNT_JSON` / a mounted file path) — never commit it.
-3. **Grant Play access:** Play Console → **Users and permissions → Invite new users** → add the service account email → grant at least **View financial data** and **Manage orders and subscriptions** (or the granular "View app information" + "Manage orders") for this app. (Older flow: Play Console → Setup → API access → link the GCP project and grant access to the service account.)
-4. Wire the JSON into the backend's `PlayPurchaseVerifier` (the `// TODO(prod)` in `play-purchase.verifier.ts`) so `google` mode returns `{ valid: purchaseState === 0, orderId }`.
+The same backend serves dev and prod via `apps/backend/.env` (validated by
+`env.validation.ts`). For **production** set at least:
 
-### License testers (test IAP without being charged)
-- Play Console → **Setup → License testing** → add tester Google accounts. License testers get test purchases (no real charge, refundable) for products in non-production tracks.
-- These accounts must also be on the **Internal testing** testers list to install the build.
+```sh
+# Real board reading + engine
+AI_PROVIDER=openai                 # or gemini (drop-in); requires the matching key
+OPENAI_API_KEY=<secret>            # gpt-5.4 by default
+# GEMINI_API_KEY=<secret>          # if AI_PROVIDER=gemini (GEMINI_MODEL=gemini-3-flash-preview)
+ENGINE_PROVIDER=pikafish           # server-side engine (or fairy-stockfish — see MONETIZATION.md)
+PIKAFISH_BINARY_PATH=<path>        # + PIKAFISH_NNUE_PATH for the net
 
-> Until step 3/4 is done you can validate the full purchase UI in `PLAY_VERIFY_MODE=sandbox` on the internal track, but DO NOT ship Production in sandbox mode — it would let anyone mint paid hints.
+# Cost guard (hints are device-local; THIS is what bounds spend)
+RATE_LIMIT_TTL=60
+RATE_LIMIT_LIMIT=30                # per-IP requests / TTL
+RATE_LIMIT_DEVICE_WINDOW_SECONDS=86400
+RATE_LIMIT_DEVICE_LIMIT=1000       # analyses / device / day
 
+# Install-grant storage (persist this dir; it's the anti-reinstall ledger + Hint Grants)
+HINTS_DATA_DIR=./data              # installs.json + grants.json
+HINTS_FREE_ON_INSTALL=10
+HINTS_OWN_KEY_DIVISOR=3
 
-### 5a. Privacy policy (required)
-Host a public privacy policy and paste the URL in **Policy → App content → Privacy policy**. FILL IN: `<YOUR_PRIVACY_POLICY_URL>`. It must disclose: anonymous account/device-id handling, that **screenshots of the user's screen are captured and uploaded** to your backend for board analysis, use of **Google AdMob** (advertising/identifiers), and **Google Play Billing** purchases.
-
-### 5b. Data Safety form (answer for THIS app)
-**Policy → App content → Data safety.** Based on what this app actually does:
-- **Device or other IDs** — *Collected*. A stable per-install `deviceId` is sent to `POST /api/accounts/register` (used to seed/track the hint wallet). AdMob also uses an advertising ID. Purpose: App functionality, Account management, Advertising/marketing.
-- **Photos / app activity (screenshots)** — the app captures the screen via MediaProjection and **uploads the screenshot** to your backend for analysis. Declare this as user-content/photos collected and transmitted, purpose **App functionality**. State whether screenshots are stored or processed-and-discarded (match your backend's actual retention — confirm in `storage.service.ts` and state it honestly).
-- **Purchase history** — IAP transactions (Google Play Billing). Purpose: App functionality.
-- **In-app account (anonymous)** — token-based, no name/email. Declare an account is created.
-- For each: indicate whether **encrypted in transit** (Yes — release builds are HTTPS-only) and whether users can request deletion.
-- Declare **data shared with third parties**: Google AdMob (advertising), Google Play (billing). Your own backend is first-party processing, not "sharing."
-
-> Be precise about screenshot retention. If the backend keeps images, you must say so; if it processes-and-discards, say that. Match the privacy policy and Data Safety answers to each other.
-
-### 5c. Ads declaration
-**App content → Ads → Yes, the app contains ads** (AdMob rewarded). Failing to declare ads is a common rejection.
-
-### 5d. Target API level
-Play requires a recent target API for new apps/updates. This app sets `targetSdk = 35` in `build.gradle.kts` (Android 15), which satisfies the current new-app target-API requirement as of 2026. `compileSdk = 36` and `minSdk = 26` (overlay needs API 26). Keep `targetSdk` at the latest Play-required level; bump if Play flags it.
-
-### 5e. Permission justifications (sensitive permissions)
-Play flags several permissions this app declares; prepare written justifications and, where prompted, a short screen-recording showing the in-app flow:
-- **`SYSTEM_ALERT_WINDOW` (overlay)** — "Displays a small, clearly-labeled floating widget that shows the recommended Xiangqi move over the board. The overlay is user-initiated and dismissible; it is core to the solver UX."
-- **MediaProjection (`FOREGROUND_SERVICE_MEDIA_PROJECTION` + `FOREGROUND_SERVICE`)** — "Captures the current screen, only after the user explicitly grants the system MediaProjection consent dialog (`MediaProjectionPermissionActivity`), to read the board position for analysis. A foreground service with type `mediaProjection` keeps the capture alive while solving; the persistent notification informs the user." Capture is started by a user action and not run silently.
-- **`POST_NOTIFICATIONS`** — required for the foreground-service notification on Android 13+.
-- **`WAKE_LOCK`** — keeps the capture/analysis pipeline alive during a solve.
-- **`com.android.vending.BILLING`** — Google Play in-app purchases (hint packs).
-- **`INTERNET`** — backend communication.
-
-> Foreground-service-type and MediaProjection apps often get extra scrutiny. Emphasize that capture is explicit, user-initiated, scoped to producing a move suggestion, and never silent/background.
-
-
-### 6a. Generate an upload keystore
-Run (FILL IN the alias and passwords; store the file OUTSIDE the repo, e.g. `~/keystores/`):
-```bash
-keytool -genkey -v \
-  -keystore ~/keystores/xiangqi-upload.jks \
-  -storetype JKS \
-  -keyalg RSA -keysize 2048 -validity 10000 \
-  -alias xiangqi-upload
+# Remote feature flags served by GET /api/config (tunable WITHOUT an app release)
+FEATURE_BANNER_ADS=true
+FEATURE_REWARDED_ADS=false
+FEATURE_APP_OPEN_ADS=false
+FEATURE_USE_REAL_ADS=true          # ← MUST be true in prod to serve real ad units
+FEATURE_UI_LICENSES=true           # ← see GPLv3 note in §8
+ONDEVICE_ENABLED=true
+ONDEVICE_NET_URL=https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue
+ONDEVICE_NET_BYTES=50760458
+ONDEVICE_VISION_MODEL=gpt-5.4
 ```
-Back this file up securely — losing it means you can't ship updates with the same upload key (recoverable via Play upload-key reset, but disruptive). Never commit it.
 
-### 6b. Create `apps/mobile/android/key.properties`
-This file is already covered by `android/.gitignore` (`key.properties`, `**/*.keystore`, `**/*.jks`), so it won't be committed. Create it with:
-```properties
-storePassword=<YOUR_STORE_PASSWORD>
-keyPassword=<YOUR_KEY_PASSWORD>
-keyAlias=xiangqi-upload
-storeFile=/Users/you/keystores/xiangqi-upload.jks
-```
-`storeFile` may be absolute or relative to `apps/mobile/android/`.
+Deployment requirements:
+- **Reachable host:** the backend must be internet-reachable at the URL the app ships
+  with. The default is `http://103.157.205.175:3000` (plain HTTP, no TLS yet).
+- **Cleartext exception:** because the backend is HTTP, the release manifest wires
+  `res/xml/network_security_config.xml`, which permits cleartext to **that one host
+  only** (everything else stays HTTPS-only). So an installed release reaches the default
+  backend out of the box. **When you add TLS**, point `BACKEND_URL` at the `https://…`
+  origin and delete the cleartext exception from `network_security_config.xml`.
+- **Persist `HINTS_DATA_DIR`** on a durable volume — it's the reinstall ledger + the
+  Hint Grants allowlist. A corrupt `installs.json` makes the backend refuse to boot
+  (fail-closed), so back it up. (It's not security-critical — a wipe just re-grants the
+  free hints once per device — but losing it is annoying.)
+- **`GET /api/config` is exempt from the throttle** so a NAT full of devices can't 429
+  the config fetch; the client falls back to cached/default flags on any outage.
 
-### 6c. Signing config (already implemented — just confirm)
-`apps/mobile/android/app/build.gradle.kts` already reads `key.properties` and wires a `release` signing config:
-- If `key.properties` exists → release is signed with your upload key.
-- If it is absent → release falls back to the **debug** key so local `flutter build` still works.
+---
 
-**You must have a real `key.properties` present at build time for the store AAB.** A debug-signed AAB will be rejected by Play. Verify after build with:
-```bash
-# confirm the release artifact is NOT debug-signed
-apksigner verify --print-certs <path-to-apk-or-extracted>  # or check via Play upload
-```
-No edits to `build.gradle.kts` are required; the signing plumbing is done.
+## 8. GPLv3 / open-source obligations (the on-device engine)
 
+**This app is distributed under GPLv3** because it bundles the Pikafish Xiangqi engine
+(`android/app/src/main/jniLibs/arm64-v8a/libpikafish.so`, GPLv3). This has real release
+obligations — don't skip them:
 
-### 7a. Pre-build checklist (release-only edits)
-1. `kUsingRealAds = true` in `ad_helper.dart`, with real `_RealUnits` IDs (§1).
-2. Real AdMob App ID in `AndroidManifest.xml` (§1).
-3. `key.properties` present (§6).
-4. Bump `version:` in `pubspec.yaml` if re-uploading (each AAB needs a higher `versionCode` = the `+N` suffix).
+1. **Ship the license notice in-app.** The engine's GPLv3 notice + a written offer of
+   source is registered via `LicenseRegistry` (`main.dart`) and surfaced on the OS
+   **Open-source licenses** page. That page is reached from **Settings → Privacy →
+   Open-source licenses**, which is **gated by `FEATURE_UI_LICENSES`** (default `false`).
+   **For the compliant production build, set `FEATURE_UI_LICENSES=true`** (§7) so the
+   notice is actually reachable.
+2. **Keep `LICENSE-engine.md`** (repo root) — the full notice + the written offer of
+   corresponding source (`github.com/official-pikafish/Pikafish`).
+3. **The `.so` must stay git-tracked.** `.gitignore` ignores `*.nnue` but the `.so` is
+   force-tracked; verify with `git ls-files …/jniLibs/` (must list `libpikafish.so`). A
+   clean clone/CI must ship the binary, or both on-device mode AND the GPLv3 posture
+   silently break.
+4. **The NNUE net is downloaded at runtime** (from `ONDEVICE_NET_URL`, the
+   non-commercial master-net) — it is NOT bundled, which keeps the non-commercial net
+   out of the distributed app. Don't add it to the AAB.
 
-### 7b. HTTP / cleartext
-The release backend is plain **HTTP** for now (`http://103.157.205.175:3000`, no TLS yet). The MAIN manifest wires `android:networkSecurityConfig="@xml/network_security_config"`, and `src/main/res/xml/network_security_config.xml` permits cleartext to **that one host only** (everything else stays HTTPS-only). So an installed RELEASE reaches the default backend out of the box — no dart-define needed. Debug builds widen this to any LAN/emulator host. **When the backend gets TLS**, point `BACKEND_URL` at the `https://…` origin and delete the cleartext exception from `network_security_config.xml`.
+> If you ever want a non-GPL app, you must remove the engine from the bundle (the
+> earlier "server-side engine only" posture). As shipped, the app IS GPLv3 and you must
+> honor it.
 
-### 7c. Build the App Bundle
-```bash
+---
+
+## 9. Build the release AAB
+
+### 9.1 Pre-build checklist
+1. `key.properties` present (§2) so the AAB is upload-key signed.
+2. Backend reachable at the shipped `BACKEND_URL`, with `FEATURE_USE_REAL_ADS=true` and
+   `FEATURE_UI_LICENSES=true` (§7, §8).
+3. `versionCode` bumped above any prior upload (`pubspec.yaml`).
+4. `JAVA_HOME` → JDK 21 (§0).
+
+### 9.2 Build
+```sh
 cd apps/mobile
 flutter clean
 flutter pub get
 flutter build appbundle --release
 ```
-- **No dart-defines are required.** `BACKEND_URL` defaults to the live backend, and the AI/engine providers default to the REAL ones (`openai` / `pikafish`).
-- **Do NOT pass `--dart-define=AI_PROVIDER=mock`** (or `ENGINE_PROVIDER=mock`). The backend honors an explicit `mock`, so that ships a build whose "our key" cloud analyses return a FAKE board/move. Only use the mock providers for a deliberate demo build against a mock backend.
-- Override only if you need to: `--dart-define=BACKEND_URL=https://<host>` once the backend has TLS, or `--dart-define=MY_SIDE=black` to flip the default side.
-- Output: `apps/mobile/build/app/outputs/bundle/release/app-release.aab`. Upload **this `.aab`** to Play (not an APK).
+- **No `--dart-define`s are required.** `BACKEND_URL` defaults to the live backend, and
+  the AI/engine providers default to the REAL ones (`openai` / `pikafish`).
+- **Do NOT pass `--dart-define=AI_PROVIDER=mock`** (or `ENGINE_PROVIDER=mock`) — the
+  backend honors an explicit `mock`, so that ships a build whose "our key" cloud
+  analyses return a FAKE board/move. Mock is only for a deliberate demo build.
+- **Never** build with `--dart-define=MOCK_MONETIZATION=true` for release — it fakes the
+  wallet/ads/store.
+- Output: `build/app/outputs/bundle/release/app-release.aab` — upload **this `.aab`**.
 
-### 7d. Build JDK
-Per the project build notes, use **JDK 21** (not 26) for the APK/AAB toolchain, `compileSdk 36`. Ensure `JAVA_HOME` points at JDK 21 before building, or Gradle may fail.
+### 9.3 R8 + crash symbolication (already configured)
+The release build runs **R8** (`isMinifyEnabled`/`isShrinkResources = true`) with
+`android/app/proguard-rules.pro`, and bundles **native debug symbols**
+(`ndk { debugSymbolLevel = "SYMBOL_TABLE" }`). The resulting AAB embeds:
+- `BUNDLE-METADATA/.../obfuscation/proguard.map` → resolves Play's **"no deobfuscation
+  file"** warning (de-obfuscates Kotlin/Java crashes).
+- `BUNDLE-METADATA/.../debugsymbols/<abi>/*.so.sym` → resolves the **native debug
+  symbols** warning.
 
-> Tip: keep two run configs — a dev one with test ad units / `http://10.0.2.2:3000` / cleartext-debug, and the release command above. Never ship the test ad units.
+Play associates both automatically — nothing to upload manually. *(Optional Dart-side
+obfuscation: add `--obfuscate --split-debug-info=build/symbols` and archive
+`build/symbols/` per build to de-obfuscate Dart stack traces.)*
 
+> ⚠️ R8 keep rules are load-bearing: WorkManager/Room (pulled in via
+> `google_mobile_ads → androidx.startup`) crash on launch under R8 full-mode without
+> them. **Any plugin/dependency change must be re-verified with an on-device RELEASE
+> launch** — a missing keep crashes ONLY the minified build, never debug (§9.4).
 
-The same backend serves dev and prod via env flags (`apps/backend/.env`, validated by `env.validation.ts`). Hints are **device-local** now, so there is **no** wallet / SSV / IAP-validation env to set (`WALLET_ENABLED`, `ADMOB_SSV_ALLOW_UNVERIFIED`, `PLAY_VERIFY_MODE` no longer exist). For the **Production** backend set:
+### 9.4 Smoke-test the release on a device (do this every release)
+```sh
+flutter build apk --release                                   # universal APK for testing
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb logcat -c
+adb shell monkey -p com.codertapsu.xiangqi_solver -c android.intent.category.LAUNCHER 1
+sleep 8
+adb shell pidof com.codertapsu.xiangqi_solver && echo "ALIVE"  # empty = crashed
+adb logcat -d | grep -iE "FATAL EXCEPTION|WorkDatabase|AndroidRuntime: .*E"
+```
+Expect `Displayed …/MainActivity` in logcat, a live PID, and **no** `FATAL` /
+`WorkDatabase` lines. Then manually exercise: launch → Solver Mode (grant overlay +
+MediaProjection) → analyze a board → buy/restore a test pack → settings/language toggle.
 
-```bash
-AI_PROVIDER=openai             # real vision (gpt-5.4); requires OPENAI_API_KEY
-OPENAI_API_KEY=<secret>
-ENGINE_PROVIDER=pikafish       # real engine (server-side; see MONETIZATION.md)
-PIKAFISH_BINARY_PATH=<path>    # + PIKAFISH_NNUE_PATH for the net
-# Per-device abuse cap — the cost guard now that hints are device-local:
-RATE_LIMIT_DEVICE_LIMIT=1000   # analyses / device / day (RATE_LIMIT_DEVICE_WINDOW_SECONDS)
-# Remote feature flags served by GET /api/config (tunable without a release):
-# FEATURE_BANNER_ADS, FEATURE_REWARDED_ADS, FEATURE_APP_OPEN_ADS,
-# HINTS_FREE_ON_INSTALL, HINTS_OWN_KEY_DIVISOR, ONDEVICE_* — see .env.example.
+---
+
+## 10. Play Console: create app, listing & declarations
+
+### 10.1 Create the app
+**Create app** → default language **Vietnamese (vi-VN)**, name **"Quân Sư Cờ Tướng"**
+(add an en-US listing titled "Xiangqi Strategist"), App, **Free**. Accept the developer
+program + US export declarations. Package `com.codertapsu.xiangqi_solver` is fixed at
+first upload.
+
+### 10.2 Store listing (per language)
+Title (≤30), short description (≤80), full description (≤4000), 512×512 icon, 1024×500
+feature graphic, 2–8 phone screenshots. Provide both **vi-VN** (primary) and **en-US**.
+
+### 10.3 App content / declarations
+| Section | What to do |
+|---|---|
+| **Privacy policy** | Paste `https://codertapsu-web.web.app/xiangqi-solver/privacy`. Required (Advertising ID + screenshot upload). |
+| **Ads** | **Yes** — the app contains ads (AdMob). |
+| **Content rating** | Run the questionnaire (a chess analyzer rates broadly Everyone/PEGI 3). |
+| **Target audience** | General audience (13+). The app does NOT set child-directed treatment. |
+| **App access** | Login-free — the app works without an account. |
+| **Government apps / Financial / Health** | No. |
+| **Data safety** | §10.4. |
+| **Advertising ID** | Declare it (the `AD_ID` permission is auto-merged by `google_mobile_ads`). |
+
+### 10.4 Data Safety form
+| Data type | Collected / shared | Notes |
+|---|---|---|
+| **Device or other IDs** | Collected (+ shared for ads) | Stable `x-device-id` (install-grant + per-device rate limit); AdMob Advertising ID. Purpose: App functionality, Fraud prevention, Advertising. |
+| **Photos / screenshots** | Collected, transmitted | Screen captures are **uploaded to the backend** for board analysis, then to OpenAI (or directly to OpenAI with the user's own key). State retention honestly — match the backend's actual behavior (process-and-discard vs stored). Purpose: App functionality. |
+| **Purchase history** | Collected | Google Play Billing (hint packs). Purpose: App functionality. |
+| **No account / name / email** | — | The app has no login. |
+| Encrypted in transit | Yes | Release is HTTPS-only except the one scoped cleartext backend host (§7); state when TLS lands. |
+| Third-party sharing | AdMob (advertising), OpenAI/your backend (board reading) | Your backend is first-party processing; OpenAI is a processor — disclose it. |
+
+> Be precise about **screenshot retention** and keep the privacy policy and Data Safety
+> answers consistent with each other.
+
+### 10.5 Permission justifications (sensitive permissions)
+Prepare written justifications and, where prompted, a short screen recording of the flow.
+This app declares:
+
+| Permission | Justification |
+|---|---|
+| `SYSTEM_ALERT_WINDOW` (overlay) | A small, clearly-labeled floating button shows the recommended move over the board; user-initiated and dismissible; core to the solver UX. |
+| `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PROJECTION` | Screen capture runs only after the user grants the system MediaProjection consent dialog, to read the board for analysis; a foreground service (type `mediaProjection`) keeps the capture alive with a persistent notification. Never silent/background. |
+| `POST_NOTIFICATIONS` | The foreground-service notification on Android 13+. |
+| `WAKE_LOCK` | Keeps the capture/analysis pipeline alive during a solve. |
+| `com.android.vending.BILLING` | Google Play in-app purchases (hint packs). |
+| `INTERNET` | Backend + ads. |
+
+> MediaProjection + overlay apps get extra scrutiny. Emphasize: capture is **explicit,
+> user-initiated, scoped to producing a move suggestion, and never silent**.
+
+### 10.6 Target API level
+`targetSdk = 35` (Android 15) satisfies Play's current new-app requirement; `compileSdk
+= 36`, `minSdk = 26` (overlay needs API 26). Bump `targetSdk` if Play later flags it.
+
+---
+
+## 11. Release tracks
+
+Always promote in order — never push a fresh build straight to Production:
+
+```
+Internal testing → Closed (Alpha) → Open (Beta) → Production
 ```
 
-Deployment requirements:
-- **Reachable host**: the backend must be internet-reachable at the `BACKEND_URL` the app ships with (`http://103.157.205.175:3000` by default). HTTPS is recommended but not yet wired; when you add TLS, update `BACKEND_URL` + the cleartext exception (§7b).
-- **No server wallet to persist**: hints live on the device (`SharedPreferences`). There is no server balance, SSV callback, or IAP-validation endpoint to deploy or make durable — a backend restart loses nothing hint-related.
-- **Cost guard**: the only server-side abuse protection is the per-IP throttle (`RATE_LIMIT_*`, which now SKIPS `GET /api/config`) plus the per-device daily cap (`RATE_LIMIT_DEVICE_*`, keyed by `x-device-id`). Tune these for your traffic/budget — they bound OpenAI spend per device.
+1. **Internal testing → Create new release** → upload `app-release.aab` → add release
+   notes (vi-VN + en-US) → **Save → Review → Start rollout**. No review delay; the right
+   place to validate IAP + ads + the full solver flow. Add testers by email; opt in on a
+   test device's Google account (license testers + internal testers).
+2. After ≥24h clean, **Production → Create release → Add from library** (the same build).
+   **Staged rollout**: start 10–20%, watch **Android vitals** (crash/ANR), then ramp.
 
+> You generally must create at least one release and complete Data Safety + content forms
+> before the listing/products go fully active. Create the consumables (§6) as soon as the
+> app exists.
 
-Run this against the **Internal testing** build (real ad units, real products, HTTPS backend) before promoting to Production.
+---
 
-**Identifiers / config:**
-- [ ] `kUsingRealAds == true` and `_RealUnits` IDs are filled (no `0000…`).
-- [ ] Manifest `APPLICATION_ID` is your real AdMob App ID (not `…3940256099942544~…`).
-- [ ] AAB built with `--dart-define=BACKEND_URL=https://…` and signed by the **upload key** (not debug). Confirm in Play Console the upload is accepted and shows Play App Signing.
-- [ ] `versionCode` is higher than any previously uploaded build.
+## 12. Pre-launch verification checklist
 
-**Ads / SSV:**
-- [ ] Watching a rewarded ad credits hints on the SERVER (balance from `GET /api/wallet` increases), not just locally.
-- [ ] Backend logs show `SSV: credited N hint(s)` with a valid signature (no `Rejected an SSV callback`).
-- [ ] Daily cap works: the 4th ad in 24h does not add hints (`MAX_AD_HINTS_PER_DAY = 3`).
-- [ ] `ADMOB_SSV_ALLOW_UNVERIFIED=false` in the environment that serves the SSV URL.
+Run against the **Internal testing** build (real ad units via `FEATURE_USE_REAL_ADS=true`,
+real products, the production backend) before promoting.
 
-**IAP:**
-- [ ] Each of `hints_20 / hints_60 / hints_150` shows the correct VND price and localized name in the in-app sheet.
-- [ ] A test/license purchase validates via `POST /api/iap/validate` and credits the correct hint count (20 / 60 / 150).
-- [ ] Re-buying the same consumable works (it was consumed) and a replayed token does NOT double-credit (ledger dedupe).
-- [ ] Production env has `PLAY_VERIFY_MODE=google` with the service account wired (or a deliberate decision to stay on the test track).
+**Build / identity**
+- [ ] AAB is **upload-key** signed (not debug); Play accepts it and shows Play App Signing.
+- [ ] `versionCode` higher than any prior upload.
+- [ ] R8 release **launches with no `WorkDatabase`/FATAL** on a real device (§9.4).
+- [ ] AAB embeds `proguard.map` + native `*.so.sym` (no Play warnings on the new build).
+- [ ] Manifest `APPLICATION_ID` is the real AdMob App ID (not `…3940256099942544~…`).
 
-**Wallet / metering:**
-- [ ] New install seeds exactly 10 free hints once; reinstall on the same device does NOT re-grant.
-- [ ] A Cloud solve spends exactly 1 hint; running out returns `NO_HINTS` (402) and opens the "get more hints" sheet.
-- [ ] `WALLET_ENABLED=true` in production.
+**App name / localization**
+- [ ] Vietnamese-locale device shows **"Quân Sư Cờ Tướng"** in the launcher; other
+      locales show **"Xiangqi Strategist"**.
+- [ ] UI is Vietnamese on a vi device and English elsewhere; **Settings → App language**
+      overrides live.
 
-**Networking / permissions:**
-- [ ] Release build reaches the backend over HTTPS (no "could not reach backend"); confirm cleartext is NOT enabled in the release manifest.
-- [ ] MediaProjection consent dialog appears before capture; overlay shows the move; foreground-service notification appears on Android 13+.
-- [ ] Permission justifications + (if requested) screen recording uploaded for SYSTEM_ALERT_WINDOW and MediaProjection.
+**Monetization**
+- [ ] Fresh install seeds the free hints once; **reinstall on the same device does NOT
+      re-grant** (install-grant working). A Hint-Grants `grants.json` entry comps a device.
+- [ ] A cloud solve spends exactly 1 hint; running out shows the "get more hints" sheet.
+- [ ] Each `hints_20 / hints_60 / hints_150` shows the right VND price + localized name;
+      a license-test purchase credits the right count; re-buying works (consumable).
+- [ ] Rewarded ad (if enabled) credits +1; banner shows real fills with
+      `FEATURE_USE_REAL_ADS=true`.
 
-**Policy:**
-- [ ] Privacy policy URL set and reachable; Data Safety completed and consistent with the policy (device ID, screenshots, purchases, AdMob).
-- [ ] Ads = Yes; content rating, target audience, and app access completed.
-- [ ] Target API (targetSdk 35) accepted by Play with no warning.
+**Engine / GPLv3**
+- [ ] On-device mode downloads the net and computes a move; fallback to cloud works.
+- [ ] **Settings → Privacy → Open-source licenses** is visible
+      (`FEATURE_UI_LICENSES=true`) and shows the Pikafish GPLv3 notice.
 
-**Durability (release blocker):**
-- [ ] Wallet repository is DB-backed (NOT `InMemoryWalletRepository`) so paid balances survive a backend restart.
+**Networking / permissions**
+- [ ] Release reaches the backend (cleartext exception works for the HTTP host).
+- [ ] MediaProjection consent appears before capture; overlay shows the move; FGS
+      notification appears on Android 13+.
+- [ ] Permission justifications + (if requested) screen recording uploaded.
+
+**Policy**
+- [ ] Privacy policy URL set + reachable; Data Safety completed + consistent (device ID,
+      screenshots, purchases, AdMob).
+- [ ] Ads = Yes; content rating, target audience, app access done.
+- [ ] Target API 35 accepted with no warning.
+
+---
+
+## 13. Post-release monitoring (first ~3 days)
+
+```sh
+adb shell dumpsys package com.codertapsu.xiangqi_solver | grep versionName
+```
+- **Play Console → Android vitals** — crash/ANR spikes (now de-obfuscated thanks to the
+  bundled mapping + native symbols).
+- **AdMob** — impressions on the new version; zero usually means the App ID or UMP
+  consent is misconfigured, or `FEATURE_USE_REAL_ADS` is still `false`.
+- **Backend** — OpenAI spend vs the per-device cap; `POST /api/hints/claim` rates;
+  watch `HINTS_DATA_DIR` disk.
+
+---
+
+## 14. Common rejections / warnings (and the fix)
+
+| Symptom | Fix |
+|---|---|
+| "No deobfuscation file" / "native debug symbols" warning | Non-blocking. The **next** AAB resolves both — R8 + `debugSymbolLevel` are on (§9.3). Old uploads keep the warning. |
+| "Privacy policy required" | Advertising ID + screenshot upload ⇒ a policy URL is mandatory (§10.3). |
+| "Data safety: undeclared data" | Declare Advertising ID (`AD_ID` permission), screenshots (uploaded), purchases (§10.4). |
+| "Permission not justified" (overlay / MediaProjection) | Provide the §10.5 justifications + a screen recording; stress user-initiated, non-silent capture. |
+| "Test ads in production" | Set `FEATURE_USE_REAL_ADS=true` on the prod backend (no build flag). |
+| Launch crash on the release track only | A missing R8 keep — add it to `proguard-rules.pro` and re-run §9.4. |
+| Cloud analysis returns a fake board | A `mock` provider shipped — rebuild without `--dart-define=*_PROVIDER=mock` (§9.2). |
+| Target API < 35 | Confirm `targetSdk = 35`, rebuild. |
+
+---
+
+## 15. Rollback
+
+1. **Halt rollout** if still <100% (Production → ⋮ → Halt rollout).
+2. Otherwise ship a **higher `versionCode`** with the fix (`git revert`, bump `+N`,
+   rebuild, upload, roll out).
+3. Many issues are **server-side** and need NO app update: ad formats
+   (`FEATURE_*_ADS`, `FEATURE_USE_REAL_ADS`), free-hint count (`HINTS_FREE_ON_INSTALL`),
+   the licenses entry (`FEATURE_UI_LICENSES`), rate limits, and the AI model — all live
+   in `GET /api/config` / backend `.env`. Change those first.
+4. Never delete a failing AAB — Play keeps it for audit.
+
+---
+
+## Appendix — v1.0.0 release notes ("What's new")
+
+Paste into the matching **listing language** (vi-VN gets Vietnamese, en-US gets English).
+Plain text, ≤ 500 chars each.
+
+**Vietnamese (vi-VN — default listing):**
+```
+Chào mừng đến với Quân Sư Cờ Tướng! 🎉
+
+Quân sư cờ tướng trong túi của bạn — tìm ngay nước đi tốt nhất cho mọi thế cờ:
+• Chụp bàn cờ từ bất kỳ ứng dụng nào và nhận gợi ý tức thì
+• Chế độ Quân Sư: nút nổi phân tích bàn cờ ngay trên màn hình
+• Công cụ cờ mạnh chỉ ra nước hay nhất kèm giải thích dễ hiểu
+• Phân tích trên máy chủ, hoặc ngay trên thiết bị của bạn
+• Có lượt gợi ý miễn phí khi cài đặt
+
+Cảm ơn bạn đã dùng thử — chúc bạn thắng thật nhiều ván cờ!
+```
+
+**English (en-US):**
+```
+Welcome to Xiangqi Strategist! 🎉
+
+Your Chinese Chess (Xiangqi) coach in your pocket — find the best move in any position:
+• Capture the board from any app and get an instant suggestion
+• Solver Mode: a floating button analyzes the board right on your screen
+• A strong engine shows the best move with a clear explanation
+• Analyze in the cloud or fully on your device
+• Free hints to get you started
+
+Thanks for playing — may your next move be the winning one!
+```
+```
