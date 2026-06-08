@@ -7,6 +7,7 @@ import { AppModule } from './app.module';
 import { AppConfig } from './config/configuration';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { ErrorLogService } from './modules/logging/error-log.service';
 
 /**
  * Application bootstrap. Binds 0.0.0.0:PORT, sets the /api prefix, enables
@@ -37,9 +38,10 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Global success envelope + error envelope.
+  // Global success envelope + error envelope. The filter also appends every
+  // failed request to the date-grouped error log (see ErrorLogService).
   app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new AllExceptionsFilter(app.get(ErrorLogService)));
 
   // OpenAPI docs at /api/docs.
   const swaggerConfig = new DocumentBuilder()

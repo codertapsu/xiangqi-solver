@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiError } from '../types/api-response';
+import { ErrorLogService } from '../../modules/logging/error-log.service';
 
 /**
  * Translates every thrown error into the standard error envelope:
@@ -21,6 +22,10 @@ import { ApiError } from '../types/api-response';
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  // Optional so the filter can still be `new`-ed in unit tests without DI; in
+  // the app it is injected (see main.ts) to mirror failures into the date log.
+  constructor(private readonly errorLog?: ErrorLogService) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -32,12 +37,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // fault — log it quietly and bail instead of emitting a scary 500.
     if (this.isClientDisconnect(exception, request, response)) {
       this.logger.warn(`${request.method} ${request.url} -> client disconnected before response`);
+      this.errorLog?.log('request', {
+        message: 'client disconnected before response',
+        method: request.method,
+        url: request.url,
+        status: 499,
+        code: 'CLIENT_DISCONNECT',
+      });
       return;
     }
 
     const { status, code, message, details } = this.normalize(exception);
+    const isServerError = status >= HttpStatus.INTERNAL_SERVER_ERROR;
 
-    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (isServerError) {
       this.logger.error(
         `${request.method} ${request.url} -> ${status} ${code}`,
         exception instanceof Error ? exception.stack : String(exception),
@@ -45,6 +58,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else {
       this.logger.warn(`${request.method} ${request.url} -> ${status} ${code}: ${message}`);
     }
+
+    // Mirror every failed request into the date-grouped log (best-effort).
+    this.errorLog?.log('request', {
+      message,
+      method: request.method,
+      url: request.url,
+      status,
+      code,
+      ...(details !== undefined ? { details } : {}),
+      // Only attach a stack for genuine server faults (5xx).
+      ...(isServerError && exception instanceof Error ? { stack: exception.stack } : {}),
+    });
 
     const body: ApiError = {
       success: false,

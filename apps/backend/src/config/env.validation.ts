@@ -77,6 +77,12 @@ export const envSchema = z.object({
   // files; gitignored. Put it on a persistent volume in production.
   HINTS_DATA_DIR: z.string().default('./data'),
 
+  // Directory for date-grouped error/failure logs (<LOGS_DIR>/<YYYY-MM-DD>.log),
+  // written by the global exception filter and the OpenAI provider. Gitignored;
+  // keep it on a persistent volume in production (it survives `rsync --delete`
+  // via the --exclude in scripts/build-release.sh).
+  LOGS_DIR: z.string().default('./logs'),
+
   // ---------------------------------------------------------------------------
   // Remote config / feature flags — served by GET /api/config so the app's
   // behavior is tunable WITHOUT a new release. Change these on the server and
