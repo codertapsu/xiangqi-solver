@@ -81,10 +81,11 @@ describe('AnalysisService', () => {
       expect(result.vision).toEqual({ provider: 'none', ok: true });
     });
 
-    it('returns the deterministic mock best move for Red', async () => {
+    it('returns the deterministic mock best move for Red (explicit en notation)', async () => {
       const result = await service.analyzeBoard({
         sideToMove: 'red',
         pieces: buildStartPosition(),
+        language: 'en',
       });
       expect(result.bestMove).not.toBeNull();
       expect(result.bestMove?.uci).toBe('b2e2');
@@ -96,11 +97,10 @@ describe('AnalysisService', () => {
       expect(result.explanation).toContain('Cannon 8 traverses to 5');
     });
 
-    it('localizes the notation when a language is given (vi)', async () => {
+    it('defaults to Vietnamese move-notation when no language is given', async () => {
       const result = await service.analyzeBoard({
         sideToMove: 'red',
         pieces: buildStartPosition(),
-        language: 'vi',
       });
       expect(result.bestMove?.human).toBe('Pháo 8 bình 5');
       expect(result.bestMove?.notation).toBe('C8=5');
