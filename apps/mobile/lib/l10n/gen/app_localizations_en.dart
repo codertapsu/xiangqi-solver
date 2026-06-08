@@ -91,6 +91,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePickImage => 'Pick an image & analyze (test)';
 
   @override
+  String get homeShareInTitle => 'Analyze a board photo';
+
+  @override
+  String get homeShareInDesc =>
+      'Screenshot your Xiangqi game in any app, then share it into this app — or pick a photo below. We\'ll read the board and show the best move.';
+
+  @override
   String get backendTitle => 'Backend';
 
   @override
@@ -402,6 +409,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsStoreScreenshotsDesc =>
       'Off by default. When on, analyzed images are kept on this device and shown in History.';
+
+  @override
+  String settingsStoreScreenshotsOnDesc(int count) {
+    return 'Keeping the last $count analyzed screenshots on this device — older ones are removed automatically.';
+  }
 
   @override
   String get settingsPrivacyPolicy => 'Privacy Policy';
