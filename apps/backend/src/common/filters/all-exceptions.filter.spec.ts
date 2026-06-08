@@ -130,6 +130,36 @@ describe('AllExceptionsFilter', () => {
     expect((capturedBody as { error: { code: string } }).error.code).toBe('RATE_LIMITED');
   });
 
+  it('mirrors a failed request to the error log (category "request" with status + code)', () => {
+    const logMock = jest.fn();
+    const logged = new AllExceptionsFilter({ log: logMock } as never);
+
+    logged.catch(new NotFoundException('nope'), host);
+
+    expect(logMock).toHaveBeenCalledTimes(1);
+    expect(logMock).toHaveBeenCalledWith(
+      'request',
+      expect.objectContaining({
+        method: 'POST',
+        url: '/api/test',
+        status: HttpStatus.NOT_FOUND,
+        code: 'NOT_FOUND',
+        message: 'nope',
+      }),
+    );
+  });
+
+  it('logs a stack only for server (5xx) faults', () => {
+    const logMock = jest.fn();
+    const logged = new AllExceptionsFilter({ log: logMock } as never);
+
+    logged.catch(new Error('boom'), host);
+
+    const fields = logMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(fields.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+    expect(typeof fields.stack).toBe('string');
+  });
+
   it('silently ignores a client-aborted request without writing a response', () => {
     const response = { status: statusMock, writable: false };
     const request = { method: 'POST', url: '/api/analysis/screenshot', destroyed: true };

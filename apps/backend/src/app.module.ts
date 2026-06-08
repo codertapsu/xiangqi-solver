@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { configuration, AppConfig } from './config/configuration';
 import { validateEnv } from './config/env.validation';
+import { LoggingModule } from './modules/logging/logging.module';
 import { HealthModule } from './modules/health/health.module';
 import { AnalysisModule } from './modules/analysis/analysis.module';
 import { AiModule } from './modules/ai/ai.module';
@@ -39,6 +40,7 @@ import { HintsModule } from './modules/hints/hints.module';
         };
       },
     }),
+    LoggingModule,
     HealthModule,
     AnalysisModule,
     AiModule,

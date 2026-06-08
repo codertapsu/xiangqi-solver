@@ -37,6 +37,10 @@ export interface AppConfig {
   hints: {
     dataDir: string;
   };
+  /** Date-grouped error/failure logs. */
+  logging: {
+    dir: string;
+  };
   rateLimit: {
     ttlSeconds: number;
     limit: number;
@@ -99,6 +103,9 @@ export function configuration(): { app: AppConfig } {
     },
     hints: {
       dataDir: env.HINTS_DATA_DIR,
+    },
+    logging: {
+      dir: env.LOGS_DIR,
     },
     rateLimit: {
       ttlSeconds: env.RATE_LIMIT_TTL,

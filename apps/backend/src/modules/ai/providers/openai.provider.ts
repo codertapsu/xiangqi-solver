@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../../../config/configuration';
 import {
@@ -8,6 +8,7 @@ import {
 } from '../ai-provider.interface';
 import { BOARD_EXTRACTION_PROMPT } from '../prompts/board-extraction.prompt';
 import { parseVisionResponse } from '../vision-response.schema';
+import { ErrorLogFields, ErrorLogService } from '../../logging/error-log.service';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -22,7 +23,10 @@ const REQUEST_TIMEOUT_MS = 30_000;
 export class OpenAiVisionProvider implements AiVisionProvider {
   readonly name = 'openai';
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly errorLog: ErrorLogService,
+  ) {}
 
   async extractBoardState(input: ExtractBoardStateInput): Promise<ExtractBoardStateResult> {
     const ai = this.config.get<AppConfig['ai']>('app.ai');
@@ -55,8 +59,64 @@ export class OpenAiVisionProvider implements AiVisionProvider {
       ],
     };
 
-    const text = await this.callApi(apiKey, body);
-    return parseVisionResponse(text);
+    let text: string;
+    try {
+      text = await this.callApi(apiKey, body);
+    } catch (err) {
+      // Failed request to the OpenAI API (HTTP error / timeout / empty body).
+      this.logFailure('openai', input, model, err);
+      throw err;
+    }
+
+    try {
+      return parseVisionResponse(text);
+    } catch (err) {
+      // The response came back but could not be turned into a board — i.e. the
+      // screenshot could not be extracted. Record the raw output + reason, then
+      // surface a clear, stable error to the client.
+      this.logFailure('vision-invalid', input, model, err, text);
+      throw new ServiceUnavailableException({
+        message:
+          'OpenAI returned a response that could not be read as a Xiangqi board ' +
+          '(the screenshot may not clearly show a board).',
+        code: 'VISION_INVALID_RESPONSE',
+        details: (err as Error).message,
+      });
+    }
+  }
+
+  /**
+   * Append a failure to the date-grouped error log. Captures enough to diagnose
+   * (model, image size/type, OpenAI's real reason, and — for an unparseable
+   * response — a bounded snippet of the raw model output) WITHOUT logging the
+   * API key or the raw image bytes.
+   */
+  private logFailure(
+    category: 'openai' | 'vision-invalid',
+    input: ExtractBoardStateInput,
+    model: string,
+    err: unknown,
+    rawText?: string,
+  ): void {
+    const fields: ErrorLogFields = {
+      message: err instanceof Error ? err.message : String(err),
+      provider: this.name,
+      model,
+      imageBytes: input.imageBuffer.byteLength,
+      mimeType: input.mimeType,
+      sideToMoveHint: input.sideToMoveHint,
+    };
+    // Surface OpenAI's real code/details carried on our ServiceUnavailableException.
+    if (err instanceof HttpException) {
+      const res = err.getResponse();
+      if (res && typeof res === 'object') {
+        const o = res as Record<string, unknown>;
+        if (typeof o.code === 'string') fields.code = o.code;
+        if (o.details !== undefined) fields.openaiDetails = o.details;
+      }
+    }
+    if (rawText !== undefined) fields.rawResponseSnippet = rawText.slice(0, 2000);
+    this.errorLog.log(category, fields);
   }
 
   private buildPrompt(hint?: ExtractBoardStateInput['sideToMoveHint']): string {

@@ -5,6 +5,7 @@ import { AiService } from '../ai/ai.service';
 import { MockVisionProvider } from '../ai/providers/mock-vision.provider';
 import { GeminiVisionProvider } from '../ai/providers/gemini.provider';
 import { OpenAiVisionProvider } from '../ai/providers/openai.provider';
+import { ErrorLogService } from '../logging/error-log.service';
 import { EngineService } from '../engine/engine.service';
 import { MockEngineService } from '../engine/mock-engine.service';
 import { PikafishEngineService } from '../engine/pikafish-engine.service';
@@ -43,11 +44,12 @@ describe('AnalysisService', () => {
 
   beforeEach(() => {
     const config = buildConfig();
+    const errorLog = { log: () => {} } as unknown as ErrorLogService;
     const aiService = new AiService(
       config,
       new MockVisionProvider(),
       new GeminiVisionProvider(config),
-      new OpenAiVisionProvider(config),
+      new OpenAiVisionProvider(config, errorLog),
     );
     const engineService = new EngineService(
       config,

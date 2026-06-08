@@ -13,10 +13,14 @@
 #     engine/master-net.nnue    the ON-DEVICE net served to the app at /api/engine/net
 #     DEPLOY.md                 server-side steps
 #
+# Download pikafish.nnue from https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue
 # Deploy + run (from your machine, then on the server):
-#   bash scripts/build-release.sh
-#   rsync -av --delete release/ root@103.157.205.175:/opt/xiangqi-solver/apps/backend
+#   ONDEVICE_NET_SRC=~/Downloads/pikafish.nnue bash scripts/build-release.sh
+#   rsync -av --delete --exclude='/data' --exclude='/logs' --exclude='/node_modules' release/ root@103.157.205.175:/opt/xiangqi-solver/apps/backend
 #   ssh root@103.157.205.175
+# The --exclude flags keep the server's runtime data/ (hint ledger), logs/
+# (date-grouped error logs), and installed node_modules — the release bundle
+# does NOT contain them, so without the excludes --delete would wipe them.
 #   cd /opt/xiangqi-solver/apps/backend && npm install --omit=dev && npm run start:prod
 #
 # Overridable via env:
@@ -125,9 +129,11 @@ with \`DEPLOY_DIR=... bash scripts/build-release.sh\` if you deploy elsewhere).
 
 ## From your machine
 \`\`\`sh
-rsync -av --delete release/ root@103.157.205.175:$DEPLOY_DIR
+rsync -av --delete --exclude='/data' --exclude='/logs' --exclude='/node_modules' release/ root@103.157.205.175:$DEPLOY_DIR
 \`\`\`
-(Tip: add \`--exclude=node_modules\` to keep the server's installed deps between deploys.)
+**Important:** the \`--exclude\` flags protect the server's runtime \`data/\` (hint
+ledger) and \`logs/\` (date-grouped error logs), plus the installed \`node_modules\`,
+from being wiped by \`--delete\` — the release bundle does not contain them.
 
 ## On the server
 \`\`\`sh
@@ -167,6 +173,6 @@ EOF
 bold "==> Done."
 echo "    Bundle size: $(du -sh "$RELEASE_DIR" | cut -f1)   ($RELEASE_DIR)"
 echo ""
-echo "Next:"
-echo "  rsync -av --delete release/ root@103.157.205.175:$DEPLOY_DIR"
+echo "Next (the --exclude flags keep the server's data/, logs/, node_modules):"
+echo "  rsync -av --delete --exclude='/data' --exclude='/logs' --exclude='/node_modules' release/ root@103.157.205.175:$DEPLOY_DIR"
 echo "  ssh root@103.157.205.175 'cd $DEPLOY_DIR && npm install --omit=dev && npm run start:prod'"
