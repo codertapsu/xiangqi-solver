@@ -96,7 +96,7 @@ class OnDeviceAnalyzer {
     BoardState board, {
     required OnDeviceEngine engine,
     required ProviderStatus visionStatus,
-    String language = 'en',
+    String language = 'vi',
     int depth = 12,
     int? threads,
     int? hashMb,
@@ -153,7 +153,7 @@ class OnDeviceAnalyzer {
     File screenshot, {
     required OnDeviceEngine engine,
     SideToMove? sideToMove,
-    String language = 'en',
+    String language = 'vi',
     String visionModel = 'gpt-4o',
     int depth = 12,
     int? threads,

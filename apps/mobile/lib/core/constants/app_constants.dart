@@ -72,12 +72,13 @@ class AppConstants {
   static const int defaultEngineHashMb = 128;
 
   /// Default move-notation language code (chess notation output, not the UI).
-  static const String defaultLanguage = 'en';
+  /// Vietnamese-first (the primary market): 'vi' | 'en' | 'zh'.
+  static const String defaultLanguage = 'vi';
 
-  /// Default app UI language: 'system' (follow the device), 'vi', or 'en'.
-  /// 'system' resolves to the device language when supported, else Vietnamese
-  /// (the primary market). Override in Settings → Language → App language.
-  static const String defaultAppLanguage = 'system';
+  /// Default app UI language: 'vi' (Vietnamese — the primary market, the default),
+  /// 'en', or 'system' (follow the device, falling back to Vietnamese). Override
+  /// in Settings → Language → App language.
+  static const String defaultAppLanguage = 'vi';
 
   /// Default side the user plays (whose move it is when solving): red | black.
   static const String defaultMySide = String.fromEnvironment(
