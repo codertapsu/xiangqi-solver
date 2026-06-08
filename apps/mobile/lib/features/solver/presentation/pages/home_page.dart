@@ -213,7 +213,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         actions: [
           // Hint balance + "get more hints" — only when the backend is used
           // (our key OR cloud engine). Fully-local mode consumes no hints.
-          if (settings.usesBackend) const HintBalanceChip(),
+          const HintBalanceChip(),
           IconButton(
             tooltip: l10n.tooltipHistory,
             icon: const Icon(Icons.history),
