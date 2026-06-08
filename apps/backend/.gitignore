@@ -24,6 +24,9 @@ npm-debug.log*
 
 # Hint wallet (SQLite) — runtime data, never commit.
 /data/
+
+# Date-grouped error/failure logs (ErrorLogService) — runtime, never commit.
+/logs/
 *.db
 *.db-wal
 *.db-shm
