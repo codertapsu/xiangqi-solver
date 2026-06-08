@@ -652,6 +652,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onChanged: (v) =>
                 _notifier.patch((s) => s.copyWith(storeScreenshots: v)),
           ),
+          // When ON, spell out the retention so it's clear only the last N are kept.
+          if (settings.storeScreenshots)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.settingsStoreScreenshotsOnDesc(
+                        ref.read(remoteConfigProvider).storedScreenshotsMax,
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.policy_outlined),

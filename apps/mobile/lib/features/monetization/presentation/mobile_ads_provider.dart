@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +33,9 @@ class MobileAdsController extends StateNotifier<bool> with WidgetsBindingObserve
     if (kIsWeb || !(Platform.isAndroid || Platform.isIOS)) return;
     try {
       await ConsentManager().gatherConsent();
+      // iOS: App Tracking Transparency must be requested before the Mobile Ads
+      // SDK may use the IDFA / SKAdNetwork attribution. No-op on Android.
+      await _requestAppTrackingIfNeeded();
       await MobileAds.instance.initialize();
       await MobileAds.instance.updateRequestConfiguration(
         RequestConfiguration(maxAdContentRating: MaxAdContentRating.g),
@@ -54,6 +58,22 @@ class MobileAdsController extends StateNotifier<bool> with WidgetsBindingObserve
       WidgetsBinding.instance.addObserver(this);
     } catch (e) {
       _log.warn('Mobile Ads init failed: $e');
+    }
+  }
+
+  /// iOS App Tracking Transparency. Shows the system prompt once (only when the
+  /// status is still undetermined); the user's choice gates IDFA use for ads.
+  /// No-op on Android/other platforms and never throws into the init path.
+  Future<void> _requestAppTrackingIfNeeded() async {
+    if (!Platform.isIOS) return;
+    try {
+      final status =
+          await AppTrackingTransparency.trackingAuthorizationStatus;
+      if (status == TrackingStatus.notDetermined) {
+        await AppTrackingTransparency.requestTrackingAuthorization();
+      }
+    } catch (e) {
+      _log.warn('ATT request failed: $e');
     }
   }
 

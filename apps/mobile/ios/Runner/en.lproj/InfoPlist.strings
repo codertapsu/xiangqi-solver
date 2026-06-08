@@ -1,0 +1,5 @@
+/* Localized Info.plist values — English (base). */
+/* App name is intentionally the Vietnamese brand on every language. */
+"CFBundleDisplayName" = "Quân Sư Cờ Tướng";
+"NSPhotoLibraryUsageDescription" = "Pick a screenshot of your Xiangqi game so we can read the board and suggest the best move.";
+"NSUserTrackingUsageDescription" = "Allow tracking so the ads shown in the app can be measured. You can change this anytime in Settings.";

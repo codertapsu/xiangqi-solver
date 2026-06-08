@@ -248,6 +248,18 @@ abstract class AppLocalizations {
   /// **'Pick an image & analyze (test)'**
   String get homePickImage;
 
+  /// No description provided for @homeShareInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyze a board photo'**
+  String get homeShareInTitle;
+
+  /// No description provided for @homeShareInDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot your Xiangqi game in any app, then share it into this app — or pick a photo below. We\'ll read the board and show the best move.'**
+  String get homeShareInDesc;
+
   /// No description provided for @backendTitle.
   ///
   /// In en, this message translates to:
@@ -799,6 +811,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off by default. When on, analyzed images are kept on this device and shown in History.'**
   String get settingsStoreScreenshotsDesc;
+
+  /// No description provided for @settingsStoreScreenshotsOnDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeping the last {count} analyzed screenshots on this device — older ones are removed automatically.'**
+  String settingsStoreScreenshotsOnDesc(int count);
 
   /// No description provided for @settingsPrivacyPolicy.
   ///

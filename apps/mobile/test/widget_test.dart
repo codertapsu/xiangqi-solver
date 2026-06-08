@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -94,6 +95,39 @@ void main() {
     expect(fieldFinder, findsOneWidget);
     final field = tester.widget<TextField>(fieldFinder);
     expect(field.controller?.text, AppConstants.defaultBackendUrl);
+  });
+
+  testWidgets('iOS hides Solver Mode and shows the share-in card', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await tester.pumpWidget(await buildHome());
+      await tester.pump();
+
+      // Solver Mode (overlay + capture) is Android-only — hidden on iOS.
+      expect(find.text('Solver Mode'), findsNothing);
+      expect(find.text('Start'), findsNothing);
+      // The iOS share-in hint card replaces it.
+      expect(find.text('Analyze a board photo'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Android shows Solver Mode and not the share-in card', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(await buildHome());
+      await tester.pump();
+
+      expect(find.text('Solver Mode'), findsOneWidget);
+      expect(find.text('Analyze a board photo'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('Stop button is disabled while solver mode is not running', (

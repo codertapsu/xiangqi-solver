@@ -39,8 +39,17 @@ dependencies:
 
   # Platform / file utilities.
   path_provider: ^2.1.5
-  permission_handler: ^11.3.1
   image_picker: ^1.1.2
+
+  # iOS share-in: receive a board screenshot the user shares from another app —
+  # the iOS replacement for Android Solver Mode's overlay capture (iOS forbids
+  # both an overlay over other apps and on-demand cross-app capture). Drives the
+  # same analyzeScreenshot() pipeline. No-op / unused on Android. See docs/IOS_PORT.md.
+  receive_sharing_intent: ^1.8.0
+
+  # iOS App Tracking Transparency prompt — required before AdMob may use the IDFA
+  # / SKAdNetwork attribution. No-op on Android.
+  app_tracking_transparency: ^2.0.6
 
   # Value equality for immutable models.
   equatable: ^2.0.7
