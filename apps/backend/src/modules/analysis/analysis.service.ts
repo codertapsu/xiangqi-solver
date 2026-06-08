@@ -182,7 +182,8 @@ export class AnalysisService {
     lenient: boolean;
   }): Promise<AnalysisResult> {
     const analysisId = uuidv4();
-    const language: NotationLanguage = args.language ?? 'en';
+    // Vietnamese-first (the primary market) when a request omits the language.
+    const language: NotationLanguage = args.language ?? 'vi';
 
     // 1-3. Repair/validate -> normalize -> FEN (shared with /extract).
     const { pieces, board, fen } = this.prepareBoard(
