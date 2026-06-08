@@ -20,6 +20,7 @@ class RemoteConfig extends Equatable {
     required this.showEngineTuning,
     required this.showVisionModel,
     required this.showLicenses,
+    required this.showDeviceId,
   });
 
   /// Whether to OFFER rewarded ads (a capped loss-leader) — default off.
@@ -68,6 +69,9 @@ class RemoteConfig extends Equatable {
   /// Whether the "Open-source licenses" entry (GPLv3 notice) is shown.
   final bool showLicenses;
 
+  /// Whether the "Device ID" tile (shared to receive a Hint Grant) is shown.
+  final bool showDeviceId;
+
   static const RemoteConfig defaults = RemoteConfig(
     rewardedAds: false,
     bannerAds: true,
@@ -86,6 +90,7 @@ class RemoteConfig extends Equatable {
     showEngineTuning: false,
     showVisionModel: false,
     showLicenses: false,
+    showDeviceId: false,
   );
 
   factory RemoteConfig.fromJson(Map<String, dynamic> json) {
@@ -111,6 +116,7 @@ class RemoteConfig extends Equatable {
       showEngineTuning: ui['engineTuning'] as bool? ?? defaults.showEngineTuning,
       showVisionModel: ui['visionModel'] as bool? ?? defaults.showVisionModel,
       showLicenses: ui['licenses'] as bool? ?? defaults.showLicenses,
+      showDeviceId: ui['deviceId'] as bool? ?? defaults.showDeviceId,
     );
   }
 
@@ -134,6 +140,7 @@ class RemoteConfig extends Equatable {
       'engineTuning': showEngineTuning,
       'visionModel': showVisionModel,
       'licenses': showLicenses,
+      'deviceId': showDeviceId,
     },
   };
 
@@ -153,6 +160,7 @@ class RemoteConfig extends Equatable {
     bool? showEngineTuning,
     bool? showVisionModel,
     bool? showLicenses,
+    bool? showDeviceId,
   }) {
     return RemoteConfig(
       rewardedAds: rewardedAds ?? this.rewardedAds,
@@ -170,6 +178,7 @@ class RemoteConfig extends Equatable {
       showEngineTuning: showEngineTuning ?? this.showEngineTuning,
       showVisionModel: showVisionModel ?? this.showVisionModel,
       showLicenses: showLicenses ?? this.showLicenses,
+      showDeviceId: showDeviceId ?? this.showDeviceId,
     );
   }
 
@@ -190,5 +199,6 @@ class RemoteConfig extends Equatable {
     showEngineTuning,
     showVisionModel,
     showLicenses,
+    showDeviceId,
   ];
 }

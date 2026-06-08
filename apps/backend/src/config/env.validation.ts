@@ -119,6 +119,8 @@ export const envSchema = z.object({
   FEATURE_UI_VISION_MODEL: boolFromEnv(false),
   // The "Open-source licenses" entry in Settings (GPLv3 on-device engine notice).
   FEATURE_UI_LICENSES: boolFromEnv(false),
+  // The "Device ID" tile in Settings (users share it to receive a Hint Grant).
+  FEATURE_UI_DEVICE_ID: boolFromEnv(false),
 });
 
 export type Env = z.infer<typeof envSchema>;
