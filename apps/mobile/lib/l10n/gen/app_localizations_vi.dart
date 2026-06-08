@@ -244,7 +244,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get engineProviderStandard => 'Tiêu chuẩn';
 
   @override
-  String get aiKeySourceOurs => 'Khóa của chúng tôi';
+  String get aiKeySourceOurs => 'Máy chủ';
 
   @override
   String get aiKeySourceOwn => 'Khóa của riêng tôi';
@@ -265,7 +265,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsBoardReading => 'Đọc bàn cờ (khóa AI)';
 
   @override
-  String get settingsOurKeyShort => 'Khóa của chúng tôi';
+  String get settingsOurKeyShort => 'Máy chủ';
 
   @override
   String get settingsMyKeyShort => 'Khóa của tôi';
