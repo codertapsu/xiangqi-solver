@@ -53,6 +53,7 @@ export interface AppConfig {
       engineTuning: boolean;
       visionModel: boolean;
       licenses: boolean;
+      deviceId: boolean;
     };
   };
 }
@@ -121,6 +122,7 @@ export function configuration(): { app: AppConfig } {
         engineTuning: env.FEATURE_UI_ENGINE_TUNING,
         visionModel: env.FEATURE_UI_VISION_MODEL,
         licenses: env.FEATURE_UI_LICENSES,
+        deviceId: env.FEATURE_UI_DEVICE_ID,
       },
     },
   };

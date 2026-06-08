@@ -19,6 +19,7 @@ describe('RemoteConfigController', () => {
       engineTuning: false,
       visionModel: false,
       licenses: false,
+      deviceId: false,
     },
   };
 

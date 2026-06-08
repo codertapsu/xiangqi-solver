@@ -670,7 +670,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 applicationName: _l10n.appTitle,
               ),
             ),
-          _buildDeviceIdTile(),
+          if (ref.watch(remoteConfigProvider).showDeviceId) _buildDeviceIdTile(),
         ],
       ),
     );
