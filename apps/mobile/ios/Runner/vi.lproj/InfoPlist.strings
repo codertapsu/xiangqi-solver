@@ -1,0 +1,4 @@
+/* Localized Info.plist values — Vietnamese (primary market). */
+"CFBundleDisplayName" = "Quân Sư Cờ Tướng";
+"NSPhotoLibraryUsageDescription" = "Chọn ảnh chụp màn hình ván cờ của bạn để chúng tôi đọc bàn cờ và gợi ý nước đi tốt nhất.";
+"NSUserTrackingUsageDescription" = "Cho phép theo dõi để đo lường quảng cáo hiển thị trong ứng dụng. Bạn có thể thay đổi bất cứ lúc nào trong Cài đặt.";

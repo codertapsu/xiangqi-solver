@@ -91,6 +91,13 @@ class AppLocalizationsVi extends AppLocalizations {
   String get homePickImage => 'Chọn ảnh & phân tích (thử)';
 
   @override
+  String get homeShareInTitle => 'Phân tích ảnh bàn cờ';
+
+  @override
+  String get homeShareInDesc =>
+      'Chụp màn hình ván cờ trong bất kỳ ứng dụng nào, rồi chia sẻ ảnh vào ứng dụng này — hoặc chọn ảnh bên dưới. Chúng tôi sẽ đọc bàn cờ và chỉ ra nước đi tốt nhất.';
+
+  @override
   String get backendTitle => 'Máy chủ';
 
   @override
@@ -405,6 +412,11 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get settingsStoreScreenshotsDesc =>
       'Mặc định tắt. Khi bật, các ảnh đã phân tích sẽ được giữ trên máy và hiển thị trong Lịch sử.';
+
+  @override
+  String settingsStoreScreenshotsOnDesc(int count) {
+    return 'Đang giữ $count ảnh phân tích gần nhất trên thiết bị này — các ảnh cũ hơn sẽ tự động bị xóa.';
+  }
 
   @override
   String get settingsPrivacyPolicy => 'Chính sách quyền riêng tư';

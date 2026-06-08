@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +18,7 @@ import '../../../monetization/presentation/mobile_ads_provider.dart';
 import '../../../settings/data/settings_repository.dart';
 import '../../data/analysis_api.dart';
 import '../providers/engine_net_provider.dart';
+import '../providers/share_intake_provider.dart';
 import '../providers/solver_providers.dart';
 import '../widgets/privacy_banner.dart';
 import '../widgets/provider_dropdowns.dart';
@@ -36,8 +39,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   final ImagePicker _picker = ImagePicker();
 
   StreamSubscription<String>? _analyzeSub;
+  StreamSubscription<String>? _shareSub;
   String? _healthLine;
   bool _testingConnection = false;
+
+  /// iOS gets the share-in / pick-a-photo product shape instead of Solver Mode
+  /// (no overlay-over-other-apps or on-demand capture on iOS — see docs/IOS_PORT.md).
+  /// A getter (not a cached const) so widget tests can flip the target platform.
+  bool get _isIos => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   @override
   void initState() {
@@ -48,6 +57,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         .read(solverModeProvider.notifier)
         .analyzeRequests
         .listen(_handleAnalyzeRequest);
+    // iOS: a board screenshot shared in from another app runs the SAME flow.
+    // (Inert off iOS — the stream never emits.)
+    _shareSub = ref.read(shareIntakeProvider).imagePaths.listen(
+      _handleAnalyzeRequest,
+    );
     // On app open: kick off the Mobile Ads SDK (consent + init) and the
     // background on-device engine net download (both self-gate if unsupported).
     ref.read(mobileAdsProvider);
@@ -115,6 +129,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   void dispose() {
     _backendController.dispose();
     unawaited(_analyzeSub?.cancel());
+    unawaited(_shareSub?.cancel());
     super.dispose();
   }
 
@@ -233,8 +248,15 @@ class _HomePageState extends ConsumerState<HomePage> {
             const BannerAdWidget(),
             const PrivacyBanner(),
             const SizedBox(height: 16),
-            _buildSolverModeCard(solverMode, native.isSupported),
-            const SizedBox(height: 16),
+            // Solver Mode is Android-only (floating overlay + on-demand capture);
+            // iOS shows the share-in flow instead, other unsupported hosts nothing.
+            if (native.isSupported) ...[
+              _buildSolverModeCard(solverMode, native.isSupported),
+              const SizedBox(height: 16),
+            ] else if (_isIos) ...[
+              _buildShareHintCard(),
+              const SizedBox(height: 16),
+            ],
             if (remoteConfig.showBackendSection) ...[
               _buildBackendCard(settings),
               const SizedBox(height: 16),
@@ -302,6 +324,22 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// iOS replacement for the Solver Mode card: explains the share-in flow (the
+  /// user screenshots their game in another app and shares it here). The actual
+  /// pick-a-photo button lives in the test card below; share-ins arrive via the
+  /// native Share Extension and are handled by [_shareSub].
+  Widget _buildShareHintCard() {
+    final l10n = AppLocalizations.of(context);
+    return SectionCard(
+      title: l10n.homeShareInTitle,
+      icon: Icons.ios_share,
+      child: Text(
+        l10n.homeShareInDesc,
+        style: Theme.of(context).textTheme.bodyMedium,
       ),
     );
   }

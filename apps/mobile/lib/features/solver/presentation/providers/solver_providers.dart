@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/app_constants.dart';
@@ -760,9 +761,14 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
   }) async {
     await result.when(
       success: (value) async {
-        final keepPath = _settings.storeScreenshots ? screenshotPath : null;
         state = AnalysisSuccess(value, screenshotPath: screenshotPath);
         _pushOverlayResult(value);
+        // Persist the screenshot into history-owned storage (NOT the transient
+        // capture cache, which is pruned to the last few frames, nor a picker/
+        // share temp file) so older history entries keep a viewable image.
+        final keepPath = _settings.storeScreenshots
+            ? await _persistHistoryScreenshot(value.analysisId, screenshotPath)
+            : null;
         await _recordHistory(value, keepPath);
       },
       failure: (failure) async {
@@ -803,6 +809,62 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
           )
           .catchError((Object _) {}),
     );
+  }
+
+  /// Copies the analysed screenshot into a persistent, history-owned directory
+  /// keyed by [analysisId] and returns the new path.
+  ///
+  /// The source is a TRANSIENT file: the Android capture pipeline keeps only the
+  /// last few frames in its cache (CAPTURE_KEEP_FILES), and the gallery picker /
+  /// iOS share use temp files. So a history entry must own its own copy, or it
+  /// would render as "unavailable" once the source is pruned/overwritten. The
+  /// [HistoryRepository] deletes these copies when an entry drops past the cap or
+  /// history is cleared, so storage stays bounded. Best-effort: on failure it
+  /// falls back to the source path (no worse than before) rather than throwing.
+  Future<String?> _persistHistoryScreenshot(
+    String analysisId,
+    String? sourcePath,
+  ) async {
+    if (sourcePath == null || sourcePath.isEmpty) return null;
+    try {
+      final src = File(sourcePath);
+      if (!src.existsSync()) return null;
+      final base = await getApplicationSupportDirectory();
+      final dir = Directory('${base.path}/history_screenshots');
+      await dir.create(recursive: true);
+      final safeId = analysisId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+      final dest = '${dir.path}/$safeId.png';
+      if (dest != src.path) await src.copy(dest);
+      // Keep only the last N (server-configurable) screenshots on disk, so
+      // storage tracks the retention shown to the user in Settings.
+      await _pruneHistoryScreenshots(
+        dir,
+        _ref.read(remoteConfigProvider).storedScreenshotsMax,
+      );
+      return dest;
+    } catch (e) {
+      _log.warn('Failed to persist history screenshot: $e');
+      return sourcePath;
+    }
+  }
+
+  /// Keeps only the [keep] most-recent screenshots in [dir], deleting the rest
+  /// so on-disk storage tracks the server-configured retention. Best-effort.
+  Future<void> _pruneHistoryScreenshots(Directory dir, int keep) async {
+    final n = keep < 0 ? 0 : keep;
+    try {
+      final files = dir.listSync().whereType<File>().toList();
+      if (files.length <= n) return;
+      final mtimes = {for (final f in files) f.path: f.lastModifiedSync()};
+      files.sort((a, b) => mtimes[b.path]!.compareTo(mtimes[a.path]!));
+      for (final old in files.skip(n)) {
+        try {
+          await old.delete();
+        } catch (_) {}
+      }
+    } catch (e) {
+      _log.warn('Failed to prune history screenshots: $e');
+    }
   }
 
   Future<void> _recordHistory(AnalysisResult result, String? path) async {

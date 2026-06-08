@@ -15,6 +15,7 @@ class RemoteConfig extends Equatable {
     required this.onDeviceNetUrl,
     required this.onDeviceNetBytes,
     required this.onDeviceVisionModel,
+    required this.storedScreenshotsMax,
     required this.showBackendSection,
     required this.showProvidersSection,
     required this.showEngineTuning,
@@ -55,6 +56,11 @@ class RemoteConfig extends Equatable {
   /// overrides it in Settings. On-device vision is OpenAI-only.
   final String onDeviceVisionModel;
 
+  /// How many of the most-recent analyzed screenshots the app keeps on the
+  /// device (when "Store screenshots" is on). Older ones are pruned, so History
+  /// shows the image for the last N analyses. Server-tunable (default 5).
+  final int storedScreenshotsMax;
+
   /// Whether the "Backend" URL / connection-test section is shown.
   final bool showBackendSection;
 
@@ -90,6 +96,7 @@ class RemoteConfig extends Equatable {
         'https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue',
     onDeviceNetBytes: 50760458,
     onDeviceVisionModel: 'gpt-5.4',
+    storedScreenshotsMax: 5,
     // Optional settings sections are HIDDEN by default; the server reveals them.
     showBackendSection: false,
     showProvidersSection: false,
@@ -106,6 +113,7 @@ class RemoteConfig extends Equatable {
     final od = (json['onDevice'] as Map?)?.cast<String, dynamic>() ?? const {};
     final ui = (json['ui'] as Map?)?.cast<String, dynamic>() ?? const {};
     final appIcon = (json['appIcon'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final history = (json['history'] as Map?)?.cast<String, dynamic>() ?? const {};
     return RemoteConfig(
       rewardedAds: ads['rewarded'] as bool? ?? defaults.rewardedAds,
       bannerAds: ads['banner'] as bool? ?? defaults.bannerAds,
@@ -119,6 +127,8 @@ class RemoteConfig extends Equatable {
       onDeviceNetUrl: od['netUrl'] as String? ?? defaults.onDeviceNetUrl,
       onDeviceNetBytes: (od['netBytes'] as num?)?.toInt() ?? defaults.onDeviceNetBytes,
       onDeviceVisionModel: od['visionModel'] as String? ?? defaults.onDeviceVisionModel,
+      storedScreenshotsMax:
+          (history['storedScreenshotsMax'] as num?)?.toInt() ?? defaults.storedScreenshotsMax,
       showBackendSection: ui['backend'] as bool? ?? defaults.showBackendSection,
       showProvidersSection: ui['providers'] as bool? ?? defaults.showProvidersSection,
       showEngineTuning: ui['engineTuning'] as bool? ?? defaults.showEngineTuning,
@@ -143,6 +153,7 @@ class RemoteConfig extends Equatable {
       'netBytes': onDeviceNetBytes,
       'visionModel': onDeviceVisionModel,
     },
+    'history': {'storedScreenshotsMax': storedScreenshotsMax},
     'ui': {
       'backend': showBackendSection,
       'providers': showProvidersSection,
@@ -165,6 +176,7 @@ class RemoteConfig extends Equatable {
     String? onDeviceNetUrl,
     int? onDeviceNetBytes,
     String? onDeviceVisionModel,
+    int? storedScreenshotsMax,
     bool? showBackendSection,
     bool? showProvidersSection,
     bool? showEngineTuning,
@@ -184,6 +196,7 @@ class RemoteConfig extends Equatable {
       onDeviceNetUrl: onDeviceNetUrl ?? this.onDeviceNetUrl,
       onDeviceNetBytes: onDeviceNetBytes ?? this.onDeviceNetBytes,
       onDeviceVisionModel: onDeviceVisionModel ?? this.onDeviceVisionModel,
+      storedScreenshotsMax: storedScreenshotsMax ?? this.storedScreenshotsMax,
       showBackendSection: showBackendSection ?? this.showBackendSection,
       showProvidersSection: showProvidersSection ?? this.showProvidersSection,
       showEngineTuning: showEngineTuning ?? this.showEngineTuning,
@@ -206,6 +219,7 @@ class RemoteConfig extends Equatable {
     onDeviceNetUrl,
     onDeviceNetBytes,
     onDeviceVisionModel,
+    storedScreenshotsMax,
     showBackendSection,
     showProvidersSection,
     showEngineTuning,
