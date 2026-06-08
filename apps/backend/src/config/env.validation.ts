@@ -121,6 +121,11 @@ export const envSchema = z.object({
   FEATURE_UI_LICENSES: boolFromEnv(false),
   // The "Device ID" tile in Settings (users share it to receive a Hint Grant).
   FEATURE_UI_DEVICE_ID: boolFromEnv(false),
+
+  // Which launcher icon + name variant the app shows. 'auto' = follow the in-app
+  // App-language; 'vi'/'en' force one. Switches among the icons BUNDLED in the
+  // app (Android can't apply a runtime-downloaded image).
+  APP_ICON_VARIANT: z.enum(['auto', 'vi', 'en']).default('auto'),
 });
 
 export type Env = z.infer<typeof envSchema>;

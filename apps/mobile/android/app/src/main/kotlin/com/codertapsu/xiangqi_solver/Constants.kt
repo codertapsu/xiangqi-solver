@@ -32,6 +32,17 @@ object Constants {
     // Push the user's current side (red/black) into the overlay's side toggle.
     const val METHOD_SET_OVERLAY_SIDE = "setOverlaySide"
 
+    // Switch the launcher icon + name variant ('vi' | 'en') via activity-alias.
+    const val METHOD_SET_APP_ICON = "setAppIcon"
+    const val KEY_VARIANT = "variant"
+    const val VARIANT_VI = "vi"
+    const val VARIANT_EN = "en"
+
+    // Activity-alias simple names (launcher entries; exactly one is enabled at a
+    // time). VI is the manifest default (android:enabled="true").
+    const val ALIAS_LAUNCHER_VI = "LauncherVi"
+    const val ALIAS_LAUNCHER_EN = "LauncherEn"
+
     // --- Event "type" values emitted on the EventChannel. ---
     const val EVENT_SOLVER_MODE_STARTED = "solverModeStarted"
     const val EVENT_SOLVER_MODE_STOPPED = "solverModeStopped"

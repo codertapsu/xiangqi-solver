@@ -55,6 +55,8 @@ export interface AppConfig {
       licenses: boolean;
       deviceId: boolean;
     };
+    /** Launcher icon + name variant: 'auto' follows the in-app App-language. */
+    appIcon: { variant: 'auto' | 'vi' | 'en' };
   };
 }
 
@@ -124,6 +126,7 @@ export function configuration(): { app: AppConfig } {
         licenses: env.FEATURE_UI_LICENSES,
         deviceId: env.FEATURE_UI_DEVICE_ID,
       },
+      appIcon: { variant: env.APP_ICON_VARIANT },
     },
   };
 
