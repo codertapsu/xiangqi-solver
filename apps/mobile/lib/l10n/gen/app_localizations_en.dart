@@ -243,7 +243,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get engineProviderStandard => 'Standard';
 
   @override
-  String get aiKeySourceOurs => 'Our key';
+  String get aiKeySourceOurs => 'Cloud';
 
   @override
   String get aiKeySourceOwn => 'My own key';
@@ -264,7 +264,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsBoardReading => 'Board reading (AI key)';
 
   @override
-  String get settingsOurKeyShort => 'Our key';
+  String get settingsOurKeyShort => 'Cloud';
 
   @override
   String get settingsMyKeyShort => 'My key';

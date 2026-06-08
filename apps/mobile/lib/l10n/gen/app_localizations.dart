@@ -533,7 +533,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiKeySourceOurs.
   ///
   /// In en, this message translates to:
-  /// **'Our key'**
+  /// **'Cloud'**
   String get aiKeySourceOurs;
 
   /// No description provided for @aiKeySourceOwn.
@@ -575,7 +575,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsOurKeyShort.
   ///
   /// In en, this message translates to:
-  /// **'Our key'**
+  /// **'Cloud'**
   String get settingsOurKeyShort;
 
   /// No description provided for @settingsMyKeyShort.
