@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,14 +41,35 @@ class HistoryRepository {
     final current = loadAll().where(
       (e) => e.analysisId != entry.analysisId,
     );
-    final updated = [entry, ...current].take(maxEntries).toList(growable: false);
+    final combined = [entry, ...current].toList(growable: false);
+    final updated = combined.take(maxEntries).toList(growable: false);
+    // Delete screenshots for entries dropped by the cap so old images don't
+    // linger on disk after they fall out of the visible history.
+    for (final dropped in combined.skip(maxEntries)) {
+      await _deleteScreenshot(dropped.screenshotPath);
+    }
     await _persist(updated);
     return updated;
   }
 
-  /// Removes every stored entry.
+  /// Removes every stored entry AND deletes any saved screenshot files they
+  /// referenced, so clearing history also reclaims the on-device image storage.
   Future<void> clear() async {
+    for (final entry in loadAll()) {
+      await _deleteScreenshot(entry.screenshotPath);
+    }
     await _prefs.remove(_key);
+  }
+
+  /// Best-effort delete of a saved screenshot file; never throws.
+  Future<void> _deleteScreenshot(String? path) async {
+    if (path == null || path.isEmpty) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } catch (e) {
+      _log.warn('Failed to delete screenshot $path: $e');
+    }
   }
 
   HistoryEntry? findById(String analysisId) {

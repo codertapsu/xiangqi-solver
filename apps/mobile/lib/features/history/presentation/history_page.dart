@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -115,7 +117,7 @@ class _HistoryTile extends StatelessWidget {
           ),
           _DetailRow(label: l10n.historyConfidence, value: pct),
           if (entry.screenshotPath != null)
-            _DetailRow(label: l10n.historyScreenshot, value: entry.screenshotPath!),
+            _ScreenshotPreview(path: entry.screenshotPath!),
         ],
       ),
     );
@@ -149,6 +151,106 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Renders the saved screenshot for a history entry as an inline image (tap to
+/// view full-screen). Falls back to a placeholder if the file was deleted.
+class _ScreenshotPreview extends StatelessWidget {
+  const _ScreenshotPreview({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final file = File(path);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.historyScreenshot, style: theme.textTheme.labelMedium),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Material(
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: InkWell(
+                onTap: () => _openFullScreen(context, file),
+                child: Image.file(
+                  file,
+                  width: double.infinity,
+                  height: 220,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                  errorBuilder: (context, error, stack) => _unavailable(theme, l10n),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _unavailable(ThemeData theme, AppLocalizations l10n) {
+    return SizedBox(
+      height: 96,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.broken_image_outlined, color: theme.colorScheme.outline),
+            const SizedBox(height: 6),
+            Text(
+              l10n.resultScreenshotUnavailable,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openFullScreen(BuildContext context, File file) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            // Pinch-to-zoom; tap the backdrop to dismiss.
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 5,
+                child: Center(
+                  child: Image.file(
+                    file,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: SafeArea(
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
