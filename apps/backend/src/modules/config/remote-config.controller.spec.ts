@@ -13,6 +13,7 @@ describe('RemoteConfigController', () => {
       netBytes: 50760458,
       visionModel: 'gpt-5.4',
     },
+    history: { storedScreenshotsMax: 5 },
     ui: {
       backend: false,
       providers: false,
