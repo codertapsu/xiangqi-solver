@@ -54,6 +54,8 @@ export interface AppConfig {
     ads: { rewarded: boolean; banner: boolean; appOpen: boolean; useReal: boolean };
     hints: { freeOnInstall: number; ownKeyDivisor: number };
     onDevice: { enabled: boolean; netUrl: string; netBytes: number; visionModel: string };
+    /** History/local-storage tunables. */
+    history: { storedScreenshotsMax: number };
     /** Visibility of optional settings sections (all default OFF). */
     ui: {
       backend: boolean;
@@ -129,6 +131,9 @@ export function configuration(): { app: AppConfig } {
         netUrl: env.ONDEVICE_NET_URL,
         netBytes: env.ONDEVICE_NET_BYTES,
         visionModel: env.ONDEVICE_VISION_MODEL,
+      },
+      history: {
+        storedScreenshotsMax: env.STORED_SCREENSHOTS_MAX,
       },
       ui: {
         backend: env.FEATURE_UI_BACKEND,
