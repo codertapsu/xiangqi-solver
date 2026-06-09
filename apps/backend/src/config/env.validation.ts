@@ -101,6 +101,10 @@ export const envSchema = z.object({
   // with OUR key it's always 1 per analysis (enforced client-side).
   HINTS_FREE_ON_INSTALL: intFromEnv(10, 0, 100000),
   HINTS_OWN_KEY_DIVISOR: intFromEnv(3, 1, 100),
+  // How many of the most-recent analyzed screenshots the app keeps on the
+  // device (when the user enables "Store screenshots"). Older ones are pruned,
+  // so History shows the image for the last N analyses. Tunable from the server.
+  STORED_SCREENSHOTS_MAX: intFromEnv(5, 0, 100),
   // On-device Pikafish. The engine binary ships in the APK; the NNUE net is
   // downloaded at runtime from this URL (default = the official master-net, which
   // matches the bundled binary). netBytes lets the app verify a complete download.
