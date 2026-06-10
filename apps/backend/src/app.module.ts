@@ -13,6 +13,7 @@ import { EngineModule } from './modules/engine/engine.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { RemoteConfigModule } from './modules/config/remote-config.module';
 import { HintsModule } from './modules/hints/hints.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 /**
  * Root module. Loads + validates config globally, configures rate limiting,
@@ -49,6 +50,7 @@ import { HintsModule } from './modules/hints/hints.module';
     StorageModule,
     RemoteConfigModule,
     HintsModule,
+    AdminModule,
   ],
   providers: [
     {

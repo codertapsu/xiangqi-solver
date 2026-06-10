@@ -264,7 +264,7 @@ class _EmptyHistory extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(16),
         child: SectionCard(
           title: l10n.historyEmptyTitle,
           icon: Icons.history_toggle_off,

@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
+import '../../../app/router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/remote_config/remote_config_provider.dart';
+import '../../admin/presentation/admin_providers.dart';
 import '../../monetization/presentation/banner_ad.dart';
 import '../../solver/domain/solver_enums.dart';
 import '../../solver/presentation/providers/engine_net_provider.dart';
@@ -65,6 +68,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final remoteConfig = ref.watch(remoteConfigProvider);
+    // Admin entry — only for an admin device (server says so). Hidden otherwise.
+    final isAdmin = ref.watch(adminStatusProvider).valueOrNull ?? false;
     return Scaffold(
       appBar: AppBar(title: Text(_l10n.settingsTitle)),
       body: SafeArea(
@@ -92,6 +97,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             _buildLanguageCard(settings),
             const SizedBox(height: 16),
             _buildPrivacyCard(settings),
+            if (isAdmin) ...[
+              const SizedBox(height: 16),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.admin_panel_settings_outlined),
+                  title: Text(_l10n.adminSettingsEntry),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(AppRoutes.admin),
+                ),
+              ),
+            ],
           ],
         ),
       ),

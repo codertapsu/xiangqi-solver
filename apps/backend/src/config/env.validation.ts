@@ -141,6 +141,11 @@ export const envSchema = z.object({
   // App-language; 'vi'/'en' force one. Switches among the icons BUNDLED in the
   // app (Android can't apply a runtime-downloaded image).
   APP_ICON_VARIANT: z.enum(['auto', 'vi', 'en']).default('auto'),
+
+  // Admin API. Shared secret that AUTHORIZES admin mutations (remote config /
+  // grants / installs). Empty = admin write API DISABLED (fail closed). Admins
+  // are also identified by device id in <HINTS_DATA_DIR>/admins.json.
+  ADMIN_SECRET: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

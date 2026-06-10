@@ -1327,6 +1327,384 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No screen for {uri}'**
   String routeNoRoute(String uri);
+
+  /// No description provided for @adminSettingsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get adminSettingsEntry;
+
+  /// No description provided for @adminTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get adminTitle;
+
+  /// No description provided for @adminLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get adminLock;
+
+  /// No description provided for @adminUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get adminUnlock;
+
+  /// No description provided for @adminUnlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin access'**
+  String get adminUnlockTitle;
+
+  /// No description provided for @adminSecretLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin secret'**
+  String get adminSecretLabel;
+
+  /// No description provided for @adminSecretHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the admin secret to manage the server.'**
+  String get adminSecretHelp;
+
+  /// No description provided for @adminWrongSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong admin secret.'**
+  String get adminWrongSecret;
+
+  /// No description provided for @adminLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load: {error}'**
+  String adminLoadFailed(String error);
+
+  /// No description provided for @adminMenuConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote config'**
+  String get adminMenuConfig;
+
+  /// No description provided for @adminMenuConfigDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the server-driven settings every user gets.'**
+  String get adminMenuConfigDesc;
+
+  /// No description provided for @adminMenuGrants.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint grants'**
+  String get adminMenuGrants;
+
+  /// No description provided for @adminMenuGrantsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Set starting hint balances by device.'**
+  String get adminMenuGrantsDesc;
+
+  /// No description provided for @adminMenuInstalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Install ledger'**
+  String get adminMenuInstalls;
+
+  /// No description provided for @adminMenuInstallsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices that have claimed their starter hints.'**
+  String get adminMenuInstallsDesc;
+
+  /// No description provided for @adminConfigTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote config'**
+  String get adminConfigTitle;
+
+  /// No description provided for @adminConfigSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get adminConfigSave;
+
+  /// No description provided for @adminConfigSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved. Users get the change when they reopen the app.'**
+  String get adminConfigSaved;
+
+  /// No description provided for @adminConfigReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to defaults'**
+  String get adminConfigReset;
+
+  /// No description provided for @adminConfigResetConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset all values to the server defaults?'**
+  String get adminConfigResetConfirm;
+
+  /// No description provided for @adminConfigResetDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to server defaults.'**
+  String get adminConfigResetDone;
+
+  /// No description provided for @adminConfigOverridden.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom (overriding server defaults)'**
+  String get adminConfigOverridden;
+
+  /// No description provided for @adminConfigDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Using server defaults'**
+  String get adminConfigDefaults;
+
+  /// No description provided for @adminConfigApplyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes take effect when users close and reopen the app.'**
+  String get adminConfigApplyNote;
+
+  /// No description provided for @adminCfgGroupAds.
+  ///
+  /// In en, this message translates to:
+  /// **'Ads'**
+  String get adminCfgGroupAds;
+
+  /// No description provided for @adminCfgGroupHints.
+  ///
+  /// In en, this message translates to:
+  /// **'Hints'**
+  String get adminCfgGroupHints;
+
+  /// No description provided for @adminCfgGroupOnDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'On-device engine'**
+  String get adminCfgGroupOnDevice;
+
+  /// No description provided for @adminCfgGroupHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get adminCfgGroupHistory;
+
+  /// No description provided for @adminCfgGroupUi.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings visibility'**
+  String get adminCfgGroupUi;
+
+  /// No description provided for @adminCfgGroupAppIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'App icon'**
+  String get adminCfgGroupAppIcon;
+
+  /// No description provided for @adminCfgRewarded.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewarded ads'**
+  String get adminCfgRewarded;
+
+  /// No description provided for @adminCfgBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Banner ads'**
+  String get adminCfgBanner;
+
+  /// No description provided for @adminCfgAppOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'App-open ads'**
+  String get adminCfgAppOpen;
+
+  /// No description provided for @adminCfgUseReal.
+  ///
+  /// In en, this message translates to:
+  /// **'Use real ad units'**
+  String get adminCfgUseReal;
+
+  /// No description provided for @adminCfgFreeOnInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Free hints on install'**
+  String get adminCfgFreeOnInstall;
+
+  /// No description provided for @adminCfgOwnKeyDivisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Own-key hint divisor (1 per N)'**
+  String get adminCfgOwnKeyDivisor;
+
+  /// No description provided for @adminCfgOnDeviceEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'On-device engine enabled'**
+  String get adminCfgOnDeviceEnabled;
+
+  /// No description provided for @adminCfgNetUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'NNUE net URL'**
+  String get adminCfgNetUrl;
+
+  /// No description provided for @adminCfgNetBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'NNUE net size (bytes)'**
+  String get adminCfgNetBytes;
+
+  /// No description provided for @adminCfgVisionModel.
+  ///
+  /// In en, this message translates to:
+  /// **'On-device vision model'**
+  String get adminCfgVisionModel;
+
+  /// No description provided for @adminCfgStoredScreenshots.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshots kept on device'**
+  String get adminCfgStoredScreenshots;
+
+  /// No description provided for @adminCfgUiBackend.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Backend card'**
+  String get adminCfgUiBackend;
+
+  /// No description provided for @adminCfgUiProviders.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Providers card'**
+  String get adminCfgUiProviders;
+
+  /// No description provided for @adminCfgUiEngineTuning.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Engine tuning'**
+  String get adminCfgUiEngineTuning;
+
+  /// No description provided for @adminCfgUiVisionModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Vision model field'**
+  String get adminCfgUiVisionModel;
+
+  /// No description provided for @adminCfgUiLicenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Licenses entry'**
+  String get adminCfgUiLicenses;
+
+  /// No description provided for @adminCfgUiDeviceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Device ID tile'**
+  String get adminCfgUiDeviceId;
+
+  /// No description provided for @adminCfgIconVariant.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon variant'**
+  String get adminCfgIconVariant;
+
+  /// No description provided for @adminAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get adminAdd;
+
+  /// No description provided for @adminRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get adminRemove;
+
+  /// No description provided for @adminRemoveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {id}?'**
+  String adminRemoveConfirm(String id);
+
+  /// No description provided for @adminDeviceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Device ID'**
+  String get adminDeviceId;
+
+  /// No description provided for @adminGrantHints.
+  ///
+  /// In en, this message translates to:
+  /// **'hints'**
+  String get adminGrantHints;
+
+  /// No description provided for @adminGrantsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No grants yet.'**
+  String get adminGrantsEmpty;
+
+  /// No description provided for @adminAddGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Add grant'**
+  String get adminAddGrant;
+
+  /// No description provided for @adminEditGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit grant'**
+  String get adminEditGrant;
+
+  /// No description provided for @adminGrantSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant saved.'**
+  String get adminGrantSaved;
+
+  /// No description provided for @adminGrantRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant removed.'**
+  String get adminGrantRemoved;
+
+  /// No description provided for @adminInstallsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No installs recorded.'**
+  String get adminInstallsEmpty;
+
+  /// No description provided for @adminInstallFirstSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'First seen'**
+  String get adminInstallFirstSeen;
+
+  /// No description provided for @adminAddInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Add device'**
+  String get adminAddInstall;
+
+  /// No description provided for @adminInstallSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get adminInstallSaved;
+
+  /// No description provided for @adminInstallRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed.'**
+  String get adminInstallRemoved;
 }
 
 class _AppLocalizationsDelegate

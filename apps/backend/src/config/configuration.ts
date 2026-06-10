@@ -68,6 +68,8 @@ export interface AppConfig {
     /** Launcher icon + name variant: 'auto' follows the in-app App-language. */
     appIcon: { variant: 'auto' | 'vi' | 'en' };
   };
+  /** Admin API (config/grants/installs management). */
+  admin: { secret: string };
 }
 
 /**
@@ -145,6 +147,7 @@ export function configuration(): { app: AppConfig } {
       },
       appIcon: { variant: env.APP_ICON_VARIANT },
     },
+    admin: { secret: env.ADMIN_SECRET },
   };
 
   return { app };
