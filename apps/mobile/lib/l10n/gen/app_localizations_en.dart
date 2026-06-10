@@ -745,4 +745,202 @@ class AppLocalizationsEn extends AppLocalizations {
   String routeNoRoute(String uri) {
     return 'No screen for $uri';
   }
+
+  @override
+  String get adminSettingsEntry => 'Admin';
+
+  @override
+  String get adminTitle => 'Admin';
+
+  @override
+  String get adminLock => 'Lock';
+
+  @override
+  String get adminUnlock => 'Unlock';
+
+  @override
+  String get adminUnlockTitle => 'Admin access';
+
+  @override
+  String get adminSecretLabel => 'Admin secret';
+
+  @override
+  String get adminSecretHelp => 'Enter the admin secret to manage the server.';
+
+  @override
+  String get adminWrongSecret => 'Wrong admin secret.';
+
+  @override
+  String adminLoadFailed(String error) {
+    return 'Couldn\'t load: $error';
+  }
+
+  @override
+  String get adminMenuConfig => 'Remote config';
+
+  @override
+  String get adminMenuConfigDesc =>
+      'Edit the server-driven settings every user gets.';
+
+  @override
+  String get adminMenuGrants => 'Hint grants';
+
+  @override
+  String get adminMenuGrantsDesc => 'Set starting hint balances by device.';
+
+  @override
+  String get adminMenuInstalls => 'Install ledger';
+
+  @override
+  String get adminMenuInstallsDesc =>
+      'Devices that have claimed their starter hints.';
+
+  @override
+  String get adminConfigTitle => 'Remote config';
+
+  @override
+  String get adminConfigSave => 'Save';
+
+  @override
+  String get adminConfigSaved =>
+      'Saved. Users get the change when they reopen the app.';
+
+  @override
+  String get adminConfigReset => 'Reset to defaults';
+
+  @override
+  String get adminConfigResetConfirm =>
+      'Reset all values to the server defaults?';
+
+  @override
+  String get adminConfigResetDone => 'Reset to server defaults.';
+
+  @override
+  String get adminConfigOverridden => 'Custom (overriding server defaults)';
+
+  @override
+  String get adminConfigDefaults => 'Using server defaults';
+
+  @override
+  String get adminConfigApplyNote =>
+      'Changes take effect when users close and reopen the app.';
+
+  @override
+  String get adminCfgGroupAds => 'Ads';
+
+  @override
+  String get adminCfgGroupHints => 'Hints';
+
+  @override
+  String get adminCfgGroupOnDevice => 'On-device engine';
+
+  @override
+  String get adminCfgGroupHistory => 'History';
+
+  @override
+  String get adminCfgGroupUi => 'Settings visibility';
+
+  @override
+  String get adminCfgGroupAppIcon => 'App icon';
+
+  @override
+  String get adminCfgRewarded => 'Rewarded ads';
+
+  @override
+  String get adminCfgBanner => 'Banner ads';
+
+  @override
+  String get adminCfgAppOpen => 'App-open ads';
+
+  @override
+  String get adminCfgUseReal => 'Use real ad units';
+
+  @override
+  String get adminCfgFreeOnInstall => 'Free hints on install';
+
+  @override
+  String get adminCfgOwnKeyDivisor => 'Own-key hint divisor (1 per N)';
+
+  @override
+  String get adminCfgOnDeviceEnabled => 'On-device engine enabled';
+
+  @override
+  String get adminCfgNetUrl => 'NNUE net URL';
+
+  @override
+  String get adminCfgNetBytes => 'NNUE net size (bytes)';
+
+  @override
+  String get adminCfgVisionModel => 'On-device vision model';
+
+  @override
+  String get adminCfgStoredScreenshots => 'Screenshots kept on device';
+
+  @override
+  String get adminCfgUiBackend => 'Show Backend card';
+
+  @override
+  String get adminCfgUiProviders => 'Show Providers card';
+
+  @override
+  String get adminCfgUiEngineTuning => 'Show Engine tuning';
+
+  @override
+  String get adminCfgUiVisionModel => 'Show Vision model field';
+
+  @override
+  String get adminCfgUiLicenses => 'Show Licenses entry';
+
+  @override
+  String get adminCfgUiDeviceId => 'Show Device ID tile';
+
+  @override
+  String get adminCfgIconVariant => 'Icon variant';
+
+  @override
+  String get adminAdd => 'Add';
+
+  @override
+  String get adminRemove => 'Remove';
+
+  @override
+  String adminRemoveConfirm(String id) {
+    return 'Remove $id?';
+  }
+
+  @override
+  String get adminDeviceId => 'Device ID';
+
+  @override
+  String get adminGrantHints => 'hints';
+
+  @override
+  String get adminGrantsEmpty => 'No grants yet.';
+
+  @override
+  String get adminAddGrant => 'Add grant';
+
+  @override
+  String get adminEditGrant => 'Edit grant';
+
+  @override
+  String get adminGrantSaved => 'Grant saved.';
+
+  @override
+  String get adminGrantRemoved => 'Grant removed.';
+
+  @override
+  String get adminInstallsEmpty => 'No installs recorded.';
+
+  @override
+  String get adminInstallFirstSeen => 'First seen';
+
+  @override
+  String get adminAddInstall => 'Add device';
+
+  @override
+  String get adminInstallSaved => 'Saved.';
+
+  @override
+  String get adminInstallRemoved => 'Removed.';
 }

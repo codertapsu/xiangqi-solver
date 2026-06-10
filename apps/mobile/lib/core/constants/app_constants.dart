@@ -106,6 +106,12 @@ class AppConstants {
   /// Install-grant: starting hint balance for this device on (re)install.
   static const String hintsClaimPath = '$apiPrefix/hints/claim';
 
+  /// Admin API (device-id + shared-secret protected; see AdminApi).
+  static const String adminStatusPath = '$apiPrefix/admin/status';
+  static const String adminConfigPath = '$apiPrefix/admin/config';
+  static const String adminGrantsPath = '$apiPrefix/admin/grants';
+  static const String adminInstallsPath = '$apiPrefix/admin/installs';
+
   /// SharedPreferences key for the stable per-device id (also sent as the
   /// `x-device-id` header). Seeded from a reinstall-stable id at startup.
   static const String deviceIdPrefKey = 'device.id';

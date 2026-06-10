@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { RemoteConfigController } from './remote-config.controller';
 import { AppConfig } from '../../config/configuration';
+import { ConfigOverrideStore } from '../admin/config-override.store';
 
 describe('RemoteConfigController', () => {
   const features: AppConfig['features'] = {
@@ -25,7 +26,9 @@ describe('RemoteConfigController', () => {
     appIcon: { variant: 'auto' },
   };
 
-  it('returns the feature config from app.features', async () => {
+  async function build(
+    effective: AppConfig['features'] = features,
+  ): Promise<RemoteConfigController> {
     const moduleRef = await Test.createTestingModule({
       controllers: [RemoteConfigController],
       providers: [
@@ -33,11 +36,30 @@ describe('RemoteConfigController', () => {
           provide: ConfigService,
           useValue: { get: (key: string) => (key === 'app.features' ? features : undefined) },
         },
+        {
+          provide: ConfigOverrideStore,
+          useValue: { effective: async () => effective, isActive: async () => false },
+        },
       ],
     }).compile();
+    return moduleRef.get(RemoteConfigController);
+  }
 
-    const controller = moduleRef.get(RemoteConfigController);
-    expect(controller.getConfig()).toEqual(features);
-    expect(controller.getConfig().ads.rewarded).toBe(false);
+  it('returns the env feature config when there is no admin override', async () => {
+    const controller = await build();
+    expect(await controller.getConfig()).toEqual(features);
+    expect((await controller.getConfig()).ads.rewarded).toBe(false);
+  });
+
+  it('serves the admin override when one is active', async () => {
+    const overridden: AppConfig['features'] = {
+      ...features,
+      ads: { ...features.ads, rewarded: true },
+      history: { storedScreenshotsMax: 9 },
+    };
+    const controller = await build(overridden);
+    const got = await controller.getConfig();
+    expect(got.ads.rewarded).toBe(true);
+    expect(got.history.storedScreenshotsMax).toBe(9);
   });
 });
