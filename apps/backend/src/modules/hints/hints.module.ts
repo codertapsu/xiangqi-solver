@@ -12,5 +12,6 @@ import { HintGrantStore } from './hint-grant.store';
 @Module({
   controllers: [HintGrantController],
   providers: [HintGrantService, HintGrantStore, DeviceRateLimitGuard],
+  exports: [HintGrantStore],
 })
 export class HintsModule {}

@@ -747,4 +747,201 @@ class AppLocalizationsVi extends AppLocalizations {
   String routeNoRoute(String uri) {
     return 'Không có màn hình cho $uri';
   }
+
+  @override
+  String get adminSettingsEntry => 'Quản trị';
+
+  @override
+  String get adminTitle => 'Quản trị';
+
+  @override
+  String get adminLock => 'Khóa';
+
+  @override
+  String get adminUnlock => 'Mở khóa';
+
+  @override
+  String get adminUnlockTitle => 'Quyền quản trị';
+
+  @override
+  String get adminSecretLabel => 'Mã bí mật quản trị';
+
+  @override
+  String get adminSecretHelp => 'Nhập mã bí mật quản trị để quản lý máy chủ.';
+
+  @override
+  String get adminWrongSecret => 'Mã bí mật quản trị không đúng.';
+
+  @override
+  String adminLoadFailed(String error) {
+    return 'Không tải được: $error';
+  }
+
+  @override
+  String get adminMenuConfig => 'Cấu hình từ xa';
+
+  @override
+  String get adminMenuConfigDesc =>
+      'Chỉnh các thiết lập do máy chủ điều khiển cho mọi người dùng.';
+
+  @override
+  String get adminMenuGrants => 'Cấp lượt';
+
+  @override
+  String get adminMenuGrantsDesc => 'Đặt số lượt khởi đầu theo từng thiết bị.';
+
+  @override
+  String get adminMenuInstalls => 'Sổ cài đặt';
+
+  @override
+  String get adminMenuInstallsDesc => 'Các thiết bị đã nhận lượt khởi đầu.';
+
+  @override
+  String get adminConfigTitle => 'Cấu hình từ xa';
+
+  @override
+  String get adminConfigSave => 'Lưu';
+
+  @override
+  String get adminConfigSaved =>
+      'Đã lưu. Người dùng sẽ nhận thay đổi khi mở lại ứng dụng.';
+
+  @override
+  String get adminConfigReset => 'Đặt lại mặc định';
+
+  @override
+  String get adminConfigResetConfirm =>
+      'Đặt lại tất cả về mặc định của máy chủ?';
+
+  @override
+  String get adminConfigResetDone => 'Đã đặt lại về mặc định của máy chủ.';
+
+  @override
+  String get adminConfigOverridden => 'Tùy chỉnh (ghi đè mặc định máy chủ)';
+
+  @override
+  String get adminConfigDefaults => 'Đang dùng mặc định máy chủ';
+
+  @override
+  String get adminConfigApplyNote =>
+      'Thay đổi có hiệu lực khi người dùng đóng và mở lại ứng dụng.';
+
+  @override
+  String get adminCfgGroupAds => 'Quảng cáo';
+
+  @override
+  String get adminCfgGroupHints => 'Lượt';
+
+  @override
+  String get adminCfgGroupOnDevice => 'Công cụ trên thiết bị';
+
+  @override
+  String get adminCfgGroupHistory => 'Lịch sử';
+
+  @override
+  String get adminCfgGroupUi => 'Hiển thị mục cài đặt';
+
+  @override
+  String get adminCfgGroupAppIcon => 'Biểu tượng ứng dụng';
+
+  @override
+  String get adminCfgRewarded => 'Quảng cáo có thưởng';
+
+  @override
+  String get adminCfgBanner => 'Quảng cáo biểu ngữ';
+
+  @override
+  String get adminCfgAppOpen => 'Quảng cáo khi mở ứng dụng';
+
+  @override
+  String get adminCfgUseReal => 'Dùng đơn vị quảng cáo thật';
+
+  @override
+  String get adminCfgFreeOnInstall => 'Lượt miễn phí khi cài đặt';
+
+  @override
+  String get adminCfgOwnKeyDivisor => 'Mẫu số lượt khi dùng khóa riêng (1/N)';
+
+  @override
+  String get adminCfgOnDeviceEnabled => 'Bật công cụ trên thiết bị';
+
+  @override
+  String get adminCfgNetUrl => 'URL mạng NNUE';
+
+  @override
+  String get adminCfgNetBytes => 'Kích thước mạng NNUE (byte)';
+
+  @override
+  String get adminCfgVisionModel => 'Mô hình đọc ảnh trên thiết bị';
+
+  @override
+  String get adminCfgStoredScreenshots => 'Số ảnh giữ trên thiết bị';
+
+  @override
+  String get adminCfgUiBackend => 'Hiện thẻ Máy chủ';
+
+  @override
+  String get adminCfgUiProviders => 'Hiện thẻ Nhà cung cấp';
+
+  @override
+  String get adminCfgUiEngineTuning => 'Hiện Tinh chỉnh công cụ';
+
+  @override
+  String get adminCfgUiVisionModel => 'Hiện ô Mô hình đọc ảnh';
+
+  @override
+  String get adminCfgUiLicenses => 'Hiện mục Giấy phép';
+
+  @override
+  String get adminCfgUiDeviceId => 'Hiện ô Mã thiết bị';
+
+  @override
+  String get adminCfgIconVariant => 'Biến thể biểu tượng';
+
+  @override
+  String get adminAdd => 'Thêm';
+
+  @override
+  String get adminRemove => 'Xóa';
+
+  @override
+  String adminRemoveConfirm(String id) {
+    return 'Xóa $id?';
+  }
+
+  @override
+  String get adminDeviceId => 'Mã thiết bị';
+
+  @override
+  String get adminGrantHints => 'lượt';
+
+  @override
+  String get adminGrantsEmpty => 'Chưa có cấp lượt nào.';
+
+  @override
+  String get adminAddGrant => 'Thêm cấp lượt';
+
+  @override
+  String get adminEditGrant => 'Sửa cấp lượt';
+
+  @override
+  String get adminGrantSaved => 'Đã lưu cấp lượt.';
+
+  @override
+  String get adminGrantRemoved => 'Đã xóa cấp lượt.';
+
+  @override
+  String get adminInstallsEmpty => 'Chưa ghi nhận cài đặt nào.';
+
+  @override
+  String get adminInstallFirstSeen => 'Lần đầu thấy';
+
+  @override
+  String get adminAddInstall => 'Thêm thiết bị';
+
+  @override
+  String get adminInstallSaved => 'Đã lưu.';
+
+  @override
+  String get adminInstallRemoved => 'Đã xóa.';
 }

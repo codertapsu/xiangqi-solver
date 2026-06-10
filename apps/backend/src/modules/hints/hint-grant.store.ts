@@ -29,6 +29,7 @@ export class HintGrantStore implements OnModuleInit {
   private grants = new Map<string, number>(); // deviceId -> hints
   private grantsMtimeMs = Number.NaN;
   private writeChain: Promise<void> = Promise.resolve(); // serialize installs writes
+  private grantsWriteChain: Promise<void> = Promise.resolve(); // serialize grants writes
   private capWarned = false;
 
   /**
@@ -166,5 +167,63 @@ export class HintGrantStore implements OnModuleInit {
       this.grants = new Map();
       this.grantsMtimeMs = Number.NaN;
     }
+  }
+
+  // --- Admin CRUD over grants.json / installs.json -------------------------
+
+  /** All manual grants `{ deviceId: hints }` (refreshes from disk first). */
+  async allGrants(): Promise<Record<string, number>> {
+    await this.refreshGrants();
+    return Object.fromEntries(this.grants);
+  }
+
+  /** Add/replace a device's manual grant (atomic, serialized). */
+  async setGrant(deviceId: string, hints: number): Promise<void> {
+    await this.refreshGrants();
+    this.grants.set(deviceId, Math.max(0, Math.floor(hints)));
+    await this.writeGrants();
+  }
+
+  /** Remove a device's manual grant (atomic; no-op if absent). */
+  async removeGrant(deviceId: string): Promise<void> {
+    await this.refreshGrants();
+    if (this.grants.delete(deviceId)) await this.writeGrants();
+  }
+
+  /** Serialize grants.json writes; atomic temp+rename; refresh the mtime cache. */
+  private writeGrants(): Promise<void> {
+    const run = this.grantsWriteChain.then(async () => {
+      await fs.mkdir(this.dir, { recursive: true });
+      const tmp = `${this.grantsPath}.tmp`;
+      const json = JSON.stringify(Object.fromEntries(this.grants), null, 2);
+      await fs.writeFile(tmp, json, 'utf8');
+      await fs.rename(tmp, this.grantsPath);
+      this.grantsMtimeMs = (await fs.stat(this.grantsPath)).mtimeMs;
+    });
+    this.grantsWriteChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  /** The full install ledger `{ deviceId: firstSeen ISO }`. */
+  allInstalls(): Record<string, string> {
+    return Object.fromEntries(this.installs);
+  }
+
+  /** Add/replace an install ledger entry (atomic). Invalid/missing date → now. */
+  async setInstall(deviceId: string, firstSeenIso?: string): Promise<void> {
+    const iso =
+      firstSeenIso && !Number.isNaN(Date.parse(firstSeenIso))
+        ? new Date(firstSeenIso).toISOString()
+        : new Date().toISOString();
+    this.installs.set(deviceId, iso);
+    await this.enqueueWrite();
+  }
+
+  /** Remove an install ledger entry (atomic; no-op if absent). */
+  async removeInstall(deviceId: string): Promise<void> {
+    if (this.installs.delete(deviceId)) await this.enqueueWrite();
   }
 }

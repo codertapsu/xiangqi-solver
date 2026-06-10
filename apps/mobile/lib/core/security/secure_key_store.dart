@@ -15,6 +15,7 @@ class SecureKeyStore {
   final FlutterSecureStorage _storage;
 
   static const String _openAiKey = 'secure.openaiApiKey';
+  static const String _adminSecret = 'secure.adminSecret';
 
   Future<String?> readOpenAiKey() => _storage.read(key: _openAiKey);
 
@@ -34,4 +35,20 @@ class SecureKeyStore {
   }
 
   Future<void> clearOpenAiKey() => _storage.delete(key: _openAiKey);
+
+  // --- Admin shared secret (authorizes admin API calls) --------------------
+
+  Future<String?> readAdminSecret() => _storage.read(key: _adminSecret);
+
+  /// Writes [value] (trimmed); an empty value deletes the stored secret.
+  Future<void> writeAdminSecret(String value) async {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      await _storage.delete(key: _adminSecret);
+    } else {
+      await _storage.write(key: _adminSecret, value: trimmed);
+    }
+  }
+
+  Future<void> clearAdminSecret() => _storage.delete(key: _adminSecret);
 }

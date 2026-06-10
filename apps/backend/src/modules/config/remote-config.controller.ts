@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { AppConfig } from '../../config/configuration';
+import { ConfigOverrideStore } from '../admin/config-override.store';
+import { Features } from '../admin/features.schema';
 
 /**
  * Remote config / feature flags for the app. The app fetches this on launch and
@@ -22,11 +24,17 @@ import { AppConfig } from '../../config/configuration';
 @SkipThrottle()
 @Controller('config')
 export class RemoteConfigController {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly overrides: ConfigOverrideStore,
+  ) {}
 
   @Get()
-  getConfig(): AppConfig['features'] {
-    // Always present (validated + defaulted at boot by configuration()).
-    return this.config.get<AppConfig['features']>('app.features')!;
+  getConfig(): Promise<AppConfig['features']> {
+    // env defaults (validated + defaulted at boot), overlaid by the admin
+    // override (config-overrides.json) when present. Re-read per request so an
+    // admin edit takes effect on the user's next launch without a restart.
+    const env = this.config.get<AppConfig['features']>('app.features')! as Features;
+    return this.overrides.effective(env) as Promise<AppConfig['features']>;
   }
 }
