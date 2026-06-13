@@ -46,9 +46,20 @@ export class AiService {
     return this.config.get<AppConfig['ai']>('app.ai')?.provider ?? 'mock';
   }
 
+  /**
+   * The provider that WILL run for a request, after applying enforcement: when
+   * AI_PROVIDER_ENFORCE is set the client's choice is ignored and the
+   * configured default wins. Used for both selection and the response envelope
+   * (so vision.provider reflects what actually ran).
+   */
+  effectiveProviderName(provider?: AiProviderName): AiProviderName {
+    const enforce = this.config.get<AppConfig['ai']>('app.ai')?.providerEnforce ?? false;
+    return (enforce ? undefined : provider) ?? this.defaultProvider;
+  }
+
   /** Pick a vision provider implementation by name. */
   resolve(provider?: AiProviderName): AiVisionProvider {
-    const name = provider ?? this.defaultProvider;
+    const name = this.effectiveProviderName(provider);
     switch (name) {
       case 'mock':
         return this.mockProvider;

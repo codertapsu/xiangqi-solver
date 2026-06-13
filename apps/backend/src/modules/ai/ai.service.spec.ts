@@ -6,9 +6,9 @@ import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
 import { ExtractBoardStateInput, ExtractBoardStateResult } from './ai-provider.interface';
 
-function buildConfig(): ConfigService {
+function buildConfig(ai: Record<string, unknown> = { provider: 'mock' }): ConfigService {
   return {
-    get: (key: string) => (key === 'app.ai' ? { provider: 'mock' } : undefined),
+    get: (key: string) => (key === 'app.ai' ? ai : undefined),
   } as unknown as ConfigService;
 }
 
@@ -112,5 +112,71 @@ describe('AiService extraction cache', () => {
       mimeType: 'image/png',
     });
     expect(counting.calls).toBe(3);
+  });
+});
+
+describe('AiService provider enforcement', () => {
+  const allProviders = (calls: { name: string }[]) => ({
+    mock: {
+      name: 'mock',
+      extractBoardState: async () => {
+        calls.push({ name: 'mock' });
+        return base();
+      },
+    },
+    gemini: {
+      name: 'gemini',
+      extractBoardState: async () => {
+        calls.push({ name: 'gemini' });
+        return base();
+      },
+    },
+    openai: {
+      name: 'openai',
+      extractBoardState: async () => {
+        calls.push({ name: 'openai' });
+        return base();
+      },
+    },
+  });
+  const base = (): ExtractBoardStateResult => ({
+    boardDetected: true,
+    sideToMove: 'red',
+    confidence: 0.9,
+    pieces: [
+      { color: 'red', type: 'king', file: 4, rank: 0 },
+      { color: 'black', type: 'king', file: 4, rank: 9 },
+    ],
+    warnings: [],
+  });
+
+  function svc(ai: Record<string, unknown>, calls: { name: string }[]): AiService {
+    const p = allProviders(calls);
+    return new AiService(
+      buildConfig(ai),
+      identityPreprocess,
+      p.mock as unknown as MockVisionProvider,
+      p.gemini as unknown as GeminiVisionProvider,
+      p.openai as unknown as OpenAiVisionProvider,
+    );
+  }
+
+  const img = Buffer.from('img');
+
+  it('honors the client provider when enforce is off (default)', async () => {
+    const calls: { name: string }[] = [];
+    const service = svc({ provider: 'gemini', providerEnforce: false }, calls);
+    await service.extractBoardState({ imageBuffer: img, mimeType: 'image/png' }, 'openai');
+    expect(calls).toEqual([{ name: 'openai' }]);
+    expect(service.effectiveProviderName('openai')).toBe('openai');
+  });
+
+  it('ignores the client provider and uses the configured default when enforce is on', async () => {
+    const calls: { name: string }[] = [];
+    const service = svc({ provider: 'gemini', providerEnforce: true }, calls);
+    // Old app sends provider=openai; the server must still use gemini.
+    await service.extractBoardState({ imageBuffer: img, mimeType: 'image/png' }, 'openai');
+    expect(calls).toEqual([{ name: 'gemini' }]);
+    expect(service.effectiveProviderName('openai')).toBe('gemini');
   });
 });

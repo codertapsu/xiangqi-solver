@@ -33,9 +33,19 @@ export class EngineService {
     return this.config.get<AppConfig['engine']>('app.engine')?.provider ?? 'mock';
   }
 
+  /**
+   * The engine that WILL run after applying enforcement: when
+   * ENGINE_PROVIDER_ENFORCE is set the client's choice is ignored and the
+   * configured default wins. Used for selection and the response envelope.
+   */
+  effectiveProviderName(provider?: EngineProviderName): EngineProviderName {
+    const enforce = this.config.get<AppConfig['engine']>('app.engine')?.providerEnforce ?? false;
+    return (enforce ? undefined : provider) ?? this.defaultProvider;
+  }
+
   /** Pick an engine implementation by name. */
   resolve(provider?: EngineProviderName): XiangqiEngine {
-    const name = provider ?? this.defaultProvider;
+    const name = this.effectiveProviderName(provider);
     switch (name) {
       case 'mock':
         return this.mockEngine;

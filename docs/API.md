@@ -252,9 +252,9 @@ Recognize a board from a screenshot, normalize it, then run the engine.
 | Field             | Type        | Required | Notes                                                              |
 | ----------------- | ----------- | -------- | ------------------------------------------------------------------ |
 | `screenshot`      | image file  | yes      | `image/png`, `image/jpeg`, or `image/webp` (sniffed from magic bytes, not the declared mime); max `MAX_UPLOAD_BYTES` (default **8 MB**). |
-| `provider`        | string enum | no       | `gemini` \| `openai` \| `mock`; **omit** to use the server's `AI_PROVIDER` (this is the app's "Auto" mode — the operator can switch the cloud vision provider fleet-wide without an app release). |
+| `provider`        | string enum | no       | `gemini` \| `openai` \| `mock`; **omit** to use the server's `AI_PROVIDER` (this is the app's "Auto" mode). When `AI_PROVIDER_ENFORCE=true` the server **ignores this field entirely** and always uses `AI_PROVIDER` — so the operator can switch the cloud vision provider fleet-wide even for already-installed apps that send an explicit value. |
 | `sideToMove`      | string enum | no       | `red` \| `black` \| `unknown`.                                     |
-| `engineProvider`  | string enum | no       | `pikafish` \| `mock`; default from `ENGINE_PROVIDER` env.          |
+| `engineProvider`  | string enum | no       | `pikafish` \| `mock`; default from `ENGINE_PROVIDER` env. Ignored (forced to `ENGINE_PROVIDER`) when `ENGINE_PROVIDER_ENFORCE=true`. |
 | `engineDepth`     | int 1..30   | no       | Engine search depth.                                               |
 | `engineMoveTimeMs`| int 50..60000| no      | Per-move think time in ms.                                         |
 | `engineThreads`   | int 1..8    | no       | Pikafish `Threads`.                                                |

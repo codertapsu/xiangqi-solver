@@ -235,6 +235,7 @@ describe('AnalysisService', () => {
       const config = buildConfig();
       const aiStub = {
         defaultProvider: 'mock',
+        effectiveProviderName: (p?: string) => p ?? 'mock',
         extractBoardState: async () => ({
           boardDetected: true,
           sideToMove: 'red',
