@@ -43,6 +43,9 @@ class _FakeEngine implements OnDeviceEngine {
   bool get isAvailable => true;
 
   @override
+  void dispose() {}
+
+  @override
   Future<LocalEngineMove> bestMove(
     BoardState board, {
     int depth = 12,
@@ -60,6 +63,9 @@ class _ThrowingEngine implements OnDeviceEngine {
 
   @override
   bool get isAvailable => true;
+
+  @override
+  void dispose() {}
 
   @override
   Future<LocalEngineMove> bestMove(
