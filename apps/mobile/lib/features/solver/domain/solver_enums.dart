@@ -81,6 +81,10 @@ enum PieceType {
 
 /// Vision (AI) provider used to read the board from an image.
 enum AiProvider {
+  /// Follow the backend's configured default (`AI_PROVIDER`): the request
+  /// omits the `provider` field, so the operator can switch the fleet's cloud
+  /// vision (e.g. OpenAI -> Gemini A/B) WITHOUT an app release.
+  auto('auto'),
   gemini('gemini'),
   openai('openai'),
   mock('mock');
@@ -88,6 +92,9 @@ enum AiProvider {
   const AiProvider(this.wireValue);
 
   final String wireValue;
+
+  /// What goes on the wire: `auto` sends NOTHING (server default applies).
+  String? get wireValueOrNull => this == AiProvider.auto ? null : wireValue;
 
   static AiProvider fromWire(String? value) {
     return AiProvider.values.firstWhere(
@@ -97,6 +104,7 @@ enum AiProvider {
   }
 
   String get label => switch (this) {
+    AiProvider.auto => 'Auto',
     AiProvider.gemini => 'Gemini',
     AiProvider.openai => 'OpenAI',
     AiProvider.mock => 'Mock',

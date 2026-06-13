@@ -17,6 +17,7 @@ extension SideToMoveL10n on SideToMove {
 
 extension AiProviderL10n on AiProvider {
   String localizedLabel(AppLocalizations l10n) => switch (this) {
+    AiProvider.auto => l10n.aiProviderAuto,
     AiProvider.gemini => l10n.aiProviderGemini,
     AiProvider.openai => l10n.aiProviderOpenai,
     AiProvider.mock => l10n.providerMock,

@@ -117,7 +117,9 @@ class AppSettings extends Equatable {
       : SideToMove.red;
 
   static const AiProvider _defaultAi =
-      AppConstants.defaultAiProvider == 'gemini'
+      AppConstants.defaultAiProvider == 'auto'
+      ? AiProvider.auto
+      : AppConstants.defaultAiProvider == 'gemini'
       ? AiProvider.gemini
       : AppConstants.defaultAiProvider == 'openai'
       ? AiProvider.openai
