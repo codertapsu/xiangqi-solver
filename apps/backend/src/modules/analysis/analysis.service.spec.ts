@@ -54,7 +54,7 @@ describe('AnalysisService', () => {
       config,
       preprocess,
       new MockVisionProvider(),
-      new GeminiVisionProvider(config),
+      new GeminiVisionProvider(config, errorLog),
       new OpenAiVisionProvider(config, errorLog),
     );
     const engineService = new EngineService(
