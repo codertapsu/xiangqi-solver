@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AnalysisService } from './analysis.service';
 import { AiService } from '../ai/ai.service';
+import { ImagePreprocessService } from '../ai/image-preprocess.service';
 import { MockVisionProvider } from '../ai/providers/mock-vision.provider';
 import { GeminiVisionProvider } from '../ai/providers/gemini.provider';
 import { OpenAiVisionProvider } from '../ai/providers/openai.provider';
@@ -45,8 +46,13 @@ describe('AnalysisService', () => {
   beforeEach(() => {
     const config = buildConfig();
     const errorLog = { log: () => {} } as unknown as ErrorLogService;
+    // Identity preprocess: unit tests use tiny fake buffers, not real images.
+    const preprocess = {
+      normalizeForVision: async (buffer: Buffer, mimeType: string) => ({ buffer, mimeType }),
+    } as unknown as ImagePreprocessService;
     const aiService = new AiService(
       config,
+      preprocess,
       new MockVisionProvider(),
       new GeminiVisionProvider(config),
       new OpenAiVisionProvider(config, errorLog),
