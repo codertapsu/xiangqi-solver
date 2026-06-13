@@ -1,8 +1,11 @@
 # On-Device Pikafish & Backendless Architecture — Feasibility Report
 
-> Status: **analysis only, nothing implemented.** This evaluates packaging the
-> Pikafish engine into the Flutter Android app and moving AI vision off the
-> backend (the "no backend at all" idea). Sources: the Pikafish repo at
+> Status: **SHIPPED.** The on-device engine is in the **release APK**
+> (`jniLibs/arm64-v8a/libpikafish.so`), the NNUE net is **downloaded at runtime
+> from the backend's `GET /api/engine/net`** (not bundled), and since this
+> release searches run through a persistent **`WarmUciSession`** instead of a
+> spawn-per-solve process (see §6b). The analysis below is kept as the
+> feasibility record that led here. Sources: the Pikafish repo at
 > `…/Pikafish` (`git describe` → `Pikafish-2026-01-02-134-gfd168f68`) and the
 > prebuilt `Pikafish.2026-01-02/` package.
 
@@ -89,6 +92,12 @@ channel / `dart:ffi`.
 
 The engine looks for `pikafish.nnue` in its working directory by default, or set
 `setoption name EvalFile value <abs-path>` (the backend already does this).
+
+**Chosen: download at runtime.** The app fetches the net from the backend's
+`GET /api/engine/net` (self-hosted, so the bytes always match the binary we
+built) and `OnDeviceEngineResolver` keeps the engine **unavailable until the
+download lands** — a netless engine would just hang on `go`. The earlier
+"bundle as a Flutter asset" approach is historical.
 
 ---
 
@@ -192,6 +201,8 @@ Flutter app ── local Pikafish (jniLibs lib*.so, UCI over Process.start)
      before `isready`, then `ucinewgame`/`position fen`/`go depth`, parse
      `info`/`bestmove` incl. MultiPV; `quit`+kill in `finally`. Backed by
      `ProcessOnDeviceEngine`. Host-tested against a fake UCI shell script.
+     *(The one-shot spawn-per-solve client is now superseded for production
+     solves by the persistent `WarmUciSession` — see §6b.)*
    - **Packaging:** native libs are extracted to the exec-allowed
      `nativeLibraryDir` via `packaging { jniLibs { useLegacyPackaging = true } }`
      in `app/build.gradle.kts` (the modern replacement for
@@ -204,9 +215,11 @@ Flutter app ── local Pikafish (jniLibs lib*.so, UCI over Process.start)
    `local/local_notation.dart` (all faithful ports, unit-tested against the
    backend's expected outputs — e.g. start-position FEN and `炮二平五`/`C2=5`).
    `OnDeviceAnalyzer` now runs vision → repair → engine → **localized**
-   `BestMove` (+ MultiPV candidates) entirely on-device. The NNUE ships as a
-   gitignored Flutter asset (`assets/engine/pikafish.nnue`) and
-   `OnDeviceEngineResolver` copies it to app storage on first use.
+   `BestMove` (+ MultiPV candidates) entirely on-device. *(Historical: the NNUE
+   originally shipped as a gitignored Flutter asset copied to app storage on
+   first use. It is now **downloaded at runtime** from the backend's
+   `GET /api/engine/net`; `OnDeviceEngineResolver` receives the downloaded
+   net's path and returns `UnavailableOnDeviceEngine` until it exists.)*
 
 ### 6. Real-device testing — three issues found & fixed
 
@@ -238,6 +251,31 @@ The PIE binary **`exec()`s** fine from `nativeLibraryDir` (the riskiest unknown
 
 Until a clean board → move is confirmed end-to-end, On-device mode degrades
 honestly (recognizes the board, explains why no move, points to Cloud mode).
+
+### 6b. WarmUciSession — persistent engine (current)
+
+Production solves no longer spawn a Pikafish process per search. `WarmUciSession`
+(`lib/features/solver/data/ondevice/uci_engine_client.dart`, used by
+`ProcessOnDeviceEngine`) keeps **one process + the ~50 MB NNUE loaded across
+solves**:
+
+- **Start once:** `Process.start` → `uci`/`uciok` → `EvalFile` → `readyok` (the
+  net loads here). Subsequent searches send only **option deltas**
+  (`Threads`/`Hash`/`MultiPV` when changed) + `ucinewgame` / `position fen` /
+  `go` — turning a 1–3 s per-solve engine cold start into tens of ms on a
+  mid-range phone.
+- **Serialized searches:** a second `search()` awaits the first.
+- **Idle dispose:** a 2-minute idle timer kills the process so the engine's RAM
+  (net + hash) is released between solving sessions; the next solve restarts it.
+- **Hardening (mirrors the backend warm pool):** any failure poisons the session
+  (disposed, never reused — a late `bestmove` from an aborted search can't
+  answer the next position); the transcript window is reset before every wait so
+  stale `readyok`/`bestmove` can't satisfy a later one; stderr drains into a
+  bounded tail for diagnostics.
+
+The one-shot `UciEngineClient` from migration step 4 remains as the simple
+spawn-per-search driver (and test harness), but production goes through the warm
+session.
 
 ### Risks
 

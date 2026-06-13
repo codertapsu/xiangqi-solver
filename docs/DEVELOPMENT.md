@@ -47,7 +47,9 @@ It runs:
 
 The script keeps going after a failure, prints a `[PASS]/[FAIL]/[SKIP]`
 summary, and exits non-zero **only** when a real check fails (skips never fail
-the run). Use it locally before pushing and as the basis for CI.
+the run). Use it locally before pushing; hosted CI now exists at
+`.github/workflows/ci.yml` and mirrors it (backend lint/test/e2e/build +
+Flutter analyze/test) — keep the two in sync.
 
 You can also run pieces directly:
 
@@ -102,16 +104,21 @@ field or the `ENGINE_PROVIDER` env default.
 2. **Let the domain do coordinate/FEN work.** The engine consumes the FEN the
    `board` module produced and returns UCI; the domain converts UCI back into
    `{from,to}` / `human`. Do not reimplement coordinate math in the engine.
-3. **External binaries (like Pikafish):** spawn over UCI, read `PIKAFISH_PATH`
-   / `PIKAFISH_NNUE_PATH` (or your engine's equivalents) from `config/`, and
-   apply `engineDepth` / `engineMoveTimeMs` limits. Fail soft: set
-   `engine.ok=false` and add a warning rather than crashing the request.
+3. **External binaries (like Pikafish):** drive over UCI, read
+   `PIKAFISH_BINARY_PATH` / `PIKAFISH_NNUE_PATH` (or your engine's
+   equivalents) from `config/`, and apply `engineDepth` / `engineMoveTimeMs`
+   limits. Fail soft: set `engine.ok=false` and add a warning rather than
+   crashing the request.
 4. **Add tests:** unit-test the UCI parsing/limits with a fake process; the
    `mock` engine keeps the rest of the suite hermetic.
-5. **Orientation check (important):** before trusting a real engine, validate
-   that the FEN orientation we emit matches what the engine expects (see the
-   Pikafish TODO in [`API.md`](API.md) and the README). A mirrored board
-   silently produces wrong moves.
+5. **Orientation check (resolved for Pikafish):** before trusting a **new**
+   real engine, validate that the FEN orientation we emit matches what it
+   expects — a mirrored board silently produces wrong moves. For Pikafish this
+   is verified by the opt-in
+   `apps/backend/src/modules/engine/pikafish-real-binary.integration.spec.ts`
+   (feeds known positions to the real binary and asserts the returned moves map
+   back onto the expected squares; self-skips without a configured binary). Use
+   it as the template when adding another engine.
 
 ---
 
@@ -161,5 +168,5 @@ field or the `ENGINE_PROVIDER` env default.
   envelope, validation errors (oversized/unsupported upload), and status codes.
 - **Mobile — `flutter test`** for Dart logic (channel-message
   encoding/decoding, the capture→post flow with a faked channel and HTTP).
-- **Run `bash scripts/check.sh`** before every push; wire it into CI as the
-  single entry point.
+- **Run `bash scripts/check.sh`** before every push; hosted CI
+  (`.github/workflows/ci.yml`) runs the same checks on every push/PR.
