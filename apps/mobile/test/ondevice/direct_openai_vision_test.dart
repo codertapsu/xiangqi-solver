@@ -209,4 +209,105 @@ void main() {
     expect(result.pieces, hasLength(1));
     expect(result.warnings.any((w) => w.contains('unreadable')), isTrue);
   });
+
+  group('grid-first output (compact prompt)', gridTests);
+}
+
+/// Wrap a board-JSON object as a canned OpenAI chat-completions response.
+ResponseBody _visionResponse(Map<String, Object?> board) => _json(200, {
+  'choices': [
+    {
+      'message': {'content': jsonEncode(board)},
+    },
+  ],
+});
+
+void gridTests() {
+  final bytes = Uint8List.fromList([1, 2, 3, 4]);
+  const startGrid = [
+    'rheakaehr',
+    '.........',
+    '.c.....c.',
+    'p.p.p.p.p',
+    '.........',
+    '.........',
+    'P.P.P.P.P',
+    '.C.....C.',
+    '.........',
+    'RHEAKAEHR',
+  ];
+
+  Future<BoardExtraction> extract(
+    DirectOpenAiVisionClient client,
+  ) => client.extract(imageBytes: bytes, mimeType: 'image/png', apiKey: 'sk-test');
+
+  test('expands the compact grid output into canonical pieces', () async {
+    final client = _client(
+      (_) => _visionResponse({
+        'boardDetected': true,
+        'grid': startGrid,
+        'redHomeAtTop': false,
+        'sideToMove': 'red',
+        'confidence': 0.97,
+        'warnings': <String>[],
+      }),
+    );
+
+    final result = await extract(client);
+
+    expect(result.pieces, hasLength(32));
+    final redKing = result.pieces.firstWhere(
+      (p) => p.color == PieceColor.red && p.type == PieceType.king,
+    );
+    expect((redKing.file, redKing.rank), (4, 0));
+    final blackKing = result.pieces.firstWhere(
+      (p) => p.color == PieceColor.black && p.type == PieceType.king,
+    );
+    expect((blackKing.file, blackKing.rank), (4, 9));
+    // Per-piece confidence inherits the overall confidence.
+    expect(result.pieces.every((p) => p.confidence == 0.97), isTrue);
+  });
+
+  test('rotates a grid with Red drawn at the top (Black perspective)', () async {
+    final client = _client(
+      (_) => _visionResponse({
+        'boardDetected': true,
+        'grid': startGrid.reversed.toList(),
+        'redHomeAtTop': true,
+        'sideToMove': 'black',
+        'confidence': 0.9,
+        'warnings': <String>[],
+      }),
+    );
+
+    final result = await extract(client);
+
+    expect(result.pieces, hasLength(32));
+    final redKing = result.pieces.firstWhere(
+      (p) => p.color == PieceColor.red && p.type == PieceType.king,
+    );
+    expect((redKing.file, redKing.rank), (4, 0));
+  });
+
+  test('falls back to the legacy pieces array when the grid is malformed', () async {
+    final client = _client(
+      (_) => _visionResponse({
+        'boardDetected': true,
+        'grid': ['bogus'],
+        'sideToMove': 'red',
+        'confidence': 0.9,
+        'pieces': [
+          {'color': 'red', 'type': 'king', 'row': 9, 'col': 4},
+          {'color': 'black', 'type': 'king', 'row': 0, 'col': 4},
+        ],
+        'warnings': <String>[],
+      }),
+    );
+
+    final result = await extract(client);
+
+    expect(result.pieces, hasLength(2));
+    final redKing = result.pieces.firstWhere((p) => p.type == PieceType.king && p.color == PieceColor.red);
+    expect((redKing.file, redKing.rank), (4, 0));
+  });
 }
