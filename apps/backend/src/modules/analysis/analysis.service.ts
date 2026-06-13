@@ -132,7 +132,9 @@ export class AnalysisService {
     sideToMove: SideToMove;
     visionWarnings: string[];
   }> {
-    const visionName = params.provider ?? this.aiService.defaultProvider;
+    // Reflect the provider that ACTUALLY runs (enforcement may override the
+    // client's choice) so the response envelope's vision.provider is honest.
+    const visionName = this.aiService.effectiveProviderName(params.provider);
     let extraction: ExtractBoardStateResult;
     try {
       extraction = await this.aiService.extractBoardState(
@@ -223,7 +225,8 @@ export class AnalysisService {
     // 4. Run the engine — but only if both generals are present (a position
     //    without a king is illegal and not solvable). On an imperfect capture we
     //    return the board + a clear warning instead of failing the request.
-    const engineName = args.engineOptions.engineProvider ?? this.engineService.defaultProvider;
+    // Honest reported engine (enforcement may override the client's choice).
+    const engineName = this.engineService.effectiveProviderName(args.engineOptions.engineProvider);
     const engineDefaults = this.config.get<AppConfig['engine']>('app.engine');
     const depth = args.engineOptions.engineDepth ?? engineDefaults?.defaultDepth ?? 12;
     const moveTimeMs =

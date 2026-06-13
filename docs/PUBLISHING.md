@@ -248,6 +248,9 @@ The same backend serves dev and prod via `apps/backend/.env` (validated by
 ```sh
 # Real board reading + engine
 AI_PROVIDER=openai                 # or gemini (drop-in); requires the matching key
+AI_PROVIDER_ENFORCE=true           # IGNORE the app's provider field so AI_PROVIDER wins even for
+                                   # already-installed apps — required to switch the fleet's cloud
+                                   # vision (e.g. openai -> gemini) without an app release.
 OPENAI_API_KEY=<secret>            # gpt-5.4 by default
 # GEMINI_API_KEY=<secret>          # if AI_PROVIDER=gemini (GEMINI_MODEL=gemini-3.5-flash)
 ENGINE_PROVIDER=pikafish           # server-side engine (or fairy-stockfish — see MONETIZATION.md)
