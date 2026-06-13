@@ -2,7 +2,9 @@ import {
   BadRequestException,
   Body,
   Controller,
+  HttpException,
   Post,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -10,7 +12,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AppConfig } from '../../config/configuration';
+import { SkipEnvelope } from '../../common/decorators/skip-envelope.decorator';
 import { AnalysisService } from './analysis.service';
 import { AnalysisResult, ExtractionResult } from './analysis.types';
 import { AnalyzeBoardDto } from './dto/analyze-board.dto';
@@ -66,6 +70,83 @@ export class AnalysisController {
       engineMultiPv: dto.engineMultiPv,
       language: dto.language,
     });
+  }
+
+  /**
+   * POST /api/analysis/screenshot/stream (multipart/form-data) -> NDJSON.
+   *
+   * Same work as /screenshot, but PROGRESSIVE: one JSON object per line as
+   * each stage completes, so the client can render the recognized board while
+   * the engine is still searching. Stages:
+   *   {"stage":"received"}                          - upload accepted
+   *   {"stage":"board","board":{...}}               - vision + repair done
+   *   {"stage":"done","data":<AnalysisResult>}      - engine + notation done
+   *   {"stage":"error","error":{code,message}}      - failure after streaming began
+   * Errors BEFORE the first byte (missing/invalid file) use the standard
+   * { success:false, error } envelope with a real HTTP status.
+   */
+  @Post('screenshot/stream')
+  @SkipEnvelope()
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('screenshot'))
+  async analyzeScreenshotStream(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: AnalyzeScreenshotDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    // Validate BEFORE any byte is written: these errors still get the normal
+    // envelope + HTTP status via the global exception filter.
+    const upload = this.validateUpload(file);
+
+    res.status(200);
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    // Disable proxy buffering (nginx/Caddy) so stages reach the client live.
+    res.setHeader('X-Accel-Buffering', 'no');
+    const write = (obj: unknown): void => {
+      res.write(`${JSON.stringify(obj)}\n`);
+    };
+    write({ stage: 'received' });
+
+    try {
+      const result = await this.analysisService.analyzeScreenshot({
+        imageBuffer: upload.buffer,
+        mimeType: upload.mimeType,
+        provider: dto.provider,
+        sideToMove: dto.sideToMove,
+        engineProvider: dto.engineProvider,
+        engineDepth: dto.engineDepth,
+        engineMoveTimeMs: dto.engineMoveTimeMs,
+        engineThreads: dto.engineThreads,
+        engineHashMb: dto.engineHashMb,
+        engineMultiPv: dto.engineMultiPv,
+        language: dto.language,
+        onBoard: (board) => write({ stage: 'board', board }),
+      });
+      write({ stage: 'done', data: result });
+    } catch (err) {
+      // Headers are already sent: deliver the failure as the final NDJSON line
+      // (mirrors the envelope's { code, message } shape).
+      write({ stage: 'error', error: this.streamError(err) });
+    } finally {
+      res.end();
+    }
+  }
+
+  /** Map an exception to the { code, message } shape used by the envelope. */
+  private streamError(err: unknown): { code: string; message: string } {
+    if (err instanceof HttpException) {
+      const body = err.getResponse();
+      if (body && typeof body === 'object') {
+        const o = body as Record<string, unknown>;
+        return {
+          code: typeof o.code === 'string' ? o.code : `HTTP_${err.getStatus()}`,
+          message: typeof o.message === 'string' ? o.message : err.message,
+        };
+      }
+      return { code: `HTTP_${err.getStatus()}`, message: err.message };
+    }
+    return { code: 'INTERNAL_ERROR', message: 'Analysis failed unexpectedly.' };
   }
 
   /**
