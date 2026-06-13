@@ -1,0 +1,33 @@
+# TLS termination for the Xiangqi Solver backend (see DEPLOY.md "TLS").
+#
+# Caddy obtains + renews a Let's Encrypt certificate AUTOMATICALLY — but only
+# for a DOMAIN NAME (ACME does not issue certificates for bare IPs). Point a
+# domain (e.g. a free DuckDNS/afraid.org subdomain, or your own) at
+# 103.157.205.175 first, then replace the placeholder below.
+#
+# Install on the VPS:   apt install caddy   (Debian/Ubuntu; runs as a systemd
+# service reading /etc/caddy/Caddyfile — copy this file there).
+#
+# After TLS is live:
+#  1. App side: set the backend URL to https://<your-domain> (Settings →
+#     Backend, or bake it with --dart-define=BACKEND_URL=...).
+#  2. Update ONDEVICE_NET_URL in .env to https://<your-domain>/api/engine/net.
+#  3. The Android cleartext exception (network_security_config.xml) and the
+#     iOS ATS concern both become unnecessary for the new URL.
+#  4. Optionally firewall port 3000 to localhost only — Caddy proxies to it.
+
+xiangqi.example.com {
+	# NDJSON streaming (/api/analysis/screenshot/stream) must not be buffered.
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+	}
+
+	# The 50 MB NNUE download benefits from compression being DISABLED (it is
+	# already compressed); everything else is small JSON. Caddy's defaults are
+	# fine — no encode block on purpose.
+
+	log {
+		output file /var/log/caddy/xiangqi-access.log
+		format json
+	}
+}
