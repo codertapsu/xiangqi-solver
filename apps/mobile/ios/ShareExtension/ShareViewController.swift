@@ -1,5 +1,6 @@
 import UIKit
 import Social
+import ImageIO
 
 /// Thin, self-contained iOS share-in shim — NO Flutter engine, NO plugin import.
 ///
@@ -21,6 +22,13 @@ class ShareViewController: SLComposeServiceViewController {
     private let userDefaultsKey = "ShareKey"
     private let schemePrefix = "ShareMedia"
     private let imageTypeId = "public.image"
+
+    /// Vision pixel budget (mirrors the backend + Android capture): models
+    /// downscale to ~2048px / shortest side 768px before reading, so larger
+    /// uploads only cost transfer time. JPEG 0.92 keeps glyph edges crisp.
+    private let maxShortSide: CGFloat = 768
+    private let maxLongSide: CGFloat = 2048
+    private let jpegQuality: CGFloat = 0.92
 
     /// Extension id is "<host>.ShareExtension" → strip the last component.
     private var hostAppBundleIdentifier: String {
@@ -56,8 +64,11 @@ class ShareViewController: SLComposeServiceViewController {
                 self.save(copyingFileAt: url)
             } else if let image = data as? UIImage {
                 self.save(image: image)
-            } else if let raw = data as? Data, let image = UIImage(data: raw) {
-                self.save(image: image)
+            } else if let raw = data as? Data,
+                      let source = CGImageSourceCreateWithData(raw as CFData, nil),
+                      let jpeg = self.downsampledJpeg(from: source) {
+                // Memory-bounded: never materialize the full-resolution bitmap.
+                self.write(jpeg: jpeg)
             } else {
                 self.finish()
             }
@@ -69,6 +80,16 @@ class ShareViewController: SLComposeServiceViewController {
     }
 
     private func save(copyingFileAt src: URL) {
+        // Prefer re-encoding to a downscaled JPEG: full-size screenshots/photos
+        // upload several MB the vision model would discard anyway, and HEIC
+        // (the iOS camera default) must be converted regardless — the backend
+        // accepts only PNG/JPEG/WebP. ImageIO decodes DOWNSAMPLED (a full
+        // 48 MP decode would blow the extension's ~120 MB memory cap). Fall
+        // back to a raw copy when decoding fails (e.g. an exotic format).
+        if let source = CGImageSourceCreateWithURL(src as CFURL, nil),
+           let jpeg = downsampledJpeg(from: source) {
+            return write(jpeg: jpeg)
+        }
         guard let dir = container() else { return finish() }
         let name = src.lastPathComponent.isEmpty
             ? "\(UUID().uuidString).png" : src.lastPathComponent
@@ -85,14 +106,52 @@ class ShareViewController: SLComposeServiceViewController {
     }
 
     private func save(image: UIImage) {
-        guard let dir = container(), let png = image.pngData() else { return finish() }
-        let dst = dir.appendingPathComponent("\(UUID().uuidString).png")
+        guard let jpeg = downscaledJpeg(from: image) else { return finish() }
+        write(jpeg: jpeg)
+    }
+
+    private func write(jpeg: Data) {
+        guard let dir = container() else { return finish() }
+        let dst = dir.appendingPathComponent("\(UUID().uuidString).jpg")
         do {
-            try png.write(to: dst)
-            persistAndRedirect(fileURL: dst, mimeType: "image/png")
+            try jpeg.write(to: dst)
+            persistAndRedirect(fileURL: dst, mimeType: "image/jpeg")
         } catch {
             finish()
         }
+    }
+
+    /// Memory-bounded downscale via ImageIO: decodes the image already
+    /// downsampled to [maxLongSide] (with EXIF orientation applied), instead
+    /// of materializing the full-resolution bitmap.
+    private func downsampledJpeg(from source: CGImageSource) -> Data? {
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxLongSide,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+        return UIImage(cgImage: cg).jpegData(compressionQuality: jpegQuality)
+    }
+
+    /// Scale down (never up) so the shortest side fits [maxShortSide] and the
+    /// longest fits [maxLongSide], then encode JPEG. Used for payloads that
+    /// arrive ALREADY decoded as UIImage (no file to downsample from).
+    private func downscaledJpeg(from image: UIImage) -> Data? {
+        let w = image.size.width * image.scale
+        let h = image.size.height * image.scale
+        guard w > 0, h > 0 else { return image.jpegData(compressionQuality: jpegQuality) }
+        let scale = min(maxShortSide / min(w, h), maxLongSide / max(w, h), 1)
+        if scale >= 1 { return image.jpegData(compressionQuality: jpegQuality) }
+        let size = CGSize(width: max(1, floor(w * scale)), height: max(1, floor(h * scale)))
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let resized = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+        return resized.jpegData(compressionQuality: jpegQuality)
     }
 
     private func persistAndRedirect(fileURL: URL, mimeType: String) {

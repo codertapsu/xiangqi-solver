@@ -30,7 +30,7 @@ import java.io.FileOutputStream
  * Foreground service (type = mediaProjection) that owns the screen-capture
  * pipeline. It builds a [MediaProjection] from the user-granted consent stored
  * in [MediaProjectionHolder], renders the display into an [ImageReader], and on
- * request grabs exactly one frame, saves it as a PNG, and reports the result.
+ * request grabs exactly one frame, saves it as a downscaled JPEG, and reports the result.
  *
  * Honesty & safety:
  *  - A persistent, clearly worded notification is shown the whole time.
@@ -237,7 +237,7 @@ class ScreenCaptureService : Service() {
 
     /**
      * Core capture: acquire the latest image, copy into a bitmap, detect a black
-     * frame, persist a PNG, and emit the matching event. Always returns a result.
+     * frame, persist a downscaled JPEG, and emit the matching event. Always returns a result.
      */
     private fun captureFrameInternal(emit: Boolean): CaptureResult {
         val reader = imageReader
@@ -325,7 +325,7 @@ class ScreenCaptureService : Service() {
         )
         bitmap.copyPixelsFromBuffer(buffer)
 
-        // Crop away the row-stride padding so the saved PNG is exactly the
+        // Crop away the row-stride padding so the saved frame is exactly the
         // display size.
         if (rowPadding == 0) return bitmap
         val cropped = Bitmap.createBitmap(bitmap, 0, 0, image.width, image.height)
@@ -369,13 +369,42 @@ class ScreenCaptureService : Service() {
                 dir,
                 "${Constants.CAPTURE_FILE_PREFIX}${System.currentTimeMillis()}${Constants.CAPTURE_FILE_EXT}",
             )
+            // Vision models downscale internally before reading (OpenAI "high"
+            // detail: fit in 2048px, then shortest side to 768px), so pixels
+            // beyond that budget never reach the model — they only slow the
+            // upload. Downscale to the same budget and encode JPEG (quality 92
+            // keeps glyph edges crisp): a 1080x2400 lossless PNG of 1-5 MB
+            // becomes a ~100-300 KB file with identical model-visible content.
+            val scaled = scaleToVisionBudget(bitmap)
             FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                scaled.compress(Bitmap.CompressFormat.JPEG, Constants.CAPTURE_JPEG_QUALITY, out)
                 out.flush()
             }
+            if (scaled !== bitmap) scaled.recycle()
             pruneOldCaptures(dir, keep = file)
             file
         }.getOrNull()
+    }
+
+    /**
+     * Scale [bitmap] down (never up) so the shortest side fits
+     * [Constants.CAPTURE_MAX_SHORT_SIDE] and the longest side fits
+     * [Constants.CAPTURE_MAX_LONG_SIDE], preserving aspect ratio. Returns the
+     * original bitmap when it is already within budget.
+     */
+    private fun scaleToVisionBudget(bitmap: Bitmap): Bitmap {
+        val short = minOf(bitmap.width, bitmap.height).toFloat()
+        val long = maxOf(bitmap.width, bitmap.height).toFloat()
+        val scale = minOf(
+            Constants.CAPTURE_MAX_SHORT_SIDE / short,
+            Constants.CAPTURE_MAX_LONG_SIDE / long,
+            1f,
+        )
+        if (scale >= 1f) return bitmap
+        val w = (bitmap.width * scale).toInt().coerceAtLeast(1)
+        val h = (bitmap.height * scale).toInt().coerceAtLeast(1)
+        return runCatching { Bitmap.createScaledBitmap(bitmap, w, h, true) }
+            .getOrDefault(bitmap)
     }
 
     /** Keep only the most recent [Constants.CAPTURE_KEEP_FILES] capture files. */
