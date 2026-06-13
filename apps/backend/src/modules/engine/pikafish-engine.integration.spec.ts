@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ServiceUnavailableException } from '@nestjs/common';
@@ -20,6 +20,10 @@ const describePosix = hasPosixShell ? describe : describe.skip;
 const FEN = 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1';
 
 function configWith(binaryPath: string): ConfigService {
+  return configWithPool(binaryPath, 2);
+}
+
+function configWithPool(binaryPath: string, poolSize: number): ConfigService {
   return {
     get: (key: string): unknown => {
       if (key === 'app.engine') {
@@ -28,6 +32,7 @@ function configWith(binaryPath: string): ConfigService {
           pikafishBinaryPath: binaryPath,
           defaultDepth: 5,
           defaultMoveTimeMs: 100,
+          poolSize,
         } as AppConfig['engine'];
       }
       return undefined;
@@ -176,5 +181,131 @@ describePosix('PikafishEngineService (fake UCI engine integration)', () => {
     expect(result.multipv?.[0]).toMatchObject({ uci: 'b2e2', score: '+0.30' });
     expect(result.multipv?.[1]).toMatchObject({ uci: 'h2e2', score: '+0.15' });
     expect(result.multipv?.[2]).toMatchObject({ uci: 'b0c2', score: '-0.05' });
+  });
+});
+
+describePosix('PikafishEngineService warm pool', () => {
+  let dir: string;
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'fake-pikafish-pool-'));
+  });
+
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function writeCountingEngine(
+    name: string,
+    opts?: { sleepOnGo?: boolean },
+  ): {
+    path: string;
+    spawnCountFile: string;
+  } {
+    const path = join(dir, name);
+    const spawnCountFile = join(dir, `${name}.spawns`);
+    writeFileSync(
+      path,
+      [
+        '#!/bin/sh',
+        `echo spawn >> "${spawnCountFile}"`,
+        'while IFS= read -r line; do',
+        '  case "$line" in',
+        '    uci) echo "uciok" ;;',
+        '    isready) echo "readyok" ;;',
+        '    go*)',
+        ...(opts?.sleepOnGo ? ['      sleep 0.2'] : []),
+        // Echo the exact go command back so tests can assert the search limits.
+        '      echo "info depth 5 score cp 42 pv b2e2 string cmd[$line]"',
+        '      echo "bestmove b2e2"',
+        '      ;;',
+        '    quit) exit 0 ;;',
+        '  esac',
+        'done',
+      ].join('\n') + '\n',
+      { mode: 0o755 },
+    );
+    chmodSync(path, 0o755);
+    return { path, spawnCountFile };
+  }
+
+  const spawnsIn = (file: string): number => {
+    try {
+      return readFileSync(file, 'utf8').split('\n').filter(Boolean).length;
+    } catch {
+      return 0;
+    }
+  };
+
+  it('reuses ONE warm process across sequential searches', async () => {
+    const { path, spawnCountFile } = writeCountingEngine('engine-warm.sh');
+    const engine = new PikafishEngineService(configWith(path));
+    try {
+      for (let i = 0; i < 3; i++) {
+        const result = await engine.getBestMove({
+          fen: FEN,
+          sideToMove: 'red',
+          depth: 5,
+          moveTimeMs: 100,
+        });
+        expect(result.uci).toBe('b2e2');
+      }
+      expect(spawnsIn(spawnCountFile)).toBe(1);
+    } finally {
+      engine.onModuleDestroy();
+    }
+  });
+
+  it('sends BOTH bounds: go depth N movetime M', async () => {
+    const { path } = writeCountingEngine('engine-cmd.sh');
+    const engine = new PikafishEngineService(configWith(path));
+    try {
+      const result = await engine.getBestMove({
+        fen: FEN,
+        sideToMove: 'red',
+        depth: 7,
+        moveTimeMs: 250,
+      });
+      expect(result.raw).toContain('cmd[go depth 7 movetime 250]');
+    } finally {
+      engine.onModuleDestroy();
+    }
+  });
+
+  it('serializes concurrent searches through the bounded pool', async () => {
+    const { path, spawnCountFile } = writeCountingEngine('engine-queue.sh', { sleepOnGo: true });
+    const engine = new PikafishEngineService(configWithPool(path, 1));
+    try {
+      const results = await Promise.all(
+        Array.from({ length: 3 }, () =>
+          engine.getBestMove({ fen: FEN, sideToMove: 'red', depth: 5, moveTimeMs: 100 }),
+        ),
+      );
+      expect(results.every((r) => r.uci === 'b2e2')).toBe(true);
+      // Pool size 1 -> a single process served all three queued searches.
+      expect(spawnsIn(spawnCountFile)).toBe(1);
+    } finally {
+      engine.onModuleDestroy();
+    }
+  });
+
+  it('respawns on demand after the warm process dies', async () => {
+    const { path, spawnCountFile } = writeCountingEngine('engine-respawn.sh');
+    const engine = new PikafishEngineService(configWith(path));
+    try {
+      await engine.getBestMove({ fen: FEN, sideToMove: 'red', depth: 5, moveTimeMs: 100 });
+      // Kill the warm engine behind the pool's back.
+      engine.onModuleDestroy();
+      const result = await engine.getBestMove({
+        fen: FEN,
+        sideToMove: 'red',
+        depth: 5,
+        moveTimeMs: 100,
+      });
+      expect(result.uci).toBe('b2e2');
+      expect(spawnsIn(spawnCountFile)).toBe(2);
+    } finally {
+      engine.onModuleDestroy();
+    }
   });
 });
