@@ -93,6 +93,8 @@ mkdir -p "$RELEASE_DIR/engine"
 cp -R dist "$RELEASE_DIR/dist"
 cp package.json "$RELEASE_DIR/package.json"
 [ -f package-lock.json ] && cp package-lock.json "$RELEASE_DIR/package-lock.json"
+# TLS scaffolding: ready-made Caddy reverse-proxy config (see DEPLOY.md "TLS").
+cp deploy/Caddyfile "$RELEASE_DIR/Caddyfile"
 
 # engine: ALL Linux binaries (so the arch can be switched server-side) + the net
 cp -R "$PIKAFISH_SRC/Linux" "$RELEASE_DIR/engine/Linux"
@@ -142,10 +144,24 @@ npm install --omit=dev      # 'npm install' also works; --omit=dev is smaller (d
 npm run start:prod          # node dist/main.js   (listens on \$PORT, default 3000)
 \`\`\`
 
+**Note (since the latency release):** \`npm install\` now also pulls in \`sharp\`
+(prebuilt linux-x64 binaries — no compiler needed) for server-side image
+downscaling, and the engine runs as a WARM POOL: set \`ENGINE_POOL_SIZE\` in
+\`.env\` to roughly the number of spare CPU cores (default 2). Each pool process
+holds the NNUE net + \`ENGINE_HASH_MB\` of RAM while warm; idle engines exit
+after 5 minutes.
+
 Run it under a process manager (pm2 / systemd) so it restarts on crash/reboot, e.g.:
 \`\`\`sh
 pm2 start "npm run start:prod" --name xiangqi-backend --cwd $DEPLOY_DIR
 \`\`\`
+
+## TLS (recommended)
+The backend itself speaks plain HTTP. Terminate TLS with Caddy in front of it
+— see the bundled [Caddyfile](./Caddyfile) for a ready-made config and the app/
+config changes to make afterwards. Requires a DOMAIN pointed at the VPS (ACME
+does not issue certificates for bare IPs); until then the app keeps using the
+scoped cleartext exception.
 
 ## Engine binary
 The bundled CPU build is **$PIKAFISH_BIN**. If the server prints
