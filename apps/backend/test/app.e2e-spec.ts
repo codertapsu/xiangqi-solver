@@ -117,4 +117,38 @@ describe('Backend (e2e)', () => {
       expect(res.body.data.engine).toBeUndefined();
     });
   });
+
+  describe('POST /api/analysis/screenshot/stream', () => {
+    it('streams received -> board -> done stages as NDJSON (mock)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/analysis/screenshot/stream')
+        .field('provider', 'mock')
+        .field('engineProvider', 'mock')
+        .field('sideToMove', 'red')
+        .attach('screenshot', TINY_PNG, 'capture.png')
+        .expect(200)
+        .expect('Content-Type', /application\/x-ndjson/);
+
+      const lines = res.text
+        .trim()
+        .split('\n')
+        .map((l) => JSON.parse(l) as Record<string, any>);
+      expect(lines[0]).toEqual({ stage: 'received' });
+      expect(lines[1].stage).toBe('board');
+      expect(typeof lines[1].board.fen).toBe('string');
+      expect(Array.isArray(lines[1].board.pieces)).toBe(true);
+      expect(lines[2].stage).toBe('done');
+      expect(lines[2].data.bestMove.uci).toBe('b2e2');
+      expect(lines[2].data.board.fen).toBe(lines[1].board.fen);
+    });
+
+    it('rejects a missing file with the standard envelope (no stream begun)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/analysis/screenshot/stream')
+        .field('provider', 'mock')
+        .expect(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('MISSING_FILE');
+    });
+  });
 });
