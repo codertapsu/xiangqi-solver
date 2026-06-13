@@ -8,6 +8,7 @@ import {
 } from '../ai-provider.interface';
 import { BOARD_EXTRACTION_PROMPT } from '../prompts/board-extraction.prompt';
 import { parseVisionResponse } from '../vision-response.schema';
+import { ErrorLogService } from '../../logging/error-log.service';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -22,7 +23,10 @@ const REQUEST_TIMEOUT_MS = 30_000;
 export class GeminiVisionProvider implements AiVisionProvider {
   readonly name = 'gemini';
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly errorLog: ErrorLogService,
+  ) {}
 
   async extractBoardState(input: ExtractBoardStateInput): Promise<ExtractBoardStateResult> {
     const ai = this.config.get<AppConfig['ai']>('app.ai');
@@ -56,8 +60,47 @@ export class GeminiVisionProvider implements AiVisionProvider {
       generationConfig: { temperature: 0, responseMimeType: 'application/json' },
     };
 
-    const text = await this.callApi(url, apiKey, body);
-    return parseVisionResponse(text);
+    let text: string;
+    try {
+      text = await this.callApi(url, apiKey, body);
+    } catch (err) {
+      this.logFailure('gemini', input, model, err);
+      throw err;
+    }
+
+    try {
+      return parseVisionResponse(text);
+    } catch (err) {
+      // Parity with the OpenAI provider: record the unreadable response and
+      // surface the same stable, user-explainable error code instead of a 500.
+      this.logFailure('vision-invalid', input, model, err, text);
+      throw new ServiceUnavailableException({
+        message:
+          'Gemini returned a response that could not be read as a Xiangqi board ' +
+          '(the screenshot may not clearly show a board).',
+        code: 'VISION_INVALID_RESPONSE',
+        details: (err as Error).message,
+      });
+    }
+  }
+
+  /** Append a failure to the date-grouped error log (never the key/image bytes). */
+  private logFailure(
+    category: 'gemini' | 'vision-invalid',
+    input: ExtractBoardStateInput,
+    model: string,
+    err: unknown,
+    rawText?: string,
+  ): void {
+    this.errorLog.log(category, {
+      message: err instanceof Error ? err.message : String(err),
+      provider: this.name,
+      model,
+      imageBytes: input.imageBuffer.byteLength,
+      mimeType: input.mimeType,
+      sideToMoveHint: input.sideToMoveHint,
+      ...(rawText !== undefined ? { rawResponseSnippet: rawText.slice(0, 2000) } : {}),
+    });
   }
 
   private buildPrompt(hint?: ExtractBoardStateInput['sideToMoveHint']): string {
