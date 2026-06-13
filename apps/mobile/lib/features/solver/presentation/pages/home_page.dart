@@ -177,7 +177,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     try {
       picked = await _picker.pickImage(
         source: ImageSource.gallery,
+        // Match the vision model's own pixel budget (it downscales to ~2048px
+        // anyway) and re-encode as JPEG: a 12 MP gallery photo shrinks from
+        // several MB to a few hundred KB before upload, with no model-visible
+        // quality loss.
         maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 92,
       );
     } catch (e) {
       _snack(l10n.homeImagePickerError('$e'));

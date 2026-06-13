@@ -105,9 +105,17 @@ object Constants {
     // older frames are pruned so they never accumulate. ---
     const val CAPTURE_DIR_NAME = "xiangqi"
     const val CAPTURE_FILE_PREFIX = "capture_"
-    const val CAPTURE_FILE_EXT = ".png"
+    const val CAPTURE_FILE_EXT = ".jpg"
     /** Keep at most this many recent capture files on disk. */
     const val CAPTURE_KEEP_FILES = 3
+
+    // --- Capture encoding. Mirrors the vision model's own pixel budget (OpenAI
+    // "high" detail: fit within 2048px, shortest side 768px) so uploads carry
+    // no pixels the model would discard anyway. JPEG 92 keeps the piece glyph
+    // edges crisp while cutting a multi-MB lossless PNG to ~100-300 KB. ---
+    const val CAPTURE_MAX_SHORT_SIDE = 768f
+    const val CAPTURE_MAX_LONG_SIDE = 2048f
+    const val CAPTURE_JPEG_QUALITY = 92
 
     /** Reason text reused for FLAG_SECURE / black-frame failures. */
     const val REASON_FLAG_SECURE =
