@@ -244,7 +244,7 @@ See [`docs/ANDROID_NATIVE.md`](docs/ANDROID_NATIVE.md) for full details.
 | `AI_PROVIDER`                 | `mock`                   | Default vision provider: `mock` \| `gemini` \| `openai`.               |
 | `ENGINE_PROVIDER`             | `mock`                   | Default engine: `mock` \| `pikafish`.                                  |
 | `GEMINI_API_KEY`              | —                        | Required when `AI_PROVIDER=gemini`.                                    |
-| `GEMINI_MODEL`                | `gemini-3-flash-preview` | Gemini vision model id.                                                |
+| `GEMINI_MODEL`                | `gemini-3.5-flash` | Gemini vision model id.                                                |
 | `OPENAI_API_KEY`              | —                        | Required when `AI_PROVIDER=openai`.                                    |
 | `OPENAI_MODEL`                | `gpt-5.4`                | OpenAI vision model id.                                                |
 | `VISION_PREPROCESS`           | `true`                   | Server-side image normalization (EXIF auto-rotate + downscale + JPEG re-encode) before the vision call. |

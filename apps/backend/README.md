@@ -67,7 +67,7 @@ Every variable has a safe mock default (see `.env.example`).
 | `GEMINI_API_KEY`             | _(empty)_                | Required only when `AI_PROVIDER=gemini`                 |
 | `OPENAI_API_KEY`             | _(empty)_                | Required only when `AI_PROVIDER=openai`                 |
 | `OPENAI_MODEL`               | `gpt-5.4`                | OpenAI vision model                                     |
-| `GEMINI_MODEL`               | `gemini-3-flash-preview` | Gemini vision model                                     |
+| `GEMINI_MODEL`               | `gemini-3.5-flash` | Gemini vision model                                     |
 | `VISION_PREPROCESS`          | `true`                   | sharp preprocessing (EXIF rotate + downscale + JPEG) before the vision call |
 | `VISION_IMAGE_SHORT_SIDE`    | `768`                    | Downscale budget: shortest side (px)                    |
 | `VISION_IMAGE_LONG_SIDE`     | `2048`                   | Downscale budget: longest side (px)                     |
