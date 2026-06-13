@@ -50,14 +50,14 @@ good sport.
  │  │  OverlayService (floating button)                               │   │
  │  │  ScreenCaptureService (foreground svc, mediaProjection type)    │   │
  │  │  MediaProjectionPermissionActivity (system consent)             │   │
- │  │  -> saves PNG to app cache                                       │   │
+ │  │  -> saves downscaled JPEG to cache                               │   │
  │  └──────────────────────────────┬──────────────────────────────────┘   │
- │                                 │ PNG file path                         │
+ │                                 │ JPEG file path                        │
  │  ┌──────────────────────────────┴──────────────────────────────────┐   │
  │  │ Flutter HTTP client  --- multipart screenshot --->               │   │
  │  └──────────────────────────────┬──────────────────────────────────┘   │
  └─────────────────────────────────┼──────────────────────────────────────┘
-                                   │  POST /api/analysis/screenshot
+                                   │  POST /api/analysis/screenshot[/stream]
                                    v
  ┌──────────────────────────────────────────────────────────────────────┐
  │ Backend (NestJS)                                                       │
@@ -66,7 +66,7 @@ good sport.
  │        │                                                               │
  │        v                                                               │
  │   AI Vision provider (mock | gemini | openai)                         │
- │        │  raw recognized pieces                                        │
+ │        │  compact 10x9 grid -> pieces                                  │
  │        v                                                               │
  │   Board validator + normalizer  -->  FEN builder                      │
  │        │  legal board + FEN                                            │
@@ -142,6 +142,10 @@ skipped cleanly if Flutter is not installed):
 ```bash
 bash scripts/check.sh
 ```
+
+The same checks run hosted on every push / pull request via GitHub Actions —
+see [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (backend lint +
+unit + e2e + build; Flutter analyze + test).
 
 ---
 
@@ -225,8 +229,8 @@ and make sure both are on the same network.
    launches the official `MediaProjection` consent dialog and resolves `true`
    only if the user grants it.
 3. With both granted, `startSolverMode` starts the foreground service and the
-   floating overlay. `captureScreenshot` then saves a PNG to the app cache and
-   returns its absolute path.
+   floating overlay. `captureScreenshot` then saves a downscaled JPEG to the
+   app cache and returns its absolute path.
 
 See [`docs/ANDROID_NATIVE.md`](docs/ANDROID_NATIVE.md) for full details.
 
@@ -234,19 +238,27 @@ See [`docs/ANDROID_NATIVE.md`](docs/ANDROID_NATIVE.md) for full details.
 
 ## Environment variables (backend)
 
-| Variable             | Default  | Description                                                            |
-| -------------------- | -------- | --------------------------------------------------------------------- |
-| `PORT`               | `3000`   | HTTP port; server binds `0.0.0.0`.                                     |
-| `AI_PROVIDER`        | `mock`   | Default vision provider: `mock` \| `gemini` \| `openai`.              |
-| `ENGINE_PROVIDER`    | `mock`   | Default engine: `mock` \| `pikafish`.                                  |
-| `ENGINE_DEPTH`       | `12`     | Default engine search depth (1..30).                                   |
-| `ENGINE_MOVE_TIME_MS`| `1000`   | Default per-move think time in ms (50..60000).                         |
-| `GEMINI_API_KEY`     | —        | Required when `AI_PROVIDER=gemini`.                                    |
-| `GEMINI_MODEL`       | provider | Gemini vision model id.                                                |
-| `OPENAI_API_KEY`     | —        | Required when `AI_PROVIDER=openai`.                                    |
-| `OPENAI_MODEL`       | provider | OpenAI vision model id.                                                |
-| `PIKAFISH_PATH`      | —        | Absolute path to the Pikafish UCI binary (when `ENGINE_PROVIDER=pikafish`). |
-| `PIKAFISH_NNUE_PATH` | —        | Path to the Pikafish NNUE weights file, if required.                  |
+| Variable                      | Default                  | Description                                                            |
+| ----------------------------- | ------------------------ | ---------------------------------------------------------------------- |
+| `PORT`                        | `3000`                   | HTTP port; server binds `0.0.0.0`.                                     |
+| `AI_PROVIDER`                 | `mock`                   | Default vision provider: `mock` \| `gemini` \| `openai`.               |
+| `ENGINE_PROVIDER`             | `mock`                   | Default engine: `mock` \| `pikafish`.                                  |
+| `GEMINI_API_KEY`              | —                        | Required when `AI_PROVIDER=gemini`.                                    |
+| `GEMINI_MODEL`                | `gemini-3-flash-preview` | Gemini vision model id.                                                |
+| `OPENAI_API_KEY`              | —                        | Required when `AI_PROVIDER=openai`.                                    |
+| `OPENAI_MODEL`                | `gpt-5.4`                | OpenAI vision model id.                                                |
+| `VISION_PREPROCESS`           | `true`                   | Server-side image normalization (EXIF auto-rotate + downscale + JPEG re-encode) before the vision call. |
+| `VISION_IMAGE_SHORT_SIDE`     | `768`                    | Downscale budget: shortest side, px.                                   |
+| `VISION_IMAGE_LONG_SIDE`      | `2048`                   | Downscale budget: longest side, px.                                    |
+| `PIKAFISH_BINARY_PATH`        | —                        | Absolute path to the Pikafish UCI binary (when `ENGINE_PROVIDER=pikafish`). |
+| `PIKAFISH_NNUE_PATH`          | —                        | Path to the Pikafish NNUE weights file; empty = `pikafish.nnue` next to the binary. |
+| `ENGINE_DEFAULT_DEPTH`        | `12`                     | Default engine search depth (1..30).                                   |
+| `ENGINE_DEFAULT_MOVE_TIME_MS` | `1000`                   | Default per-move think time in ms (50..60000).                         |
+| `ENGINE_POOL_SIZE`            | `2`                      | Warm engine pool size — persistent engine processes; also the hard cap on concurrent searches. |
+
+This is the core set. See [`apps/backend/.env.example`](apps/backend/.env.example)
+for the full list (engine UCI tuning, rate limits, hint economy, remote-config
+feature flags, admin API).
 
 Create `apps/backend/.env` (it is gitignored). Example:
 
@@ -305,6 +317,17 @@ the engine provider returns a deterministic best move.
      -F 'sideToMove=red'
    ```
 
+5. Same analysis, **progressively** (NDJSON: one JSON object per line —
+   `{"stage":"received"}` → `{"stage":"board",...}` as soon as vision finishes
+   → `{"stage":"done","data":...}` when the engine is done):
+
+   ```bash
+   curl -sN -X POST http://localhost:3000/api/analysis/screenshot/stream \
+     -F 'screenshot=@./sample.png;type=image/png' \
+     -F 'provider=mock' \
+     -F 'engineProvider=mock'
+   ```
+
 You will get a full `AnalysisResult` envelope back. See
 [`docs/API.md`](docs/API.md) for the exact response shape.
 
@@ -350,18 +373,23 @@ Xiangqi engine that speaks UCI.
 
    ```dotenv
    ENGINE_PROVIDER=pikafish
-   PIKAFISH_PATH=/absolute/path/to/pikafish
+   PIKAFISH_BINARY_PATH=/absolute/path/to/pikafish
    PIKAFISH_NNUE_PATH=/absolute/path/to/pikafish.nnue
    ```
 
-4. Tune with `ENGINE_DEPTH` and/or `ENGINE_MOVE_TIME_MS`, or pass
-   `engineDepth` / `engineMoveTimeMs` per request.
+4. Tune with `ENGINE_DEFAULT_DEPTH` and/or `ENGINE_DEFAULT_MOVE_TIME_MS`, or
+   pass `engineDepth` / `engineMoveTimeMs` per request.
 
-> **TODO (must verify before production):** confirm the exact board orientation
-> our FEN builder produces matches what the real Pikafish binary expects. Our
-> FEN spec is documented in [`docs/API.md`](docs/API.md); validate it against a
-> live Pikafish process (feed a known FEN, compare engine output to a trusted
-> reference) before relying on real-engine results.
+Engines run in a **warm pool**: up to `ENGINE_POOL_SIZE` (default 2)
+persistent Pikafish processes stay alive between requests, so the NNUE net and
+hash load once per process instead of per solve. Pool size is also the hard cap
+on concurrent searches — extra requests queue, and idle engines shut down after
+5 minutes.
+
+> **Note:** the board orientation our FEN builder produces has been verified
+> against the real Pikafish binary (known FENs fed to a live process, engine
+> output compared to a trusted reference). The FEN spec is documented in
+> [`docs/API.md`](docs/API.md).
 
 ---
 
@@ -376,15 +404,16 @@ Xiangqi engine that speaks UCI.
 | App can't reach backend on a **physical device**   | Use the host's LAN IP (e.g. `http://192.168.1.50:3000`); same Wi-Fi; check firewall.                          |
 | Browser/cross-origin call blocked                  | CORS is enabled for all origins in dev. If you locked it down, re-allow your origin or restore dev CORS.       |
 | `cleartext` HTTP blocked on device                 | Android blocks plain HTTP by default in release builds; for local dev use a network-security config or HTTPS.  |
-| Engine results look wrong / mirrored               | Verify FEN orientation against the real Pikafish binary (see Pikafish TODO above).                            |
+| Engine results look wrong / mirrored               | FEN orientation is verified against real Pikafish (see the note above); double-check `sideToMove` and the recognized board in the response `warnings`. |
 
 ---
 
 ## Privacy & policy notes
 
-- **No permanent screenshot storage by default.** Captured PNGs live in the
-  app's cache and are sent for analysis; the backend does not persist images by
-  default. Storage providers, if enabled, are opt-in.
+- **No permanent screenshot storage by default.** Captured screenshots
+  (downscaled JPEGs) live in the app's cache and are sent for analysis; the
+  backend does not persist images by default. Storage providers, if enabled,
+  are opt-in.
 - **API keys live on the backend only.** The mobile app never embeds Gemini /
   OpenAI keys. It only talks to your backend.
 - **No raw image logging.** The backend must not log raw screenshot bytes or
@@ -397,6 +426,7 @@ Xiangqi engine that speaks UCI.
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — layers, boundaries, data flow.
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — solve-latency architecture: warm engine pool, caches, image budgets, streaming.
 - [`docs/API.md`](docs/API.md) — full HTTP API reference + curl examples.
 - [`docs/ANDROID_NATIVE.md`](docs/ANDROID_NATIVE.md) — native components & channels.
 - [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — dev workflow, extending providers/engines.

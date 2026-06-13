@@ -5,7 +5,9 @@ Xiangqi Solver. The system has two deployable units: a **Flutter Android app**
 (`apps/mobile`) and a **NestJS backend** (`apps/backend`). They communicate over
 a single, versioned HTTP contract (see [`API.md`](API.md)). Within the app,
 Dart and native Kotlin communicate over platform channels (see
-[`ANDROID_NATIVE.md`](ANDROID_NATIVE.md)).
+[`ANDROID_NATIVE.md`](ANDROID_NATIVE.md)). Where the solve latency goes — and
+the warm engine pool, caches, and streaming that attack it — is covered in
+[`PERFORMANCE.md`](PERFORMANCE.md).
 
 ---
 
@@ -51,12 +53,13 @@ src/
 │   ├── interceptors/            Response envelope interceptor.
 │   ├── filters/                 Global exception -> error envelope.
 │   ├── dto/                     Shared DTOs / validation pipes.
-│   └── types/                   Shared cross-module types (AnalysisResult, etc.).
+│   ├── types/                   Shared cross-module types (AnalysisResult, etc.).
+│   └── utils/                   LruCache (backs the vision + engine caches).
 └── modules/
     ├── health/                  GET /api/health (envelope-skipped).
     ├── analysis/                Orchestrates vision -> board -> engine.
     │   └── dto/                 Request DTOs for /screenshot and /board.
-    ├── ai/                      Vision abstraction.
+    ├── ai/                      Vision abstraction + sharp image preprocessing.
     │   ├── providers/           mock | gemini | openai implementations.
     │   └── prompts/             Prompt templates for the vision models.
     ├── board/                   Domain: validator + normalizer + FEN/UCI.
@@ -111,37 +114,72 @@ Pikafish without touching vision code.
 
 ## 4. Data flow — capture to result
 
-The two entry points produce the same `AnalysisResult`:
+The entry points produce the same `AnalysisResult`:
 
 - `POST /api/analysis/screenshot` runs **vision → board → engine**.
+- `POST /api/analysis/screenshot/stream` runs the identical pipeline but
+  responds as **NDJSON**, flushing a line per stage so the client can render
+  the recognized board while the engine is still searching:
+  `{"stage":"received"}` → `{"stage":"board","board":{sideToMove,fen,pieces,confidence,warnings}}`
+  → `{"stage":"done","data":<AnalysisResult>}`, or
+  `{"stage":"error","error":{code,message}}` if a failure occurs after
+  streaming began (pre-stream validation errors use the normal envelope).
 - `POST /api/analysis/board` skips vision and runs **board → engine** on a
   position you supply (useful for tests, puzzles, and debugging).
 
 ```
-screenshot (multipart)            board (json)
-        │                              │
-        v                              │
-  [AI VisionProvider]                  │
-   mock|gemini|openai                  │
-        │ recognized pieces            │ given pieces
-        └──────────────┬───────────────┘
+screenshot (multipart, client-downscaled JPEG)        board (json)
+        │                                                  │
+        v                                                  │
+ [vision LRU cache] ── hit (skips preprocess + LLM) ──┐    │
+  key: provider|sideHint|sha256(upload)               │    │
+        │ miss                                        │    │
+        v                                             │    │
+ [image preprocess (sharp)]                           │    │
+  EXIF auto-rotate, downscale to ≤768 short /         │    │
+  ≤2048 long side, JPEG q90 (skipped if in budget)    │    │
+        v                                             │    │
+  [AI VisionProvider]                                 │    │
+   mock|gemini|openai                                 │    │
+        │ compact 10x9 "grid"                         │    │
+        v                                             │    │
+ [grid -> pieces (parser expands; legacy              │    │
+  pieces[] accepted as fallback)] ◄───────────────────┘    │ given pieces
+        └──────────────┬───────────────────────────────────┘
                        v
-              [Board validator]
+            [Board repair / validator]
                        v
               [Board normalizer]  --> warnings[]
                        v
-                 [FEN builder] --> fen, sideToMove
+                 [FEN builder] --> fen, sideToMove   ··> "board" stage (stream)
                        v
-              [EngineProvider]
-               mock|pikafish
-                       │ bestmove (UCI) | none
+ [engine LRU cache] ── hit (skips the engine) ──┐
+  key: provider|fen|limits                      │
+        │ miss                                  │
+        v                                       │
+            [Warm engine pool]                  │
+             mock|pikafish — ENGINE_POOL_SIZE   │
+             persistent processes, bounded      │
+             FIFO queue, 5-min idle shutdown    │
+        │ bestmove (UCI) | none                 │
+        └──────────────┬────────────────────────┘
                        v
             [UCI -> {from,to}/human]
                        v
-                 AnalysisResult
+                 AnalysisResult                      ··> "done" stage (stream)
    { analysisId, board, bestMove, explanation,
      warnings, engine:{provider,ok}, vision:{provider,ok} }
 ```
+
+Cache notes: the vision cache keys on the **original** upload bytes (so a hit
+skips preprocessing too) and only stores **usable** extractions (board
+detected, both generals present); the engine cache stores results with the raw
+UCI transcript stripped.
+
+The mobile app's default `AiProvider` is **`auto`**: the request simply omits
+`provider`, so the backend's `AI_PROVIDER` env decides — letting the operator
+A/B switch the fleet's cloud vision model without an app release. An explicit
+`provider` value still overrides.
 
 Provider/engine failures are **degraded, not fatal**: `engine.ok` /
 `vision.ok` flags and `warnings[]` communicate partial results, and `bestMove`
@@ -159,19 +197,33 @@ User    Flutter        Native(Kotlin)        Backend            AI        Engine
  │         │ ◄───────────────│                   │                │           │
  │         │ captureScreenshot() (MethodChannel)  │               │           │
  │         │────────────────►│ grab frame via MediaProjection     │           │
- │         │                 │ save PNG to cache                  │           │
+ │         │                 │ downscale (≤768/2048) + save JPEG q92          │
  │         │ ◄───────────────│ return absolute path               │           │
  │         │ screenshotCaptured{path,w,h} (event) │               │           │
  │         │                 │                   │                │           │
- │         │ POST /api/analysis/screenshot (multipart PNG) ─────► │           │
+ │         │ POST /api/analysis/screenshot (multipart JPEG) ────► │           │
+ │         │                 │                   │ vision cache? — on miss:   │
+ │         │                 │                   │ preprocess (sharp), then   │
  │         │                 │                   │ recognize ───► │           │
- │         │                 │                   │ ◄───── pieces  │           │
- │         │                 │                   │ validate+normalize+FEN     │
- │         │                 │                   │ bestmove ─────────────────►│
+ │         │                 │                   │ ◄── 10x9 grid  │           │
+ │         │                 │                   │ grid->pieces, repair+      │
+ │         │                 │                   │ normalize+FEN              │
+ │         │                 │                   │ engine cache? — on miss:   │
+ │         │                 │                   │ bestmove ───► warm pool ──►│
  │         │                 │                   │ ◄──────────── UCI bestmove │
+ │         │                 │                   │ UCI -> {from,to}/human     │
  │         │ ◄─────────────────── AnalysisResult (JSON envelope)  │           │
  │ ◄─── overlay shows best move + score + explanation             │           │
 ```
+
+The streaming variant (`POST /api/analysis/screenshot/stream`) is the same
+round trip, except the backend flushes `{"stage":"received"}` on upload and
+`{"stage":"board",...}` as soon as repair/normalize/FEN finish — so the
+overlay can draw the recognized board **before** the engine returns — then
+`{"stage":"done","data":AnalysisResult}`. Because the warm engine pool keeps
+persistent Pikafish processes (no spawn-per-request), warm solves are
+engine-bound rather than startup-bound, and cache hits short-circuit the AI
+and engine hops entirely.
 
 If overlay/projection permissions are not granted, native emits
 `permissionDenied{permission}` and the flow stops before capture. On capture
