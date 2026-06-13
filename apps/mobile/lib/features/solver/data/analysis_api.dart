@@ -100,7 +100,8 @@ class AnalysisApi {
     EngineOptions options = const EngineOptions(),
   }) async {
     final payload = <String, dynamic>{
-      if (provider != null) 'provider': provider.wireValue,
+      // `auto` omits the field: the backend's AI_PROVIDER decides.
+      if (provider?.wireValueOrNull != null) 'provider': provider!.wireValueOrNull,
       'sideToMove': sideToMove.wireValue,
       'pieces': pieces.map((p) => p.toJson()).toList(growable: false),
       'language': ?language,
@@ -140,7 +141,8 @@ class AnalysisApi {
         screenshot.path,
         filename: _fileName(screenshot.path),
       ),
-      if (provider != null) 'provider': provider.wireValue,
+      // `auto` omits the field: the backend's AI_PROVIDER decides.
+      if (provider?.wireValueOrNull != null) 'provider': provider!.wireValueOrNull,
       if (sideToMove != null) 'sideToMove': sideToMove.wireValue,
       'language': ?language,
       ...options.toJsonFields().map((k, v) => MapEntry(k, '$v')),
@@ -179,7 +181,8 @@ class AnalysisApi {
         screenshot.path,
         filename: _fileName(screenshot.path),
       ),
-      if (provider != null) 'provider': provider.wireValue,
+      // `auto` omits the field: the backend's AI_PROVIDER decides.
+      if (provider?.wireValueOrNull != null) 'provider': provider!.wireValueOrNull,
       if (sideToMove != null) 'sideToMove': sideToMove.wireValue,
       'language': ?language,
       ...options.toJsonFields().map((k, v) => MapEntry(k, '$v')),
@@ -282,7 +285,8 @@ class AnalysisApi {
         screenshot.path,
         filename: _fileName(screenshot.path),
       ),
-      if (provider != null) 'provider': provider.wireValue,
+      // `auto` omits the field: the backend's AI_PROVIDER decides.
+      if (provider?.wireValueOrNull != null) 'provider': provider!.wireValueOrNull,
       if (sideToMove != null) 'sideToMove': sideToMove.wireValue,
     });
     final response = await _client.postMultipart(

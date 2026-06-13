@@ -30,16 +30,19 @@ class AppConstants {
     defaultValue: 'http://103.157.205.175:3000',
   );
 
-  /// Default AI (vision) provider. One of: gemini | openai | mock.
+  /// Default AI (vision) provider. One of: auto | gemini | openai | mock.
   ///
-  /// Defaults to the REAL provider so a shipped release asks the backend for
-  /// real board recognition. The backend honors an explicit value, so a `mock`
-  /// default would make every "our key" cloud analysis return a FAKE board.
-  /// For offline/local dev against the mock backend, override with
-  /// `--dart-define=AI_PROVIDER=mock` or pick "Mock" in Settings → Providers.
+  /// `auto` OMITS the provider field from requests, so the BACKEND's
+  /// `AI_PROVIDER` decides (openai on the deployed server) — this is what lets
+  /// the operator A/B switch cloud vision (e.g. to Gemini 3 Flash) for the
+  /// whole fleet without an app release. An explicit value still overrides the
+  /// server. For offline/local dev against the mock backend, override with
+  /// `--dart-define=AI_PROVIDER=mock` or pick "Mock" in Settings → Providers
+  /// (the local backend's own zero-config default is mock, so `auto` works
+  /// there too).
   static const String defaultAiProvider = String.fromEnvironment(
     'AI_PROVIDER',
-    defaultValue: 'openai',
+    defaultValue: 'auto',
   );
 
   /// Default engine provider. One of: pikafish | mock. Real by default for the
