@@ -39,7 +39,7 @@ export class GeminiVisionProvider implements AiVisionProvider {
       });
     }
 
-    const model = ai?.geminiModel ?? 'gemini-3-flash-preview';
+    const model = ai?.geminiModel ?? 'gemini-3.5-flash';
     const url = `${GEMINI_BASE_URL}/${encodeURIComponent(model)}:generateContent`;
 
     const body = {

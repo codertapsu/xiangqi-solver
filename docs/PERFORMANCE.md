@@ -200,7 +200,7 @@ position).
 | `VISION_IMAGE_LONG_SIDE` | `2048` (512..8192)       | Target longest side for the vision payload.                                                                                                                                      |
 | `AI_PROVIDER`            | `mock`                   | Default vision provider when the request omits `provider`. The app's default provider is **`auto`**, which omits the field — so this one env var A/B-switches cloud vision fleet-wide (e.g. to Gemini 3 Flash) without an app release. Explicit per-request values still override. |
 | `OPENAI_MODEL`           | `gpt-5.4`                | OpenAI vision model id.                                                                                                                                                          |
-| `GEMINI_MODEL`           | `gemini-3-flash-preview` | Gemini vision model id.                                                                                                                                                          |
+| `GEMINI_MODEL`           | `gemini-3.5-flash` | Gemini vision model id.                                                                                                                                                          |
 
 Per-request engine knobs are clamped by the DTOs: `engineThreads` ≤ 8,
 `engineHashMb` ≤ 1024 — a single request cannot commandeer the host.
