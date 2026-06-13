@@ -43,6 +43,8 @@
   "backendHealthFailedShort": "Không kết nối được máy chủ.",
 
   "statusAnalyzing": "Đang phân tích…",
+  "statusBoardRecognized": "\u0110\u00e3 nh\u1eadn di\u1ec7n b\u00e0n c\u1edd ({count} qu\u00e2n)",
+  "statusComputingMove": "\u0110ang t\u00ednh n\u01b0\u1edbc \u0111i t\u1ed1t nh\u1ea5t\u2026",
   "statusNoMove": "Không tìm thấy nước đi",
   "statusAnalysisFailed": "Phân tích thất bại",
 
@@ -85,6 +87,7 @@
   "sideBlack": "Đen",
   "sideUnknown": "Chưa rõ",
 
+  "aiProviderAuto": "T\u1ef1 \u0111\u1ed9ng (theo m\u00e1y ch\u1ee7)",
   "aiProviderGemini": "Gemini",
   "aiProviderOpenai": "OpenAI",
   "providerMock": "Thử nghiệm",

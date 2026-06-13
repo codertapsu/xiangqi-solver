@@ -88,10 +88,30 @@ class DioClient {
     );
   }
 
+  /// Multipart POST whose response BODY is consumed as a byte stream (used for
+  /// the progressive NDJSON analysis endpoint). The caller is responsible for
+  /// draining `response.data.stream`. `receiveTimeout` applies BETWEEN chunks,
+  /// so a live stream may outlast it in total.
+  Future<Response<ResponseBody>> postMultipartStream(
+    String path, {
+    required FormData formData,
+  }) {
+    return _guard(
+      () => _dio.post<ResponseBody>(
+        path,
+        data: formData,
+        options: Options(
+          contentType: 'multipart/form-data',
+          responseType: ResponseType.stream,
+        ),
+      ),
+    );
+  }
+
   /// Wraps a Dio call, translating [DioException]s into [NetworkException]s
   /// with friendly messages.
-  Future<Response<dynamic>> _guard(
-    Future<Response<dynamic>> Function() run,
+  Future<Response<T>> _guard<T>(
+    Future<Response<T>> Function() run,
   ) async {
     try {
       return await run();

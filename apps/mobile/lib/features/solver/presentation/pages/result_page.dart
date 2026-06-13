@@ -32,9 +32,14 @@ class ResultPage extends ConsumerWidget {
         icon: Icons.info_outline,
         message: l10n.resultIdle,
       ),
-      AnalysisLoading() => _CenteredMessage(
-        icon: Icons.hourglass_top,
-        message: l10n.statusAnalyzing,
+      // Progressive solve: once the streaming endpoint has recognized the
+      // board, say so (with the piece count) while the engine still searches.
+      AnalysisLoading(:final board) => _CenteredMessage(
+        icon: board == null ? Icons.hourglass_top : Icons.grid_on,
+        message: board == null
+            ? l10n.statusAnalyzing
+            : l10n.statusBoardRecognized(board.pieces.length),
+        detail: board == null ? null : l10n.statusComputingMove,
         showSpinner: true,
       ),
       AnalysisError(:final failure) => _CenteredMessage(

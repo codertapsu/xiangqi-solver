@@ -46,6 +46,13 @@
   "backendHealthFailedShort": "Couldn't reach the backend.",
 
   "statusAnalyzing": "Analyzing…",
+  "statusBoardRecognized": "Board recognized ({count} pieces)",
+  "@statusBoardRecognized": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "statusComputingMove": "Computing the best move\u2026",
   "statusNoMove": "No move found",
   "statusAnalysisFailed": "Analysis failed",
 
@@ -92,6 +99,7 @@
   "sideBlack": "Black",
   "sideUnknown": "Unknown",
 
+  "aiProviderAuto": "Auto (server default)",
   "aiProviderGemini": "Gemini",
   "aiProviderOpenai": "OpenAI",
   "providerMock": "Test",

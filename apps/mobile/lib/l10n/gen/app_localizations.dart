@@ -308,6 +308,18 @@ abstract class AppLocalizations {
   /// **'Analyzing…'**
   String get statusAnalyzing;
 
+  /// No description provided for @statusBoardRecognized.
+  ///
+  /// In en, this message translates to:
+  /// **'Board recognized ({count} pieces)'**
+  String statusBoardRecognized(Object count);
+
+  /// No description provided for @statusComputingMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Computing the best move…'**
+  String get statusComputingMove;
+
   /// No description provided for @statusNoMove.
   ///
   /// In en, this message translates to:
@@ -517,6 +529,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unknown'**
   String get sideUnknown;
+
+  /// No description provided for @aiProviderAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto (server default)'**
+  String get aiProviderAuto;
 
   /// No description provided for @aiProviderGemini.
   ///

@@ -139,6 +139,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     _openResult();
   }
 
+  /// Progressive solve: as soon as the streamed board stage lands, open the
+  /// result page so the user sees the recognized position while the engine is
+  /// still computing (the page renders [AnalysisLoading.board] reactively).
+  void _maybeOpenResultEarly(AnalysisStatus status) {
+    if (status is AnalysisLoading && status.board != null && mounted) {
+      _openResult();
+    }
+  }
+
   /// Opens the result screen, but never stacks a second copy. The result page
   /// reads [analysisProvider] reactively, so when one is already showing (e.g.
   /// several captures in a row) it just refreshes in place. This keeps a single
@@ -209,6 +218,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     final analysisStatus = ref.watch(analysisProvider);
     final native = ref.watch(nativeSolverProvider);
     final remoteConfig = ref.watch(remoteConfigProvider);
+
+    // Open the result page as soon as a streamed board stage lands.
+    ref.listen<AnalysisStatus>(analysisProvider, (_, next) {
+      _maybeOpenResultEarly(next);
+    });
 
     // Surface transient solver-mode messages as snackbars.
     ref.listen(solverModeProvider, (prev, next) {

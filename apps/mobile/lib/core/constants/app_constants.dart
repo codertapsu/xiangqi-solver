@@ -101,6 +101,11 @@ class AppConstants {
   static const String configPath = '$apiPrefix/config';
   static const String analyzeBoardPath = '$apiPrefix/analysis/board';
   static const String analyzeScreenshotPath = '$apiPrefix/analysis/screenshot';
+
+  /// Progressive (NDJSON) variant of [analyzeScreenshotPath]: emits the
+  /// recognized board as soon as vision finishes, then the full result.
+  static const String analyzeScreenshotStreamPath =
+      '$apiPrefix/analysis/screenshot/stream';
   static const String analyzeExtractPath = '$apiPrefix/analysis/extract';
 
   /// Install-grant: starting hint balance for this device on (re)install.
