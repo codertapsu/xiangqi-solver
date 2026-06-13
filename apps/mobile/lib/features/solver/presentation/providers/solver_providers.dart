@@ -86,10 +86,15 @@ final deviceIdProvider = Provider<String>((ref) {
 });
 
 /// Dio client kept in sync with the configured backend URL.
+///
+/// Watches ONLY the backend URL (not the whole settings object): rebuilding
+/// the client on every settings patch — overlay side toggles, slider drags,
+/// language changes — closed the connection pool mid-session, so the next
+/// solve paid a fresh TCP handshake.
 final dioClientProvider = Provider<DioClient>((ref) {
-  final settings = ref.watch(settingsProvider);
+  final backendUrl = ref.watch(settingsProvider.select((s) => s.backendUrl));
   final client = DioClient(
-    baseUrl: settings.backendUrl,
+    baseUrl: backendUrl,
     deviceId: ref.watch(deviceIdProvider),
   );
   ref.onDispose(client.raw.close);
@@ -321,7 +326,10 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
           message: AppL10n.current.solverStopped,
         );
       case ScreenshotCapturedEvent(:final path):
-        state = state.copyWith(lastEvent: event, isBusy: false);
+        // Keep isBusy: the capture is only the START of the real wait
+        // (upload + vision + engine). AnalysisNotifier clears it when the
+        // analysis settles, so progress indicators span the whole solve.
+        state = state.copyWith(lastEvent: event, isBusy: true);
         _emitAnalyze(path);
       case ScreenshotFailedEvent(:final reason):
         state = state.copyWith(
@@ -469,6 +477,12 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
 
   void clearMessage() => state = state.copyWith(clearMessage: true);
 
+  /// Lets the analysis flow keep the busy indicator honest: it stays on from
+  /// capture until the solve settles (see [AnalysisNotifier._apply]).
+  void setBusy(bool value) {
+    if (state.isBusy != value) state = state.copyWith(isBusy: value);
+  }
+
   @override
   void dispose() {
     unawaited(_eventSub?.cancel());
@@ -553,17 +567,33 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     final wallet = _ref.read(walletProvider.notifier);
 
     if (s.usesBackend && !wallet.canSpend()) {
-      state = AnalysisError(
-        UnknownFailure(
-          AppL10n.current.hintsOutOfHints,
-          code: 'NO_HINTS',
-        ),
+      final failure = UnknownFailure(
+        AppL10n.current.hintsOutOfHints,
+        code: 'NO_HINTS',
       );
+      state = AnalysisError(failure);
+      _ref.read(solverModeProvider.notifier).setBusy(false);
+      // The overlay showed "Analyzing…" on the tap — settle it too, or a
+      // Solver-Mode user out of hints watches a spinner forever.
+      _pushOverlayError(failure);
       return;
     }
 
     state = const AnalysisLoading();
-    final run = await _route(file, s);
+    final _RunOutcome run;
+    try {
+      run = await _route(file, s);
+    } catch (e) {
+      // _route's legs normally return ApiResult failures, but an unexpected
+      // throw (e.g. the engine-resolver future erroring) must not wedge the
+      // Loading state and the solver-mode busy indicator forever.
+      _log.warn('Analysis route threw: $e');
+      await _apply(
+        ApiResult.failure(UnknownFailure('$e', code: 'ANALYSIS_FAILED')),
+        screenshotPath: file.path,
+      );
+      return;
+    }
 
     // Charge by what ACTUALLY ran (after any backend fallback), not the
     // originally-selected mode: our OpenAI key reading the board = 1 full hint;
@@ -759,6 +789,9 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     ApiResult<AnalysisResult> result, {
     String? screenshotPath,
   }) async {
+    // The solve settled (either way) — release the solver-mode busy indicator
+    // that has been on since capture.
+    _ref.read(solverModeProvider.notifier).setBusy(false);
     await result.when(
       success: (value) async {
         state = AnalysisSuccess(value, screenshotPath: screenshotPath);
@@ -832,8 +865,19 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
       final base = await getApplicationSupportDirectory();
       final dir = Directory('${base.path}/history_screenshots');
       await dir.create(recursive: true);
-      final safeId = analysisId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
-      final dest = '${dir.path}/$safeId.png';
+      // Guard against an empty/garbage id (on-device results may not carry a
+      // UUID): a constant dest like "<dir>/.jpg" would make every fully-local
+      // solve overwrite the same file.
+      final rawId = analysisId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+      final safeId = rawId.isEmpty
+          ? 'local_${DateTime.now().millisecondsSinceEpoch}'
+          : rawId;
+      // Preserve the source encoding: captures are JPEG now, picker/share
+      // files can be either. (Flutter decodes by magic bytes, but a truthful
+      // extension keeps the files debuggable.)
+      final lower = sourcePath.toLowerCase();
+      final ext = lower.endsWith('.jpg') || lower.endsWith('.jpeg') ? '.jpg' : '.png';
+      final dest = '${dir.path}/$safeId$ext';
       if (dest != src.path) await src.copy(dest);
       // Keep only the last N (server-configurable) screenshots on disk, so
       // storage tracks the retention shown to the user in Settings.

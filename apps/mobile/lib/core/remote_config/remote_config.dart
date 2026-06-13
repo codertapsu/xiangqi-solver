@@ -88,7 +88,10 @@ class RemoteConfig extends Equatable {
     rewardedAds: false,
     bannerAds: true,
     appOpenAds: false,
-    useRealAds: true,
+    // Fail-safe: NEVER serve real ad units until the server explicitly enables
+    // them (matches the field contract above and AdHelper's documented
+    // behavior — an offline fresh install must fall back to Google TEST units).
+    useRealAds: false,
     freeHintsOnInstall: 10,
     ownKeyHintDivisor: 3,
     onDeviceEnabled: true,
