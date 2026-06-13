@@ -6,9 +6,9 @@ import { EngineBestMoveInput, EngineBestMoveResult } from './engine.interface';
 
 const FEN = 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1';
 
-function buildConfig(): ConfigService {
+function buildConfig(engine: Record<string, unknown> = { provider: 'pikafish' }): ConfigService {
   return {
-    get: (key: string) => (key === 'app.engine' ? { provider: 'pikafish' } : undefined),
+    get: (key: string) => (key === 'app.engine' ? engine : undefined),
   } as unknown as ConfigService;
 }
 
@@ -85,5 +85,34 @@ describe('EngineService result cache', () => {
     await expect(svc.getBestMove(input)).rejects.toThrow('engine down');
     await expect(svc.getBestMove(input)).rejects.toThrow('engine down');
     expect(failing.calls).toBe(2);
+  });
+});
+
+describe('EngineService provider enforcement', () => {
+  const pikafishStub = {
+    name: 'pikafish',
+    async getBestMove() {
+      return {} as EngineBestMoveResult;
+    },
+  } as unknown as PikafishEngineService;
+
+  it('honors the client engineProvider when enforce is off', () => {
+    const svc = new EngineService(
+      buildConfig({ provider: 'pikafish', providerEnforce: false }),
+      new MockEngineService(),
+      pikafishStub,
+    );
+    expect(svc.effectiveProviderName('mock')).toBe('mock');
+    expect(svc.resolve('mock').name).toBe('mock');
+  });
+
+  it('ignores the client engineProvider and uses the default when enforce is on', () => {
+    const svc = new EngineService(
+      buildConfig({ provider: 'pikafish', providerEnforce: true }),
+      new MockEngineService(),
+      pikafishStub,
+    );
+    expect(svc.effectiveProviderName('mock')).toBe('pikafish');
+    expect(svc.resolve('mock').name).toBe('pikafish');
   });
 });

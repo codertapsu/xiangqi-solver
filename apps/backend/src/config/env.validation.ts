@@ -29,6 +29,15 @@ export const envSchema = z.object({
 
   AI_PROVIDER: aiProviderSchema.default('mock'),
   ENGINE_PROVIDER: engineProviderSchema.default('mock'),
+  // Operator authority over which provider runs. The analysis endpoints accept
+  // an optional per-request provider/engineProvider, and by default the server
+  // HONORS it (handy for dev: a client can request mock). Set these true in
+  // production so the server ALWAYS uses AI_PROVIDER/ENGINE_PROVIDER regardless
+  // of what the app sends — this lets you switch the fleet's cloud vision (e.g.
+  // openai -> gemini) for ALREADY-INSTALLED apps via a restart, no app release.
+  // Default false to keep the e2e/dev "request mock" override working.
+  AI_PROVIDER_ENFORCE: boolFromEnv(false),
+  ENGINE_PROVIDER_ENFORCE: boolFromEnv(false),
 
   // AI credentials (optional; required only by the matching real provider).
   // Default real provider is OpenAI (gpt-5.4). To switch the cloud vision to

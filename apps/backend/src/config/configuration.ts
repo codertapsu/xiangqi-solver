@@ -9,6 +9,10 @@ export interface AppConfig {
   port: number;
   ai: {
     provider: 'gemini' | 'openai' | 'mock';
+    /** When true, IGNORE the client-supplied provider and always use `provider`
+     *  (operator authority — lets the server switch the fleet's cloud vision
+     *  even for already-installed apps that send an explicit provider). */
+    providerEnforce: boolean;
     geminiApiKey: string;
     openaiApiKey: string;
     openaiModel: string;
@@ -20,6 +24,9 @@ export interface AppConfig {
   };
   engine: {
     provider: 'pikafish' | 'mock';
+    /** When true, IGNORE the client-supplied engineProvider and always use
+     *  `provider` (operator authority — symmetric with ai.providerEnforce). */
+    providerEnforce: boolean;
     pikafishBinaryPath: string;
     pikafishNnuePath: string;
     /** File served at GET /api/engine/net — the Pikafish master-net the ON-DEVICE
@@ -90,6 +97,7 @@ export function configuration(): { app: AppConfig } {
     port: env.PORT,
     ai: {
       provider: env.AI_PROVIDER,
+      providerEnforce: env.AI_PROVIDER_ENFORCE,
       geminiApiKey: env.GEMINI_API_KEY,
       openaiApiKey: env.OPENAI_API_KEY,
       openaiModel: env.OPENAI_MODEL,
@@ -100,6 +108,7 @@ export function configuration(): { app: AppConfig } {
     },
     engine: {
       provider: env.ENGINE_PROVIDER,
+      providerEnforce: env.ENGINE_PROVIDER_ENFORCE,
       pikafishBinaryPath: env.PIKAFISH_BINARY_PATH,
       pikafishNnuePath: env.PIKAFISH_NNUE_PATH,
       onDeviceNetPath: env.ONDEVICE_NET_PATH,

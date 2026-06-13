@@ -19,6 +19,16 @@ describe('Backend (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
+    // Hermetic: never inherit the developer's .env (which may pin a real
+    // provider and/or AI_PROVIDER_ENFORCE=true). Force the deterministic mock
+    // providers with enforcement OFF so the per-request `provider=mock` the
+    // tests send is honored. dotenv does not override an already-set
+    // process.env var, so these win over .env when ConfigModule loads below.
+    process.env.AI_PROVIDER = 'mock';
+    process.env.ENGINE_PROVIDER = 'mock';
+    process.env.AI_PROVIDER_ENFORCE = 'false';
+    process.env.ENGINE_PROVIDER_ENFORCE = 'false';
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
