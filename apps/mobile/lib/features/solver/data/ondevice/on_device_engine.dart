@@ -60,6 +60,10 @@ abstract interface class OnDeviceEngine {
     int? hashMb,
     int? multiPv,
   });
+
+  /// Release any warm engine process/memory. Safe to call repeatedly; a later
+  /// [bestMove] may start a fresh process.
+  void dispose() {}
 }
 
 /// Placeholder used until a real engine is bundled/runnable. Keeps the app
@@ -83,4 +87,7 @@ class UnavailableOnDeviceEngine implements OnDeviceEngine {
       code: 'ENGINE_NOT_BUNDLED',
     );
   }
+
+  @override
+  void dispose() {}
 }

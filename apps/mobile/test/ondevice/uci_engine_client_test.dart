@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xiangqi_solver/features/solver/data/ondevice/on_device_engine.dart';
 import 'package:xiangqi_solver/features/solver/data/ondevice/uci_engine_client.dart';
 import 'package:xiangqi_solver/features/solver/domain/board_piece.dart';
+import 'package:xiangqi_solver/features/solver/domain/board_state.dart';
+import 'package:xiangqi_solver/features/solver/domain/solver_enums.dart';
 
 /// A tiny shell script that mimics Pikafish's UCI handshake so the client can be
 /// exercised end-to-end (spawn → handshake → options → search → parse) on the
@@ -157,5 +159,133 @@ void main() {
       final engine = ProcessOnDeviceEngine(binaryPath: enginePath, nnuePath: nnuePath);
       expect(engine.isAvailable, isTrue);
     });
+  });
+
+  group('WarmUciSession (persistent engine)', warmSessionTests);
+}
+
+/// Counting fake: appends a line to a spawn-count file each time it starts, so
+/// tests can assert process reuse across searches.
+String _countingEngine(String countFile) => '''#!/bin/sh
+echo spawn >> "$countFile"
+while IFS= read -r line; do
+  case "\$line" in
+    uci) echo "uciok" ;;
+    isready) echo "readyok" ;;
+    go*)
+      echo "info depth 12 score cp 42 multipv 1 pv b2e2"
+      echo "bestmove b2e2"
+      ;;
+    quit) exit 0 ;;
+  esac
+done
+''';
+
+void warmSessionTests() {
+  late Directory dir;
+  late String nnuePath;
+
+  Future<String> writeEngine(String name, String body) async {
+    final file = File('${dir.path}/$name');
+    await file.writeAsString(body);
+    await Process.run('chmod', ['+x', file.path]);
+    return file.path;
+  }
+
+  int spawnsIn(String path) {
+    final f = File(path);
+    if (!f.existsSync()) return 0;
+    return f.readAsLinesSync().where((l) => l.isNotEmpty).length;
+  }
+
+  setUp(() async {
+    dir = await Directory.systemTemp.createTemp('uci_warm');
+    final net = File('${dir.path}/fake.nnue')..writeAsStringSync('not-a-real-net');
+    nnuePath = net.path;
+  });
+
+  tearDown(() async {
+    if (dir.existsSync()) await dir.delete(recursive: true);
+  });
+
+  const fen = 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1';
+
+  test('reuses ONE warm process across sequential searches', () async {
+    final countFile = '${dir.path}/spawns.txt';
+    final enginePath = await writeEngine('warm.sh', _countingEngine(countFile));
+    final session = WarmUciSession(binaryPath: enginePath, nnuePath: nnuePath);
+    try {
+      for (var i = 0; i < 3; i++) {
+        final move = await session.search(fen: fen, depth: 12);
+        expect(move.uci, 'b2e2');
+      }
+      expect(spawnsIn(countFile), 1);
+      expect(session.isWarm, isTrue);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  test('serializes concurrent searches on one process', () async {
+    final countFile = '${dir.path}/spawns2.txt';
+    final enginePath = await writeEngine('warm2.sh', _countingEngine(countFile));
+    final session = WarmUciSession(binaryPath: enginePath, nnuePath: nnuePath);
+    try {
+      final results = await Future.wait([
+        session.search(fen: fen, depth: 12),
+        session.search(fen: fen, depth: 12),
+        session.search(fen: fen, depth: 12),
+      ]);
+      expect(results.every((m) => m.uci == 'b2e2'), isTrue);
+      expect(spawnsIn(countFile), 1);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  test('restarts a fresh process after dispose()', () async {
+    final countFile = '${dir.path}/spawns3.txt';
+    final enginePath = await writeEngine('warm3.sh', _countingEngine(countFile));
+    final session = WarmUciSession(binaryPath: enginePath, nnuePath: nnuePath);
+    try {
+      await session.search(fen: fen, depth: 12);
+      session.dispose();
+      expect(session.isWarm, isFalse);
+      final move = await session.search(fen: fen, depth: 12);
+      expect(move.uci, 'b2e2');
+      expect(spawnsIn(countFile), 2);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  test('ProcessOnDeviceEngine keeps one warm session across bestMove calls', () async {
+    final countFile = '${dir.path}/spawns4.txt';
+    final enginePath = await writeEngine('warm4.sh', _countingEngine(countFile));
+    final engine = ProcessOnDeviceEngine(binaryPath: enginePath, nnuePath: nnuePath);
+    const board = BoardState(
+      sideToMove: SideToMove.red,
+      fen: fen,
+      pieces: [
+        BoardPiece(
+          color: PieceColor.red,
+          type: PieceType.king,
+          position: BoardPosition(file: 4, rank: 0),
+        ),
+        BoardPiece(
+          color: PieceColor.black,
+          type: PieceType.king,
+          position: BoardPosition(file: 4, rank: 9),
+        ),
+      ],
+      confidence: 1,
+    );
+    try {
+      await engine.bestMove(board, depth: 12);
+      await engine.bestMove(board, depth: 12);
+      expect(spawnsIn(countFile), 1);
+    } finally {
+      engine.dispose();
+    }
   });
 }

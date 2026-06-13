@@ -123,10 +123,16 @@ final onDeviceEngineResolverProvider = Provider<OnDeviceEngineResolver>((ref) {
 /// The resolved on-device engine. Recomputes when the downloaded net becomes
 /// ready: the binary ships in the APK, the net is fetched at runtime
 /// ([engineNetProvider]), so this is [UnavailableOnDeviceEngine] until both exist.
-final onDeviceEngineProvider = FutureProvider<OnDeviceEngine>((ref) {
+///
+/// The engine instance is CACHED by this provider across solves, so its warm
+/// UCI session (process + loaded NNUE) is reused; disposal on rebuild releases
+/// the old session's memory.
+final onDeviceEngineProvider = FutureProvider<OnDeviceEngine>((ref) async {
   final net = ref.watch(engineNetProvider);
   final nnuePath = net is EngineNetReady ? net.path : null;
-  return ref.watch(onDeviceEngineResolverProvider).resolve(nnuePath);
+  final engine = await ref.watch(onDeviceEngineResolverProvider).resolve(nnuePath);
+  ref.onDispose(engine.dispose);
+  return engine;
 });
 
 /// Direct OpenAI vision client (BYO key) for the on-device path.
