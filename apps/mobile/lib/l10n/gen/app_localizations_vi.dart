@@ -124,6 +124,14 @@ class AppLocalizationsVi extends AppLocalizations {
   String get statusAnalyzing => 'Đang phân tích…';
 
   @override
+  String statusBoardRecognized(Object count) {
+    return 'Đã nhận diện bàn cờ ($count quân)';
+  }
+
+  @override
+  String get statusComputingMove => 'Đang tính nước đi tốt nhất…';
+
+  @override
   String get statusNoMove => 'Không tìm thấy nước đi';
 
   @override
@@ -237,6 +245,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get sideUnknown => 'Chưa rõ';
+
+  @override
+  String get aiProviderAuto => 'Tự động (theo máy chủ)';
 
   @override
   String get aiProviderGemini => 'Gemini';

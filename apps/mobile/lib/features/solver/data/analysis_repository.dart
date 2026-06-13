@@ -61,6 +61,30 @@ class AnalysisRepository {
     );
   }
 
+  /// Progressive analysis: [onBoard] fires when the board is recognized (the
+  /// engine is still searching); resolves with the full result. Fails with
+  /// code `STREAM_UNAVAILABLE` when the backend lacks the streaming endpoint —
+  /// callers fall back to [analyzeScreenshot].
+  Future<ApiResult<AnalysisResult>> analyzeScreenshotStreamed(
+    File screenshot, {
+    AiProvider? provider,
+    SideToMove? sideToMove,
+    String? language,
+    EngineOptions options = const EngineOptions(),
+    required void Function(BoardState board) onBoard,
+  }) {
+    return _run(
+      () => _api.analyzeScreenshotStreamed(
+        screenshot,
+        provider: provider,
+        sideToMove: sideToMove,
+        language: language,
+        options: options,
+        onBoard: onBoard,
+      ),
+    );
+  }
+
   /// Vision-only board recognition (no engine) — board + vision warnings.
   Future<ApiResult<({BoardState board, List<String> warnings})>> extractBoard(
     File screenshot, {
