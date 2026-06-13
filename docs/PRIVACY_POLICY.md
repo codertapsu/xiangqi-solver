@@ -1,14 +1,17 @@
 # Privacy Policy — Xiangqi Solver
 
-_Last updated: [DATE]. This is a DRAFT template — review it (ideally with a lawyer),
-fill in the bracketed values, host it at a public URL, and paste that URL into Google
-Play Console (App content → Privacy policy) and the in-app Settings/About._
+_Last updated: June 13, 2026._
 
-> **Note:** the LIVE policy page (hosted on codertapsu-web) must be regenerated from
-> this text whenever this file changes — this document is the source of truth.
+> **Published:** the LIVE page is generated from the `xiangqi-solver` entry in
+> `codertapsu-web/apps.json` and served at
+> <https://codertapsu-web.web.app/xiangqi-solver/privacy> (the URL used by Google
+> Play Console and the in-app Settings/About). Whenever this file changes, update
+> that apps.json entry to match and redeploy (`firebase deploy --only hosting`) —
+> THIS document is the source of truth for the wording. Not legal advice; have a
+> lawyer review material changes.
 
-**Developer:** [YOUR NAME / COMPANY]
-**Contact:** [YOUR SUPPORT EMAIL]
+**Developer:** Codertapsu
+**Contact:** hoangduykhanh21@gmail.com
 
 Xiangqi Solver ("the app") helps you analyze a Chinese-chess (Xiangqi) board. This
 policy explains what data the app handles and why.
@@ -63,7 +66,7 @@ in the background.
   cloud engine), or the fully on-device mode to send nothing at all.
 - Manage/reset your advertising id and ad personalization in Android settings; adjust ad
   consent via the in-app consent options where shown.
-- Contact us at [YOUR SUPPORT EMAIL] to request deletion of your device identifier from
+- Contact us at hoangduykhanh21@gmail.com to request deletion of your device identifier from
   our install-grant ledger.
 
 ## Children
@@ -78,4 +81,4 @@ above.
 
 ## Contact
 
-[YOUR NAME / COMPANY] — [YOUR SUPPORT EMAIL]
+Codertapsu — hoangduykhanh21@gmail.com
