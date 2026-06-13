@@ -39,6 +39,13 @@ export const envSchema = z.object({
   OPENAI_API_KEY: z.string().default(''),
   OPENAI_MODEL: z.string().default('gpt-5.4'),
   GEMINI_MODEL: z.string().default('gemini-3-flash-preview'),
+  // Vision-image normalization. Providers downscale internally anyway (OpenAI
+  // "high" detail: fit in 2048px then shortest side 768px), so pixels beyond
+  // that budget only cost upload time and tiles. We mirror the budget server-
+  // side and re-encode as JPEG before base64'ing the image into the API call.
+  VISION_PREPROCESS: boolFromEnv(true),
+  VISION_IMAGE_SHORT_SIDE: intFromEnv(768, 256, 4096),
+  VISION_IMAGE_LONG_SIDE: intFromEnv(2048, 512, 8192),
 
   // Engine settings.
   PIKAFISH_BINARY_PATH: z.string().default(''),
@@ -57,6 +64,10 @@ export const envSchema = z.object({
   ENGINE_HASH_MB: intFromEnv(128, 1, 32768),
   ENGINE_MULTIPV: intFromEnv(1, 1, 10),
   ENGINE_MOVE_OVERHEAD_MS: intFromEnv(10, 0, 5000),
+  // Warm engine pool: persistent engine processes kept alive between requests
+  // (NNUE + hash loaded once, reused). Also the hard cap on CONCURRENT engine
+  // searches — further requests queue. Size for the host: ~1 per spare core.
+  ENGINE_POOL_SIZE: intFromEnv(2, 1, 16),
 
   // Upload guardrails.
   MAX_UPLOAD_BYTES: intFromEnv(8_388_608, 1, 64 * 1024 * 1024),
