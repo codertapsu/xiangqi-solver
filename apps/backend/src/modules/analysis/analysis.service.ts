@@ -8,7 +8,7 @@ import { BoardValidatorService } from '../board/board-validator.service';
 import { BoardNormalizerService } from '../board/board-normalizer.service';
 import { FenService } from '../board/fen.service';
 import { MoveNotationService, NotationLanguage } from '../board/move-notation.service';
-import { BoardPiece, NormalizedBoard, SideToMove } from '../board/xiangqi.types';
+import { BoardPiece, NormalizedBoard, NormalizedPiece, SideToMove } from '../board/xiangqi.types';
 import { EngineService, EngineProviderName } from '../engine/engine.service';
 import { EngineBestMoveResult } from '../engine/engine.interface';
 import { AnalysisBestMove, AnalysisResult, ExtractionResult } from './analysis.types';
@@ -30,6 +30,15 @@ export interface AnalyzeBoardParams extends EngineOptions {
   language?: NotationLanguage;
 }
 
+/** The recognized board, surfaced to streaming clients before the engine runs. */
+export interface BoardStagePayload {
+  sideToMove: SideToMove;
+  fen: string;
+  pieces: NormalizedPiece[];
+  confidence: number;
+  warnings: string[];
+}
+
 /** Parameters for the screenshot (vision) analysis path. */
 export interface AnalyzeScreenshotParams extends EngineOptions {
   imageBuffer: Buffer;
@@ -37,6 +46,12 @@ export interface AnalyzeScreenshotParams extends EngineOptions {
   provider?: AiProviderName;
   sideToMove?: SideToMove;
   language?: NotationLanguage;
+  /**
+   * Invoked as soon as the board is recognized + repaired (BEFORE the engine
+   * search), so a streaming endpoint can push the board to the client while
+   * the move is still being computed.
+   */
+  onBoard?: (board: BoardStagePayload) => void;
 }
 
 /** Parameters for the vision-only board extraction (no engine). */
@@ -80,6 +95,7 @@ export class AnalysisService {
       // Vision output is imperfect: repair the board rather than 400 the whole
       // analysis on a single mis-read piece.
       lenient: true,
+      onBoard: params.onBoard,
     });
   }
 
@@ -180,6 +196,7 @@ export class AnalysisService {
     engineOptions: EngineOptions;
     language?: NotationLanguage;
     lenient: boolean;
+    onBoard?: (board: BoardStagePayload) => void;
   }): Promise<AnalysisResult> {
     const analysisId = uuidv4();
     // Vietnamese-first (the primary market) when a request omits the language.
@@ -192,6 +209,16 @@ export class AnalysisService {
       args.incomingWarnings,
       args.lenient,
     );
+
+    // Board stage: let a streaming caller show the recognized position while
+    // the engine (below) is still searching.
+    args.onBoard?.({
+      sideToMove: board.sideToMove,
+      fen,
+      pieces: board.pieces,
+      confidence: board.confidence,
+      warnings: [...board.warnings],
+    });
 
     // 4. Run the engine — but only if both generals are present (a position
     //    without a king is illegal and not solvable). On an imperfect capture we
