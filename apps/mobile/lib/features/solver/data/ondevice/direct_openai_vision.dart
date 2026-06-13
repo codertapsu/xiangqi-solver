@@ -171,6 +171,54 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
     return (message: null, code: null);
   }
 
+  /// Grid letter -> piece type (case carries the color). Includes the
+  /// chess-style aliases (n=horse, b=elephant) some models emit.
+  static const Map<String, PieceType> _letterToType = {
+    'k': PieceType.king,
+    'a': PieceType.advisor,
+    'e': PieceType.elephant,
+    'h': PieceType.horse,
+    'r': PieceType.rook,
+    'c': PieceType.cannon,
+    'p': PieceType.pawn,
+    'n': PieceType.horse,
+    'b': PieceType.elephant,
+  };
+
+  /// Expand FEN-style digit runs ("2p2c3" -> "..p..c...") some models emit.
+  static String _expandDigitRuns(String line) => line.replaceAllMapped(
+    RegExp(r'[1-9]'),
+    (m) => '.' * int.parse(m.group(0)!),
+  );
+
+  /// Expand the compact 10x9 `grid` into image-space pieces, or null when the
+  /// grid is absent/malformed (the caller then falls back to `pieces`).
+  /// Mirrors the backend `vision-response.schema.ts` exactly.
+  List<_RawPiece>? _piecesFromGrid(Object? gridRaw, double confidence) {
+    if (gridRaw is! List || gridRaw.length != 10) return null;
+    final entries = <_RawPiece>[];
+    for (var row = 0; row < 10; row++) {
+      final line = gridRaw[row];
+      if (line is! String) return null;
+      final cells = _expandDigitRuns(line.trim());
+      if (cells.length != 9) return null;
+      for (var col = 0; col < 9; col++) {
+        final ch = cells[col];
+        if (ch == '.' || ch == '-' || ch == ' ') continue;
+        final type = _letterToType[ch.toLowerCase()];
+        if (type == null) return null;
+        entries.add(_RawPiece(
+          color: ch == ch.toUpperCase() ? PieceColor.red : PieceColor.black,
+          type: type,
+          row: row,
+          col: col,
+          confidence: confidence,
+        ));
+      }
+    }
+    return entries;
+  }
+
   BoardExtraction _parse(String content) {
     final jsonText = _stripCodeFences(content);
     final Map<String, dynamic> obj;
@@ -186,34 +234,53 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
     final warnings = (obj['warnings'] as List<dynamic>? ?? const [])
         .map((e) => e.toString())
         .toList();
+    final overallConfidence = (obj['confidence'] as num?)?.toDouble() ?? 0;
 
-    // 1) Parse raw pieces in whatever frame the model used (image row/col, or
-    //    legacy canonical file/rank).
-    final entries = <_RawPiece>[];
+    // 1) Preferred: expand the authoritative compact grid. Fallback: parse the
+    //    legacy per-piece array in whatever frame the model used (image
+    //    row/col, or legacy canonical file/rank).
+    var entries = _piecesFromGrid(obj['grid'], overallConfidence);
     var dropped = 0;
-    for (final raw in (obj['pieces'] as List<dynamic>? ?? const [])) {
-      if (raw is! Map) {
-        dropped++;
-        continue;
+    if (entries == null) {
+      // A present-but-malformed grid with no pieces fallback is an unreadable
+      // response, not an empty board: throw so the caller's own-key failure
+      // path can fall back to server vision (mirrors the backend's
+      // VISION_INVALID_RESPONSE).
+      final gridRaw = obj['grid'];
+      final pieces = obj['pieces'];
+      if (gridRaw is List &&
+          gridRaw.isNotEmpty &&
+          (pieces is! List || pieces.isEmpty)) {
+        throw OnDeviceVisionException(
+          AppL10n.current.visionBadJson,
+          code: 'VISION_INVALID_RESPONSE',
+        );
       }
-      final m = raw.cast<String, dynamic>();
-      final row = _asInt(m['row']);
-      final col = _asInt(m['col']);
-      final file = _asInt(m['file']);
-      final rank = _asInt(m['rank']);
-      final entry = _RawPiece(
-        color: PieceColor.fromWire(m['color'] as String?),
-        type: PieceType.fromWire(m['type'] as String?),
-        row: row,
-        col: col,
-        file: file,
-        rank: rank,
-        confidence: (m['confidence'] as num?)?.toDouble(),
-      );
-      if (entry.hasPosition) {
-        entries.add(entry);
-      } else {
-        dropped++;
+      entries = <_RawPiece>[];
+      for (final raw in (obj['pieces'] as List<dynamic>? ?? const [])) {
+        if (raw is! Map) {
+          dropped++;
+          continue;
+        }
+        final m = raw.cast<String, dynamic>();
+        final row = _asInt(m['row']);
+        final col = _asInt(m['col']);
+        final file = _asInt(m['file']);
+        final rank = _asInt(m['rank']);
+        final entry = _RawPiece(
+          color: PieceColor.fromWire(m['color'] as String?),
+          type: PieceType.fromWire(m['type'] as String?),
+          row: row,
+          col: col,
+          file: file,
+          rank: rank,
+          confidence: (m['confidence'] as num?)?.toDouble(),
+        );
+        if (entry.hasPosition) {
+          entries.add(entry);
+        } else {
+          dropped++;
+        }
       }
     }
 
@@ -243,7 +310,7 @@ class DirectOpenAiVisionClient implements BoardVisionClient {
     return BoardExtraction(
       boardDetected: obj['boardDetected'] == true,
       sideToMove: SideToMove.fromWire(obj['sideToMove'] as String?),
-      confidence: (obj['confidence'] as num?)?.toDouble() ?? 0,
+      confidence: overallConfidence,
       pieces: pieces,
       warnings: warnings,
     );
@@ -322,10 +389,13 @@ class _RawPiece {
 }
 
 /// Strict board-extraction prompt — kept IN LOCKSTEP with the backend
-/// `prompts/board-extraction.prompt.ts`. The model first fills a `grid` field (a
-/// complete 10x9 FEN-like scan) as a perception scaffold, then transcribes the
-/// board by IMAGE position (row/col) + reports `redHomeAtTop`; code rotates to
-/// canonical and ignores `grid` (the parser drops unknown keys).
+/// `prompts/board-extraction.prompt.ts`. The model returns the board as a
+/// compact 10x9 `grid` (the AUTHORITATIVE placement; the parser expands it in
+/// code) + `redHomeAtTop`; code rotates to canonical deterministically. The
+/// old per-piece `pieces` array was dropped from the output: it merely
+/// restated the grid while roughly QUADRUPLING completion tokens — the
+/// dominant share of vision latency (the parser still accepts it as a
+/// fallback).
 const String _boardExtractionPrompt = '''
 You are a meticulous Xiangqi (Chinese chess) board digitizer. Your ONLY job is to read the board in the image and report every piece and its position as STRICT JSON. Do NOT suggest a move, evaluate the position, or add any strategy, commentary, or analysis.
 
@@ -334,37 +404,32 @@ THE BOARD
 - Two 3x3 "palaces" (each marked with a diagonal cross) sit at the top-center and bottom-center. KINGS and ADVISORS never leave their own palace. ELEPHANTS never cross the central river — they stay on their own half. PAWNS only ever advance. Use these facts only to SANITY-CHECK a reading, never to invent a piece.
 
 COORDINATES — report exactly what you SEE, by image position. Do NOT rotate, flip, or normalize:
-- row: integer 0..9. row 0 = the TOP rank line in the image, row 9 = the BOTTOM rank line.
-- col: integer 0..8. col 0 = the LEFT file line, col 8 = the RIGHT file line.
+- The first grid row = the TOP rank line in the image; the last (10th) = the BOTTOM rank line.
+- Within a row, the first character = the LEFT file line, the 9th = the RIGHT file line.
 
 PIECE COLORS: "red" or "black", shown by the disc/ink color AND the character.
-PIECE TYPES (lowercase) with Chinese characters:
-  "king" 帥/將, "advisor" 仕/士, "elephant" 相/象, "horse" 傌/馬, "rook" 俥/車, "cannon" 炮/砲/包, "pawn" 兵/卒.
+PIECE LETTERS (RED = UPPERCASE, BLACK = lowercase) with Chinese characters:
+  K/k=king 帥/將, A/a=advisor 仕/士, E/e=elephant 相/象, H/h=horse 傌/馬, R/r=rook 俥/車, C/c=cannon 炮/砲/包, P/p=pawn 兵/卒.
 Per side AT MOST: 1 king, 2 advisors, 2 elephants, 2 horses, 2 rooks, 2 cannons, 5 pawns. BOTH kings are ALWAYS on the board — find each inside its palace, even if partly covered by a move marker, highlight, last-move dot, or cursor.
 
 HOW TO READ — fill the JSON fields IN ORDER:
-1) "grid": transcribe ALL 10 rows, TOP (row 0) to BOTTOM (row 9). Each entry is a string of EXACTLY 9 chars, col 0 (left) to col 8 (right):
-     "." = empty;  RED = UPPERCASE, BLACK = lowercase, using K=king A=advisor E=elephant H=horse R=rook C=cannon P=pawn.
-   Example row: "rheakaehr". Read cell by cell — this grid IS your complete scan.
-2) "redHomeAtTop": after scanning, true if the RED army (incl. red king 帥) is in the TOP half (rows 0..4), false if Red is at the bottom. A Black player's screenshot shows Red at the top -> true. Decide from where the red king actually sits.
-3) "pieces": list EVERY non-empty intersection from your grid, with its color, type, and the SAME row/col. The pieces array MUST match the grid exactly.
-4) Self-check: each side has exactly one king inside a palace; no side exceeds the maximums; no two pieces share a (row,col); pieces match grid. If anything is off, re-read that area; if still unsure, lower "confidence" and note it in "warnings".
+1) "grid": transcribe ALL 10 rows, TOP to BOTTOM. Each entry is a string of EXACTLY 9 chars, left to right: "." = empty, otherwise the piece letter above. Example row: "rheakaehr". Read cell by cell — this grid IS the complete, authoritative scan.
+2) "redHomeAtTop": after scanning, true if the RED army (incl. red king 帥) is in the TOP half (first 5 rows), false if Red is at the bottom. A Black player's screenshot shows Red at the top -> true. Decide from where the red king actually sits.
+3) Self-check: each grid row has EXACTLY 9 characters; each side has exactly one king inside a palace; no side exceeds the maximums. If anything is off, re-read that area and correct the grid; if still unsure, lower "confidence" and note it in "warnings".
 
 OUTPUT a single JSON object with EXACTLY these fields:
 {
   "boardDetected": boolean,
-  "grid": ["row0", "row1", "row2", "row3", "row4", "row5", "row6", "row7", "row8", "row9"],
+  "grid": ["rheakaehr", ".........", ".c.....c.", "p.p.p.p.p", ".........", ".........", "P.P.P.P.P", ".C.....C.", ".........", "RHEAKAEHR"],  // EXAMPLE (the standard start position) — always 10 strings of EXACTLY 9 chars; output what YOU see
   "redHomeAtTop": boolean,
   "sideToMove": "red" | "black" | "unknown",
   "confidence": number,
-  "pieces": [ { "color": "red", "type": "cannon", "row": 7, "col": 1, "confidence": 0.95 } ],
   "warnings": [ "string" ]
 }
 
 RULES:
 - JSON only. No markdown, no code fences, no prose.
 - Read each piece's CHARACTER to decide type and color; use palace/half/river only to sanity-check, never to guess from position alone.
-- Every piece MUST have integer row 0..9 and col 0..8, matching where it sits in the IMAGE, and appear in "grid".
-- Never place two pieces on the same (row, col). Do NOT invent pieces or exceed the per-side maximums.
-- Do NOT output "file", "rank", "move", or any field not listed above.
-- If you cannot read the board, set "boardDetected": false, "grid": [], "pieces": [], and explain in "warnings".''';
+- Never place two pieces on the same intersection. Do NOT invent pieces or exceed the per-side maximums.
+- Do NOT output "pieces", "file", "rank", "move", or any field not listed above.
+- If you cannot read the board, set "boardDetected": false, "grid": [], and explain in "warnings".''';
