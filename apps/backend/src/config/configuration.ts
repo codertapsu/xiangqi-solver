@@ -13,6 +13,10 @@ export interface AppConfig {
     openaiApiKey: string;
     openaiModel: string;
     geminiModel: string;
+    /** Downscale/recompress uploads to the provider's pixel budget pre-call. */
+    visionPreprocess: boolean;
+    visionImageShortSide: number;
+    visionImageLongSide: number;
   };
   engine: {
     provider: 'pikafish' | 'mock';
@@ -29,6 +33,8 @@ export interface AppConfig {
     hashMb: number;
     multiPv: number;
     moveOverheadMs: number;
+    /** Warm persistent engine processes kept by the pool (concurrency bound). */
+    poolSize: number;
   };
   upload: {
     maxBytes: number;
@@ -88,6 +94,9 @@ export function configuration(): { app: AppConfig } {
       openaiApiKey: env.OPENAI_API_KEY,
       openaiModel: env.OPENAI_MODEL,
       geminiModel: env.GEMINI_MODEL,
+      visionPreprocess: env.VISION_PREPROCESS,
+      visionImageShortSide: env.VISION_IMAGE_SHORT_SIDE,
+      visionImageLongSide: env.VISION_IMAGE_LONG_SIDE,
     },
     engine: {
       provider: env.ENGINE_PROVIDER,
@@ -101,6 +110,7 @@ export function configuration(): { app: AppConfig } {
       hashMb: env.ENGINE_HASH_MB,
       multiPv: env.ENGINE_MULTIPV,
       moveOverheadMs: env.ENGINE_MOVE_OVERHEAD_MS,
+      poolSize: env.ENGINE_POOL_SIZE,
     },
     upload: {
       maxBytes: env.MAX_UPLOAD_BYTES,
