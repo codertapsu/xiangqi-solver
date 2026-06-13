@@ -38,7 +38,7 @@ export const envSchema = z.object({
   GEMINI_API_KEY: z.string().default(''),
   OPENAI_API_KEY: z.string().default(''),
   OPENAI_MODEL: z.string().default('gpt-5.4'),
-  GEMINI_MODEL: z.string().default('gemini-3-flash-preview'),
+  GEMINI_MODEL: z.string().default('gemini-3.5-flash'),
   // Vision-image normalization. Providers downscale internally anyway (OpenAI
   // "high" detail: fit in 2048px then shortest side 768px), so pixels beyond
   // that budget only cost upload time and tiles. We mirror the budget server-
