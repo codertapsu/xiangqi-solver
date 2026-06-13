@@ -46,20 +46,20 @@ export class AnalyzeScreenshotDto {
   @Max(60000)
   engineMoveTimeMs?: number;
 
-  @ApiProperty({ required: false, minimum: 1, maximum: 1024, description: 'Pikafish Threads.' })
+  @ApiProperty({ required: false, minimum: 1, maximum: 8, description: 'Pikafish Threads.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(8)
+  engineThreads?: number;
+
+  @ApiProperty({ required: false, minimum: 1, maximum: 1024, description: 'Pikafish Hash (MB).' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(1024)
-  engineThreads?: number;
-
-  @ApiProperty({ required: false, minimum: 1, maximum: 32768, description: 'Pikafish Hash (MB).' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(32768)
   engineHashMb?: number;
 
   @ApiProperty({ required: false, minimum: 1, maximum: 10, description: 'Top-N moves (MultiPV).' })
