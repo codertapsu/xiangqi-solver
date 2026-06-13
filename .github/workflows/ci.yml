@@ -1,0 +1,46 @@
+name: CI
+
+# Mirrors scripts/check.sh: backend lint + tests + build, Flutter analyze +
+# tests. Keep the two in sync — check.sh is the local pre-push gate, this is
+# the hosted one.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (lint, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx jest --silent
+      - run: npm run test:e2e
+      - run: npm run build
+
+  mobile:
+    name: Mobile (analyze, test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter gen-l10n
+      - run: flutter analyze
+      - run: flutter test
