@@ -124,6 +124,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusAnalyzing => 'Analyzing…';
 
   @override
+  String statusBoardRecognized(Object count) {
+    return 'Board recognized ($count pieces)';
+  }
+
+  @override
+  String get statusComputingMove => 'Computing the best move…';
+
+  @override
   String get statusNoMove => 'No move found';
 
   @override
@@ -236,6 +244,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sideUnknown => 'Unknown';
+
+  @override
+  String get aiProviderAuto => 'Auto (server default)';
 
   @override
   String get aiProviderGemini => 'Gemini';

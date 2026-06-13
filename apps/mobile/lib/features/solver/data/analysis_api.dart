@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -150,6 +151,113 @@ class AnalysisApi {
       formData: formData,
     );
     return _parseEnvelopeData(response, AnalysisResult.fromJson);
+  }
+
+  /// POST /api/analysis/screenshot/stream — progressive (NDJSON) analysis.
+  ///
+  /// Emits [onBoard] as soon as the backend has recognized + repaired the
+  /// board (the engine is still searching), then resolves with the complete
+  /// [AnalysisResult]. Throws a [ServerException] with code
+  /// `STREAM_UNAVAILABLE` when the backend predates the endpoint (404/405) so
+  /// the caller can fall back to the fused [analyzeScreenshot].
+  Future<AnalysisResult> analyzeScreenshotStreamed(
+    File screenshot, {
+    AiProvider? provider,
+    SideToMove? sideToMove,
+    String? language,
+    EngineOptions options = const EngineOptions(),
+    required void Function(BoardState board) onBoard,
+  }) async {
+    if (!await screenshot.exists()) {
+      throw FileException(
+        AppL10n.current.apiFileNotFound(screenshot.path),
+        code: 'FILE_NOT_FOUND',
+      );
+    }
+    final formData = FormData.fromMap({
+      'screenshot': await MultipartFile.fromFile(
+        screenshot.path,
+        filename: _fileName(screenshot.path),
+      ),
+      if (provider != null) 'provider': provider.wireValue,
+      if (sideToMove != null) 'sideToMove': sideToMove.wireValue,
+      'language': ?language,
+      ...options.toJsonFields().map((k, v) => MapEntry(k, '$v')),
+    });
+
+    final response = await _client.postMultipartStream(
+      AppConstants.analyzeScreenshotStreamPath,
+      formData: formData,
+    );
+    final status = response.statusCode ?? 0;
+    final body = response.data;
+    if (status == 404 || status == 405 || body == null) {
+      throw ServerException(
+        AppL10n.current.apiServerHttpError('$status'),
+        code: 'STREAM_UNAVAILABLE',
+        statusCode: status,
+      );
+    }
+    final text = body.stream
+        .map<List<int>>((chunk) => chunk)
+        .transform(utf8.decoder);
+    if (status < 200 || status >= 300) {
+      // Pre-stream failure: the standard { success:false, error } envelope.
+      final raw = await text.join();
+      Map<String, dynamic> envelope;
+      try {
+        envelope = (jsonDecode(raw) as Map).cast<String, dynamic>();
+      } catch (_) {
+        throw ServerException(
+          AppL10n.current.apiServerHttpError('$status'),
+          code: 'HTTP_$status',
+          statusCode: status,
+        );
+      }
+      throw _errorFromEnvelope(envelope, status);
+    }
+
+    AnalysisResult? result;
+    await for (final line in text.transform(const LineSplitter())) {
+      if (line.trim().isEmpty) continue;
+      final Map<String, dynamic> event;
+      try {
+        event = (jsonDecode(line) as Map).cast<String, dynamic>();
+      } catch (_) {
+        continue; // tolerate a corrupted line; later stages decide the outcome
+      }
+      switch (event['stage']) {
+        case 'board':
+          final board = event['board'];
+          if (board is Map) {
+            try {
+              onBoard(BoardState.fromJson(board.cast<String, dynamic>()));
+            } catch (e) {
+              _log.warn('Ignoring unparseable board stage: $e');
+            }
+          }
+        case 'done':
+          final data = event['data'];
+          if (data is Map) {
+            result = AnalysisResult.fromJson(data.cast<String, dynamic>());
+          }
+        case 'error':
+          final error = event['error'];
+          throw ServerException(
+            (error is Map ? error['message']?.toString() : null) ??
+                AppL10n.current.apiServerError,
+            code: error is Map ? error['code']?.toString() : null,
+            statusCode: status,
+          );
+      }
+    }
+    if (result == null) {
+      throw ParseException(
+        AppL10n.current.apiMissingData,
+        code: 'STREAM_INCOMPLETE',
+      );
+    }
+    return result;
   }
 
   /// POST /api/analysis/extract — vision-only board recognition (no engine).

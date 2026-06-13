@@ -519,7 +519,14 @@ class AnalysisIdle extends AnalysisStatus {
 }
 
 class AnalysisLoading extends AnalysisStatus {
-  const AnalysisLoading();
+  const AnalysisLoading({this.board});
+
+  /// Set once the backend's streaming endpoint has recognized the board (the
+  /// engine is still searching) — lets the UI show the position early.
+  final BoardState? board;
+
+  @override
+  List<Object?> get props => [board];
 }
 
 class AnalysisSuccess extends AnalysisStatus {
@@ -568,7 +575,24 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
   /// `ownKeyDivisor` analyses; fully-local (own key + on-device engine) = none.
   /// An empty wallet surfaces a `NO_HINTS` failure (the UI opens the "get more
   /// hints" sheet); a hint is only charged for a SUCCESSFUL result.
+  /// Drops overlapping solves: rapid double-taps each fire a capture event,
+  /// and concurrent runs would race the shared state + double-charge hints.
+  bool _inFlight = false;
+
   Future<void> analyzeScreenshot(File file) async {
+    if (_inFlight) {
+      _log.warn('Ignoring analyze request while another solve is in flight.');
+      return;
+    }
+    _inFlight = true;
+    try {
+      await _analyzeScreenshotInner(file);
+    } finally {
+      _inFlight = false;
+    }
+  }
+
+  Future<void> _analyzeScreenshotInner(File file) async {
     final s = _settings;
     final wallet = _ref.read(walletProvider.notifier);
 
@@ -629,15 +653,30 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     final cloud = s.engineLocation == EngineLocation.cloud;
     final analyzer = _ref.read(onDeviceAnalyzerProvider);
 
-    // our key + cloud engine → one fused backend call; nothing to fall back to.
+    // our key + cloud engine → one PROGRESSIVE backend call: the recognized
+    // board is shown while the engine still searches. Falls back to the fused
+    // endpoint when the backend predates /screenshot/stream.
     if (ours && cloud) {
-      final r = await _repo.analyzeScreenshot(
+      var r = await _repo.analyzeScreenshotStreamed(
         file,
         provider: s.aiProvider,
         sideToMove: s.mySide,
         language: s.language,
         options: _engineOptions,
+        onBoard: (board) {
+          state = AnalysisLoading(board: board);
+          _pushOverlayProgress(board);
+        },
       );
+      if (r.failureOrNull?.code == 'STREAM_UNAVAILABLE') {
+        r = await _repo.analyzeScreenshot(
+          file,
+          provider: s.aiProvider,
+          sideToMove: s.mySide,
+          language: s.language,
+          options: _engineOptions,
+        );
+      }
       return _RunOutcome(r, usedOurVision: true, usedOurEngine: true);
     }
 
@@ -832,6 +871,22 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
     unawaited(
       native
           .updateOverlay(title: title, detail: detail, kind: 'result')
+          .catchError((Object _) {}),
+    );
+  }
+
+  /// Mid-solve overlay update: the board is read, the engine is searching.
+  void _pushOverlayProgress(BoardState board) {
+    final native = _ref.read(nativeSolverProvider);
+    if (!native.isSupported) return;
+    final l10n = AppL10n.current;
+    unawaited(
+      native
+          .updateOverlay(
+            title: l10n.statusBoardRecognized(board.pieces.length),
+            detail: l10n.statusComputingMove,
+            kind: 'progress',
+          )
           .catchError((Object _) {}),
     );
   }
