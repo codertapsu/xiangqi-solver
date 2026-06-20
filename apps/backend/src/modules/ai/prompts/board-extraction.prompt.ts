@@ -30,8 +30,9 @@ THE BOARD
 COORDINATES — report exactly what you SEE, by image position. Do NOT rotate, flip, or "normalize" the board:
 - The first grid row = the TOP rank line in the image; the last (10th) = the BOTTOM rank line.
 - Within a row, the first character = the LEFT file line, the 9th = the RIGHT file line.
+- VERY COMMON: the board is shown from the BLACK player's side, so the RED army is at the TOP and BLACK is at the BOTTOM. This is normal — about half of all screenshots look this way. Transcribe the intersections EXACTLY as drawn (top image row first). Do NOT mentally rotate the board to put Red at the bottom, and do NOT let the familiar opening layout pull your reading toward "Red on the bottom rows". The orientation is re-derived from the kings downstream in code, so your only job is an honest, literal scan.
 
-PIECE COLORS: "red" or "black", shown by the disc/ink color AND by the character.
+PIECE COLORS: "red" or "black", read from each piece's actual disc/ink COLOR and character GLYPH. NEVER infer color from WHICH HALF of the image a piece sits in — on a flipped board the bottom half is Black and the top half is Red, so position is not a reliable color cue.
 PIECE LETTERS (RED = UPPERCASE, BLACK = lowercase) with their Chinese characters:
   K/k = king     — 帥 / 將   (red 帥, black 將; also 帅/将)
   A/a = advisor  — 仕 / 士   (red 仕, black 士)
@@ -44,15 +45,15 @@ Per side there are AT MOST: 1 king, 2 advisors, 2 elephants, 2 horses, 2 rooks, 
 
 HOW TO READ — fill the JSON fields IN ORDER, top to bottom:
 1) "grid": transcribe ALL 10 rows, from the TOP row to the BOTTOM row. Each entry is a string of EXACTLY 9 characters, one per intersection from left to right: "." = empty intersection, otherwise the piece letter above. Example row (a black back rank): "rheakaehr". Read carefully, cell by cell — this grid IS the complete, authoritative scan of the board.
-2) "redHomeAtTop": after scanning, true if the RED army (incl. the red king 帥) sits in the TOP half (first 5 rows), false if Red is at the bottom. A player views the board from their own side (their pieces at the bottom), so a screenshot taken by the BLACK player shows Red at the top -> true. Decide it purely from where the red king actually sits.
+2) "redHomeAtTop": true if the RED army (incl. the red king 帥) sits in the TOP half (first 5 rows), false if it sits in the BOTTOM half. Decide this ONLY from the red king's actual pixel position in the image — NEVER from who the player is or whose turn it is. Either side may be the human player and either side may be drawn on top; the two are unrelated, and the app already knows the player's side. Both orientations are about equally common — do not assume either.
 3) Self-check before finishing: each grid row has EXACTLY 9 characters; each side has EXACTLY one king inside a palace; no side exceeds the per-side maximums. If anything is off, re-read that area of the image and correct the grid; if still unsure, lower "confidence" and say why in "warnings".
 
 OUTPUT a single JSON object with EXACTLY these fields and nothing else:
 {
   "boardDetected": boolean,          // true if a Xiangqi board is clearly visible
   "grid": ["rheakaehr", ".........", ".c.....c.", "p.p.p.p.p", ".........", ".........", "P.P.P.P.P", ".C.....C.", ".........", "RHEAKAEHR"],  // EXAMPLE (the standard start position) — always 10 strings of EXACTLY 9 chars; output what YOU see
-  "redHomeAtTop": boolean,           // is the Red army in the top half of the image?
-  "sideToMove": "red" | "black" | "unknown",
+  "redHomeAtTop": boolean,           // is the Red army in the top half of the image? (purely pixel position of the red king)
+  "sideToMove": "red" | "black" | "unknown",  // whose turn — set red/black ONLY if a clear in-image indicator shows it (highlighted side, move arrow, clock). Otherwise "unknown": the app supplies the player's selected side, so a guess only risks a spurious mismatch.
   "confidence": number,              // overall confidence 0..1
   "warnings": [ "string" ]           // occlusion, blur, ambiguity; [] if none
 }

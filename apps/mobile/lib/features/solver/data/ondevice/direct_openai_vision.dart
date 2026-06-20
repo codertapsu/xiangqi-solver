@@ -406,15 +406,16 @@ THE BOARD
 COORDINATES — report exactly what you SEE, by image position. Do NOT rotate, flip, or normalize:
 - The first grid row = the TOP rank line in the image; the last (10th) = the BOTTOM rank line.
 - Within a row, the first character = the LEFT file line, the 9th = the RIGHT file line.
+- VERY COMMON: the board is shown from the BLACK player's side, so the RED army is at the TOP and BLACK at the BOTTOM. This is normal — about half of screenshots look this way. Transcribe EXACTLY as drawn (top image row first); do NOT mentally rotate to put Red at the bottom, and do NOT let the familiar opening layout pull your reading toward "Red on the bottom". Orientation is re-derived from the kings in code.
 
-PIECE COLORS: "red" or "black", shown by the disc/ink color AND the character.
+PIECE COLORS: "red" or "black", read from each piece's actual disc/ink COLOR and character GLYPH. NEVER infer color from WHICH HALF of the image a piece sits in — on a flipped board the bottom half is Black and the top is Red.
 PIECE LETTERS (RED = UPPERCASE, BLACK = lowercase) with Chinese characters:
   K/k=king 帥/將, A/a=advisor 仕/士, E/e=elephant 相/象, H/h=horse 傌/馬, R/r=rook 俥/車, C/c=cannon 炮/砲/包, P/p=pawn 兵/卒.
 Per side AT MOST: 1 king, 2 advisors, 2 elephants, 2 horses, 2 rooks, 2 cannons, 5 pawns. BOTH kings are ALWAYS on the board — find each inside its palace, even if partly covered by a move marker, highlight, last-move dot, or cursor.
 
 HOW TO READ — fill the JSON fields IN ORDER:
 1) "grid": transcribe ALL 10 rows, TOP to BOTTOM. Each entry is a string of EXACTLY 9 chars, left to right: "." = empty, otherwise the piece letter above. Example row: "rheakaehr". Read cell by cell — this grid IS the complete, authoritative scan.
-2) "redHomeAtTop": after scanning, true if the RED army (incl. red king 帥) is in the TOP half (first 5 rows), false if Red is at the bottom. A Black player's screenshot shows Red at the top -> true. Decide from where the red king actually sits.
+2) "redHomeAtTop": true if the RED army (incl. red king 帥) is in the TOP half (first 5 rows), false if it is in the BOTTOM half. Decide this ONLY from the red king's actual pixel position — NEVER from who the player is or whose turn it is. Either side may be the player and either may be drawn on top; the two are unrelated. Both orientations are about equally common — do not assume either.
 3) Self-check: each grid row has EXACTLY 9 characters; each side has exactly one king inside a palace; no side exceeds the maximums. If anything is off, re-read that area and correct the grid; if still unsure, lower "confidence" and note it in "warnings".
 
 OUTPUT a single JSON object with EXACTLY these fields:
@@ -422,7 +423,7 @@ OUTPUT a single JSON object with EXACTLY these fields:
   "boardDetected": boolean,
   "grid": ["rheakaehr", ".........", ".c.....c.", "p.p.p.p.p", ".........", ".........", "P.P.P.P.P", ".C.....C.", ".........", "RHEAKAEHR"],  // EXAMPLE (the standard start position) — always 10 strings of EXACTLY 9 chars; output what YOU see
   "redHomeAtTop": boolean,
-  "sideToMove": "red" | "black" | "unknown",
+  "sideToMove": "red" | "black" | "unknown",  // set red/black ONLY if a clear in-image indicator shows whose turn it is; otherwise "unknown" (the app supplies the player's selected side).
   "confidence": number,
   "warnings": [ "string" ]
 }
