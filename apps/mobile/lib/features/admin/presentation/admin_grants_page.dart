@@ -129,7 +129,7 @@ class _AdminGrantsPageState extends ConsumerState<AdminGrantsPage> {
             : ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: grants.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final e = grants.entries.elementAt(index);
 
