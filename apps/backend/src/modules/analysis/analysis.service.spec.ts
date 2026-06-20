@@ -73,6 +73,37 @@ describe('AnalysisService', () => {
     );
   });
 
+  /** Build a service whose vision stub returns a fixed board (sideToMove 'red')
+   *  + the given pieces — for exercising the post-vision pipeline directly. */
+  function serviceWithExtraction(pieces: unknown[]): AnalysisService {
+    const config = buildConfig();
+    const aiStub = {
+      defaultProvider: 'mock',
+      effectiveProviderName: (p?: string) => p ?? 'mock',
+      extractBoardState: async () => ({
+        boardDetected: true,
+        sideToMove: 'red',
+        confidence: 0.5,
+        pieces,
+        warnings: [],
+      }),
+    } as unknown as AiService;
+    const engineService = new EngineService(
+      config,
+      new MockEngineService(),
+      new PikafishEngineService(config),
+    );
+    return new AnalysisService(
+      config,
+      aiStub,
+      engineService,
+      new BoardValidatorService(),
+      new BoardNormalizerService(),
+      new FenService(),
+      new MoveNotationService(),
+    );
+  }
+
   describe('analyzeBoard (no-vision path)', () => {
     it('runs the full mock pipeline and returns a complete result', async () => {
       const result = await service.analyzeBoard({
@@ -231,35 +262,6 @@ describe('AnalysisService', () => {
   });
 
   describe('analyzeScreenshot leniency (imperfect AI extraction)', () => {
-    function serviceWithExtraction(pieces: unknown[]): AnalysisService {
-      const config = buildConfig();
-      const aiStub = {
-        defaultProvider: 'mock',
-        effectiveProviderName: (p?: string) => p ?? 'mock',
-        extractBoardState: async () => ({
-          boardDetected: true,
-          sideToMove: 'red',
-          confidence: 0.5,
-          pieces,
-          warnings: [],
-        }),
-      } as unknown as AiService;
-      const engineService = new EngineService(
-        config,
-        new MockEngineService(),
-        new PikafishEngineService(config),
-      );
-      return new AnalysisService(
-        config,
-        aiStub,
-        engineService,
-        new BoardValidatorService(),
-        new BoardNormalizerService(),
-        new FenService(),
-        new MoveNotationService(),
-      );
-    }
-
     const run = (svc: AnalysisService) =>
       svc.analyzeScreenshot({ imageBuffer: Buffer.from('x'), mimeType: 'image/png' });
 
@@ -291,6 +293,35 @@ describe('AnalysisService', () => {
 
     it('throws only when no board pieces are detected at all', async () => {
       await expect(run(serviceWithExtraction([]))).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  // The player picks their own side (red or black) in the app; that selection
+  // is authoritative for whose move to solve, INDEPENDENT of how the board is
+  // drawn (the vision stub always guesses 'red' here). Board geometry is a
+  // separate concern, resolved from the kings in parseVisionResponse.
+  describe("player-selected side drives 'side to move'", () => {
+    const bothKings = [
+      { color: 'red', type: 'king', file: 4, rank: 0 },
+      { color: 'black', type: 'king', file: 4, rank: 9 },
+    ];
+    const analyze = (svc: AnalysisService, sideToMove: 'red' | 'black') =>
+      svc.analyzeScreenshot({ imageBuffer: Buffer.from('x'), mimeType: 'image/png', sideToMove });
+
+    it('solves for BLACK when the player selected black, overriding the vision guess', async () => {
+      // serviceWithExtraction's stub reports sideToMove 'red'.
+      const result = await analyze(serviceWithExtraction(bothKings), 'black');
+      expect(result.board.sideToMove).toBe('black');
+      expect(result.bestMove).not.toBeNull();
+      // The mismatch is surfaced, not silently swallowed.
+      expect(result.warnings.some((w) => /selected black/i.test(w))).toBe(true);
+    });
+
+    it('solves for RED when the player selected red (no spurious warning)', async () => {
+      const result = await analyze(serviceWithExtraction(bothKings), 'red');
+      expect(result.board.sideToMove).toBe('red');
+      expect(result.bestMove).not.toBeNull();
+      expect(result.warnings.some((w) => /you selected/i.test(w))).toBe(false);
     });
   });
 });
