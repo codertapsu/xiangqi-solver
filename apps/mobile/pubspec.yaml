@@ -2,7 +2,7 @@ name: xiangqi_solver
 description: "Android Xiangqi solver — captures the board, analyzes it via a backend, and overlays the best move."
 publish_to: 'none'
 
-version: 1.0.0+4
+version: 1.0.0+5
 
 environment:
   sdk: ^3.12.0
