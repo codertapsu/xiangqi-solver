@@ -7,9 +7,12 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
+import android.os.Build
+import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
@@ -75,18 +78,41 @@ class RegionSelectionOverlay(private val context: Context) {
         )
         rootView = container
 
+        // The selection MUST live in the exact same coordinate space as the
+        // captured bitmap, which ScreenCaptureService sizes to the FULL physical
+        // display (currentWindowMetrics.bounds, incl. status/nav bars, origin at
+        // the true top-left). MATCH_PARENT alone does NOT guarantee that: without
+        // FLAG_LAYOUT_IN_SCREEN the window frame is inset by the system bars, so
+        // the SelectorView would measure smaller and offset, and normalizedRegion
+        // (fractions of the view) would then map onto the larger bitmap shifted +
+        // stretched — the reported crop mismatch. Sizing the window explicitly to
+        // the same bounds and adding IN_SCREEN pins selection-space == capture-space.
+        val (dispW, dispH) = displaySize(wm)
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            dispW,
+            dispH,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            // Focusable + touch so we can drive the selection; LAYOUT_NO_LIMITS
-            // makes the window span the whole display, matching the capture.
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
             y = 0
+            // Extend under a display cutout/notch too — the capture includes that
+            // band, so the selection space must as well.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
+        }
+
+        // The SelectorView is now truly full-display; keep the bottom controls
+        // clear of the navigation bar by padding them with the bottom system-bar
+        // inset, without shrinking the (full-display) selection space.
+        container.setOnApplyWindowInsetsListener { _, insets ->
+            controls.setPadding(24, 16, 24, 16 + systemBarBottomInset(insets))
+            insets
         }
 
         runCatching { wm.addView(container, params) }.onFailure { dismiss() }
@@ -100,6 +126,32 @@ class RegionSelectionOverlay(private val context: Context) {
         }
         rootView = null
         windowManager = null
+    }
+
+    /**
+     * Full physical display size in the current rotation, INCLUDING the system
+     * bars — the exact extent [ScreenCaptureService] mirrors into the capture
+     * bitmap, so the selection and the capture share one coordinate space.
+     */
+    @Suppress("DEPRECATION")
+    private fun displaySize(wm: WindowManager): Pair<Int, Int> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val b = wm.currentWindowMetrics.bounds
+            b.width() to b.height()
+        } else {
+            val m = DisplayMetrics().also { wm.defaultDisplay.getRealMetrics(it) }
+            m.widthPixels to m.heightPixels
+        }
+    }
+
+    /** Bottom system-bar (navigation bar) inset, across API levels. */
+    @Suppress("DEPRECATION")
+    private fun systemBarBottomInset(insets: WindowInsets): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            insets.getInsets(WindowInsets.Type.systemBars()).bottom
+        } else {
+            insets.systemWindowInsetBottom
+        }
     }
 
     private fun makeButton(label: String, onClick: () -> Unit): Button {
