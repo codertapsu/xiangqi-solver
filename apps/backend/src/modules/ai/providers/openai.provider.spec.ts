@@ -1,14 +1,15 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenAiVisionProvider } from './openai.provider';
+import { BOARD_EXTRACTION_PROMPT } from '../prompts/board-extraction.prompt';
 import { ErrorLogService } from '../../logging/error-log.service';
 import { ExtractBoardStateInput } from '../ai-provider.interface';
 
-/** ConfigService stub exposing an OpenAI key + model under `app.ai`. */
-function configWithKey(key = 'sk-test'): ConfigService {
+/** ConfigService stub exposing an OpenAI key + model (+ optional tuning) under `app.ai`. */
+function configWithKey(ai: Record<string, unknown> = {}): ConfigService {
   return {
     get: (k: string) =>
-      k === 'app.ai' ? { openaiApiKey: key, openaiModel: 'gpt-5.4' } : undefined,
+      k === 'app.ai' ? { openaiApiKey: 'sk-test', openaiModel: 'gpt-5.4', ...ai } : undefined,
   } as unknown as ConfigService;
 }
 
@@ -96,5 +97,105 @@ describe('OpenAiVisionProvider error logging', () => {
 
     expect(result.boardDetected).toBe(true);
     expect(logMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('OpenAiVisionProvider retry + request shape', () => {
+  const realFetch = global.fetch;
+  const errorLog = { log: jest.fn() } as unknown as ErrorLogService;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  const ok = () => ({
+    ok: true,
+    json: async () => ({ choices: [{ message: { content: VALID_BOARD } }] }),
+  });
+
+  it('retries a transient 5xx, then succeeds', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, text: async () => 'upstream down' })
+      .mockResolvedValueOnce(ok());
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(configWithKey({ maxRetries: 1 }), errorLog);
+    const result = await provider.extractBoardState(input);
+
+    expect(result.boardDetected).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does NOT retry a 4xx (bad key)', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 401, text: async () => 'bad key' });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(configWithKey({ maxRetries: 3 }), errorLog);
+    await expect(provider.extractBoardState(input)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the static prompt as a SYSTEM message and applies the output-token cap', async () => {
+    let captured: Record<string, unknown> = {};
+    global.fetch = jest.fn().mockImplementation((_url: string, opts: { body: string }) => {
+      captured = JSON.parse(opts.body) as Record<string, unknown>;
+      return Promise.resolve(ok());
+    }) as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(configWithKey({ maxOutputTokens: 1536 }), errorLog);
+    await provider.extractBoardState(input);
+
+    const messages = captured.messages as { role: string; content: unknown }[];
+    expect(messages[0]).toEqual({ role: 'system', content: BOARD_EXTRACTION_PROMPT });
+    expect(messages[1].role).toBe('user');
+    expect(captured.max_completion_tokens).toBe(1536);
+  });
+
+  it('does NOT retry a truncated (finish_reason=length) empty response — surfaces a clear error', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '' }, finish_reason: 'length' }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(
+      configWithKey({ maxOutputTokens: 1536, maxRetries: 2 }),
+      errorLog,
+    );
+    await expect(provider.extractBoardState(input)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'VISION_OUTPUT_TRUNCATED' }),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // deterministic — never retried
+  });
+
+  it('does NOT retry an ordinary empty response either', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '' } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(configWithKey({ maxRetries: 2 }), errorLog);
+    await expect(provider.extractBoardState(input)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'VISION_EMPTY_RESPONSE' }),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('honors a per-call model override (used by the cascade)', async () => {
+    let captured: Record<string, unknown> = {};
+    global.fetch = jest.fn().mockImplementation((_url: string, opts: { body: string }) => {
+      captured = JSON.parse(opts.body) as Record<string, unknown>;
+      return Promise.resolve(ok());
+    }) as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(configWithKey(), errorLog);
+    await provider.extractBoardState({ ...input, modelOverride: 'gpt-5.4-strong' });
+
+    expect(captured.model).toBe('gpt-5.4-strong');
   });
 });

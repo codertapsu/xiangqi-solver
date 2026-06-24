@@ -21,6 +21,12 @@ export interface AppConfig {
     visionPreprocess: boolean;
     visionImageShortSide: number;
     visionImageLongSide: number;
+    /** Cap on the model's output tokens (0 = no cap). */
+    maxOutputTokens: number;
+    /** Retries on a transient vision-API failure. */
+    maxRetries: number;
+    /** Optional accuracy cascade to a stronger model on a weak primary read. */
+    cascade: { enabled: boolean; model: string; minConfidence: number };
   };
   engine: {
     provider: 'pikafish' | 'mock';
@@ -105,6 +111,13 @@ export function configuration(): { app: AppConfig } {
       visionPreprocess: env.VISION_PREPROCESS,
       visionImageShortSide: env.VISION_IMAGE_SHORT_SIDE,
       visionImageLongSide: env.VISION_IMAGE_LONG_SIDE,
+      maxOutputTokens: env.VISION_MAX_OUTPUT_TOKENS,
+      maxRetries: env.VISION_MAX_RETRIES,
+      cascade: {
+        enabled: env.VISION_CASCADE_ENABLED,
+        model: env.VISION_CASCADE_MODEL,
+        minConfidence: env.VISION_CASCADE_MIN_CONFIDENCE,
+      },
     },
     engine: {
       provider: env.ENGINE_PROVIDER,

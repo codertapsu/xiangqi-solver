@@ -9,6 +9,7 @@ import {
 import { BOARD_EXTRACTION_PROMPT } from '../prompts/board-extraction.prompt';
 import { parseVisionResponse } from '../vision-response.schema';
 import { ErrorLogService } from '../../logging/error-log.service';
+import { AttemptResult, isTransientStatus, withRetries } from './vision-retry.util';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -39,30 +40,34 @@ export class GeminiVisionProvider implements AiVisionProvider {
       });
     }
 
-    const model = ai?.geminiModel ?? 'gemini-3.5-flash';
+    const model = input.modelOverride?.trim() || ai?.geminiModel || 'gemini-3.5-flash';
+    const maxTokens = ai?.maxOutputTokens ?? 0;
+    const maxRetries = ai?.maxRetries ?? 0;
     const url = `${GEMINI_BASE_URL}/${encodeURIComponent(model)}:generateContent`;
 
+    // The static prompt is a `systemInstruction` (identical every call) so
+    // Gemini's implicit prompt caching can reuse it; only the variable turn hint
+    // + image go in the user content. The hint part is omitted when absent.
+    const parts: unknown[] = [];
+    const hint = this.hintText(input.sideToMoveHint);
+    if (hint) parts.push({ text: hint });
+    parts.push({
+      inline_data: { mime_type: input.mimeType, data: input.imageBuffer.toString('base64') },
+    });
+
     const body = {
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: this.buildPrompt(input.sideToMoveHint) },
-            {
-              inline_data: {
-                mime_type: input.mimeType,
-                data: input.imageBuffer.toString('base64'),
-              },
-            },
-          ],
-        },
-      ],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+      systemInstruction: { parts: [{ text: BOARD_EXTRACTION_PROMPT }] },
+      contents: [{ role: 'user', parts }],
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: 'application/json',
+        ...(maxTokens > 0 ? { maxOutputTokens: maxTokens } : {}),
+      },
     };
 
     let text: string;
     try {
-      text = await this.callApi(url, apiKey, body);
+      text = await withRetries(maxRetries, () => this.attempt(url, apiKey, body));
     } catch (err) {
       this.logFailure('gemini', input, model, err);
       throw err;
@@ -103,14 +108,23 @@ export class GeminiVisionProvider implements AiVisionProvider {
     });
   }
 
-  private buildPrompt(hint?: ExtractBoardStateInput['sideToMoveHint']): string {
-    if (hint && hint !== 'unknown') {
-      return `${BOARD_EXTRACTION_PROMPT}\n\nHINT: The user indicated it is ${hint}'s turn to move.`;
-    }
-    return BOARD_EXTRACTION_PROMPT;
+  /** The variable turn hint as a standalone user part (empty when none). */
+  private hintText(hint?: ExtractBoardStateInput['sideToMoveHint']): string {
+    return hint && hint !== 'unknown'
+      ? `HINT: The user indicated it is ${hint}'s turn to move.`
+      : '';
   }
 
-  private async callApi(url: string, apiKey: string, body: unknown): Promise<string> {
+  /**
+   * One Gemini request. Returns a classified outcome (never throws) so the
+   * retry policy can decide: 429/5xx + timeouts + empty bodies are retryable; a
+   * 4xx (bad key / unreadable image) is not.
+   */
+  private async attempt(
+    url: string,
+    apiKey: string,
+    body: unknown,
+  ): Promise<AttemptResult<string>> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
@@ -123,36 +137,58 @@ export class GeminiVisionProvider implements AiVisionProvider {
 
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
-        throw new ServiceUnavailableException({
-          message: `Gemini API request failed (HTTP ${res.status}).`,
-          code: 'VISION_API_ERROR',
-          details: detail.slice(0, 500),
-        });
+        return {
+          ok: false,
+          retryable: isTransientStatus(res.status),
+          error: new ServiceUnavailableException({
+            message: `Gemini API request failed (HTTP ${res.status}).`,
+            code: 'VISION_API_ERROR',
+            details: detail.slice(0, 500),
+          }),
+        };
       }
 
       const json = (await res.json()) as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[];
+        candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
       };
-      const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('');
+      const candidate = json.candidates?.[0];
+      const text = candidate?.content?.parts?.map((p) => p.text ?? '').join('');
       if (!text) {
-        throw new ServiceUnavailableException({
-          message: 'Gemini API returned an empty response.',
-          code: 'VISION_EMPTY_RESPONSE',
-        });
+        // finishReason "MAX_TOKENS" = truncated at the output cap: deterministic,
+        // so don't retry (a re-send burns another paid call for the same empty
+        // body). Other empties are likewise not retried (temperature 0).
+        const truncated = candidate?.finishReason === 'MAX_TOKENS';
+        return {
+          ok: false,
+          retryable: false,
+          error: new ServiceUnavailableException({
+            message: truncated
+              ? 'Gemini truncated the response at the output-token cap. Raise VISION_MAX_OUTPUT_TOKENS (its thinking budget counts against this) or disable it (0).'
+              : 'Gemini API returned an empty response.',
+            code: truncated ? 'VISION_OUTPUT_TRUNCATED' : 'VISION_EMPTY_RESPONSE',
+          }),
+        };
       }
-      return text;
+      return { ok: true, value: text };
     } catch (err) {
-      if (err instanceof ServiceUnavailableException) throw err;
       if (err instanceof Error && err.name === 'AbortError') {
-        throw new ServiceUnavailableException({
-          message: `Gemini API timed out after ${REQUEST_TIMEOUT_MS}ms.`,
-          code: 'VISION_TIMEOUT',
-        });
+        return {
+          ok: false,
+          retryable: true,
+          error: new ServiceUnavailableException({
+            message: `Gemini API timed out after ${REQUEST_TIMEOUT_MS}ms.`,
+            code: 'VISION_TIMEOUT',
+          }),
+        };
       }
-      throw new ServiceUnavailableException({
-        message: `Gemini API request error: ${(err as Error).message}`,
-        code: 'VISION_API_ERROR',
-      });
+      return {
+        ok: false,
+        retryable: true,
+        error: new ServiceUnavailableException({
+          message: `Gemini API request error: ${(err as Error).message}`,
+          code: 'VISION_API_ERROR',
+        }),
+      };
     } finally {
       clearTimeout(timeout);
     }

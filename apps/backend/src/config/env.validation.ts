@@ -12,6 +12,10 @@ import { z } from 'zod';
 const intFromEnv = (def: number, min: number, max: number) =>
   z.coerce.number().int().min(min).max(max).default(def);
 
+/** Coerce a string env value into a bounded float with a default. */
+const floatFromEnv = (def: number, min: number, max: number) =>
+  z.coerce.number().min(min).max(max).default(def);
+
 /** Coerce a string env flag ("true"/"1") into a boolean with a default. */
 const boolFromEnv = (def: boolean) =>
   z.preprocess(
@@ -55,6 +59,27 @@ export const envSchema = z.object({
   VISION_PREPROCESS: boolFromEnv(true),
   VISION_IMAGE_SHORT_SIDE: intFromEnv(768, 256, 4096),
   VISION_IMAGE_LONG_SIDE: intFromEnv(2048, 512, 8192),
+  // Optional cap on the model's output tokens (0 = OFF, the default — so the
+  // current behavior is unchanged and a reasoning model is never truncated).
+  // The grid response is ~250 tokens, so set e.g. 1536 to bound a runaway
+  // generation (cost + tail latency) IF your model is non-reasoning. For a
+  // REASONING model, hidden tokens count against this budget, so either leave it
+  // off or set it generously — a truncated completion is surfaced as a clear
+  // error (raise the cap), never silently retried.
+  VISION_MAX_OUTPUT_TOKENS: intFromEnv(0, 0, 32768),
+  // Retry a vision call on a TRANSIENT failure (HTTP 429/5xx, timeout, empty
+  // body) with short backoff — a transient blip otherwise wastes the whole
+  // multi-second solve. Never retried: 4xx (bad key / unreadable image) and a
+  // 200 that parses to an invalid board (re-asking yields the same).
+  VISION_MAX_RETRIES: intFromEnv(1, 0, 5),
+  // Optional accuracy CASCADE (default off): when the primary read comes back
+  // unusable (no board / a general missing) or below VISION_CASCADE_MIN_CONFIDENCE,
+  // re-run ONCE on a stronger model (same provider). Costs a second call only on
+  // ambiguous boards. VISION_CASCADE_MODEL must be a valid id for the active
+  // provider (e.g. gpt-5.4 when the primary is a cheaper/faster model).
+  VISION_CASCADE_ENABLED: boolFromEnv(false),
+  VISION_CASCADE_MODEL: z.string().default(''),
+  VISION_CASCADE_MIN_CONFIDENCE: floatFromEnv(0, 0, 1),
 
   // Engine settings.
   PIKAFISH_BINARY_PATH: z.string().default(''),

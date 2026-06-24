@@ -180,3 +180,117 @@ describe('AiService provider enforcement', () => {
     expect(service.effectiveProviderName('openai')).toBe('gemini');
   });
 });
+
+describe('AiService single-flight coalescing', () => {
+  it('collapses concurrent identical extractions onto ONE provider call', async () => {
+    const counting = new CountingProvider();
+    const service = new AiService(
+      buildConfig(),
+      identityPreprocess,
+      counting as unknown as MockVisionProvider,
+      {} as GeminiVisionProvider,
+      {} as OpenAiVisionProvider,
+    );
+    const input: ExtractBoardStateInput = {
+      imageBuffer: Buffer.from('same-bytes'),
+      mimeType: 'image/png',
+      sideToMoveHint: 'red',
+    };
+    const [a, b] = await Promise.all([
+      service.extractBoardState(input),
+      service.extractBoardState(input),
+    ]);
+    expect(counting.calls).toBe(1);
+    expect(a).toEqual(b);
+    // Cloned per caller: mutating one must not affect the other or the cache.
+    a.pieces.pop();
+    expect(b.pieces).toHaveLength(2);
+  });
+});
+
+describe('AiService accuracy cascade', () => {
+  const weak = (): ExtractBoardStateResult => ({
+    boardDetected: true, // a board, but missing the black general -> unusable
+    sideToMove: 'red',
+    confidence: 0.4,
+    pieces: [{ color: 'red', type: 'king', file: 4, rank: 0 }],
+    warnings: [],
+  });
+  const strong = (): ExtractBoardStateResult => ({
+    boardDetected: true,
+    sideToMove: 'red',
+    confidence: 0.95,
+    pieces: [
+      { color: 'red', type: 'king', file: 4, rank: 0 },
+      { color: 'black', type: 'king', file: 4, rank: 9 },
+    ],
+    warnings: [],
+  });
+
+  /** Provider that reads "weak" on its base model and "strong" on the override. */
+  function cascadeProvider() {
+    return {
+      name: 'openai',
+      calls: 0,
+      models: [] as (string | undefined)[],
+      async extractBoardState(input: ExtractBoardStateInput): Promise<ExtractBoardStateResult> {
+        this.calls++;
+        this.models.push(input.modelOverride);
+        return input.modelOverride ? strong() : weak();
+      },
+    };
+  }
+
+  function build(ai: Record<string, unknown>, provider: ReturnType<typeof cascadeProvider>) {
+    return new AiService(
+      buildConfig({ provider: 'openai', ...ai }),
+      identityPreprocess,
+      {} as MockVisionProvider,
+      {} as GeminiVisionProvider,
+      provider as unknown as OpenAiVisionProvider,
+    );
+  }
+  const img: ExtractBoardStateInput = { imageBuffer: Buffer.from('x'), mimeType: 'image/png' };
+
+  it('re-reads a weak board on the stronger model when enabled', async () => {
+    const provider = cascadeProvider();
+    const service = build(
+      { cascade: { enabled: true, model: 'gpt-strong', minConfidence: 0 } },
+      provider,
+    );
+    const result = await service.extractBoardState(img);
+    expect(result.pieces).toHaveLength(2); // the strong, usable read won
+    expect(provider.calls).toBe(2);
+    expect(provider.models).toEqual([undefined, 'gpt-strong']);
+  });
+
+  it('does NOT cascade when disabled (default) — returns the weak read as-is', async () => {
+    const provider = cascadeProvider();
+    const service = build(
+      { cascade: { enabled: false, model: 'gpt-strong', minConfidence: 0 } },
+      provider,
+    );
+    const result = await service.extractBoardState(img);
+    expect(result.pieces).toHaveLength(1);
+    expect(provider.calls).toBe(1);
+  });
+
+  it('keeps the primary read when the cascade call fails', async () => {
+    const provider = {
+      name: 'openai',
+      calls: 0,
+      async extractBoardState(input: ExtractBoardStateInput): Promise<ExtractBoardStateResult> {
+        this.calls++;
+        if (input.modelOverride) throw new Error('strong model unavailable');
+        return weak();
+      },
+    };
+    const service = build(
+      { cascade: { enabled: true, model: 'gpt-strong', minConfidence: 0 } },
+      provider as unknown as ReturnType<typeof cascadeProvider>,
+    );
+    const result = await service.extractBoardState(img);
+    expect(result.pieces).toHaveLength(1); // fell back to the primary
+    expect(provider.calls).toBe(2);
+  });
+});

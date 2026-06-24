@@ -32,6 +32,8 @@ const VISION_CACHE_ENTRIES = 100;
 @Injectable()
 export class AiService {
   private readonly cache = new LruCache<ExtractBoardStateResult>(VISION_CACHE_ENTRIES);
+  /** Single-flight: concurrent identical extractions share ONE provider call. */
+  private readonly inFlight = new Map<string, Promise<ExtractBoardStateResult>>();
 
   constructor(
     private readonly config: ConfigService,
@@ -86,29 +88,94 @@ export class AiService {
     // and the (sharp) preprocessing work entirely.
     const hash = createHash('sha256').update(input.imageBuffer).digest('hex');
     const key = `${impl.name}|${input.sideToMoveHint ?? 'unknown'}|${hash}`;
+
     const hit = this.cache.get(key);
     // Clone: downstream repair/normalize steps reorder piece arrays in place.
     if (hit) return structuredClone(hit);
 
+    // Coalesce concurrent identical requests (app double-fire, two devices on
+    // the same board) onto ONE provider call.
+    const existing = this.inFlight.get(key);
+    if (existing) return structuredClone(await existing);
+
+    const work = this.compute(impl, input, key);
+    this.inFlight.set(key, work);
+    try {
+      return structuredClone(await work);
+    } finally {
+      this.inFlight.delete(key);
+    }
+  }
+
+  /** Preprocess → extract (+ optional cascade) → memoize. */
+  private async compute(
+    impl: AiVisionProvider,
+    input: ExtractBoardStateInput,
+    cacheKey: string,
+  ): Promise<ExtractBoardStateResult> {
     const { buffer, mimeType } = await this.preprocess.normalizeForVision(
       input.imageBuffer,
       input.mimeType,
     );
-    const result = await impl.extractBoardState({
+    const baseInput: ExtractBoardStateInput = {
       imageBuffer: buffer,
       mimeType,
       sideToMoveHint: input.sideToMoveHint,
-    });
+    };
+
+    let result = await impl.extractBoardState(baseInput);
+    result = await this.maybeCascade(impl, baseInput, result);
+
     // Memoize only USABLE extractions (board found, both generals present).
     // Vision is nondeterministic, so a "no board" / garbled read must stay
     // retryable — the UI explicitly tells the user to try again, and pinning
     // the failure for byte-identical retries (history re-solve, re-share)
     // would make that advice a lie. Mirrors the engine cache, which never
     // memoizes failures.
-    if (result.boardDetected && this.hasBothGenerals(result)) {
-      this.cache.set(key, structuredClone(result));
+    if (this.isUsable(result)) {
+      this.cache.set(cacheKey, structuredClone(result));
     }
     return result;
+  }
+
+  /**
+   * Accuracy cascade (config-gated, default off): when the primary read is
+   * unusable (no board / a general missing) or below the confidence floor,
+   * re-run ONCE on a stronger model and keep it if it's better. Costs a second
+   * call only on ambiguous boards; a failure of the second call keeps the first.
+   */
+  private async maybeCascade(
+    impl: AiVisionProvider,
+    baseInput: ExtractBoardStateInput,
+    primary: ExtractBoardStateResult,
+  ): Promise<ExtractBoardStateResult> {
+    const cascade = this.config.get<AppConfig['ai']>('app.ai')?.cascade;
+    if (
+      !cascade?.enabled ||
+      !cascade.model ||
+      impl.name === 'mock' ||
+      !this.isWeak(primary, cascade.minConfidence)
+    ) {
+      return primary;
+    }
+    try {
+      const strong = await impl.extractBoardState({ ...baseInput, modelOverride: cascade.model });
+      const better =
+        this.isUsable(strong) &&
+        (!this.isUsable(primary) || strong.confidence >= primary.confidence);
+      return better ? strong : primary;
+    } catch {
+      // Cascade is best-effort: keep the primary read on any failure.
+      return primary;
+    }
+  }
+
+  private isWeak(result: ExtractBoardStateResult, minConfidence: number): boolean {
+    return !this.isUsable(result) || result.confidence < minConfidence;
+  }
+
+  private isUsable(result: ExtractBoardStateResult): boolean {
+    return result.boardDetected && this.hasBothGenerals(result);
   }
 
   private hasBothGenerals(result: ExtractBoardStateResult): boolean {

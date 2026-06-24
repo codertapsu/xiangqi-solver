@@ -5,6 +5,9 @@ export interface ExtractBoardStateInput {
   imageBuffer: Buffer;
   mimeType: string;
   sideToMoveHint?: SideToMove;
+  /** Override the configured model for this one call (used by the accuracy
+   *  cascade to re-read a weak board on a stronger model). */
+  modelOverride?: string;
 }
 
 /** Structured board state extracted from an image (never a move). */
