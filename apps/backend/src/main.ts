@@ -9,6 +9,12 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ErrorLogService } from './modules/logging/error-log.service';
 
+// NOTE: Node's built-in `fetch` (the only outbound HTTP, used by the vision
+// providers) already pools + keep-alives connections via its OWN bundled undici
+// instance. Tuning it from a userland `undici` package's setGlobalDispatcher is
+// unreliable across Node versions (separate global-dispatcher singleton), so we
+// leave the default in place rather than ship a no-op.
+
 /**
  * Application bootstrap. Binds 0.0.0.0:PORT, sets the /api prefix, enables
  * permissive CORS for development, and installs the global validation pipe,
