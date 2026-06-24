@@ -83,6 +83,9 @@ export class AnalysisService {
 
   /** Vision path: extract board from image, then run the engine pipeline. */
   async analyzeScreenshot(params: AnalyzeScreenshotParams): Promise<AnalysisResult> {
+    // Overlap engine warm-up with the (much slower) vision call so a cold pool
+    // doesn't add its spawn + NNUE-load latency on top of the solve.
+    void this.engineService.warmUp(params.engineProvider).catch(() => undefined);
     const { visionName, pieces, sideToMove, visionWarnings } = await this.runVision(params);
     return this.runPipeline({
       pieces,

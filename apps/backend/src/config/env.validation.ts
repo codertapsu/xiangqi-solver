@@ -102,6 +102,15 @@ export const envSchema = z.object({
   // (NNUE + hash loaded once, reused). Also the hard cap on CONCURRENT engine
   // searches — further requests queue. Size for the host: ~1 per spare core.
   ENGINE_POOL_SIZE: intFromEnv(2, 1, 16),
+  // Spawn + warm an engine at boot so the very first solve doesn't pay the cold
+  // start (process spawn + ~50 MB NNUE load). No-op when ENGINE_PROVIDER=mock or
+  // the binary isn't configured. Best-effort: a failure just falls back to
+  // on-demand spawning.
+  ENGINE_PREWARM: boolFromEnv(true),
+  // Keep at least this many engines warm — the idle reaper never drops below it,
+  // so a low-traffic server doesn't pay a cold start on each session's first
+  // solve. 0 restores "reap everything when idle".
+  ENGINE_KEEP_WARM: intFromEnv(1, 0, 16),
 
   // Upload guardrails.
   MAX_UPLOAD_BYTES: intFromEnv(8_388_608, 1, 64 * 1024 * 1024),

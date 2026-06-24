@@ -48,6 +48,10 @@ export interface AppConfig {
     moveOverheadMs: number;
     /** Warm persistent engine processes kept by the pool (concurrency bound). */
     poolSize: number;
+    /** Spawn + warm an engine at boot to hide the first-solve cold start. */
+    prewarm: boolean;
+    /** Minimum engines the idle reaper keeps warm. */
+    keepWarm: number;
   };
   upload: {
     maxBytes: number;
@@ -133,6 +137,8 @@ export function configuration(): { app: AppConfig } {
       multiPv: env.ENGINE_MULTIPV,
       moveOverheadMs: env.ENGINE_MOVE_OVERHEAD_MS,
       poolSize: env.ENGINE_POOL_SIZE,
+      prewarm: env.ENGINE_PREWARM,
+      keepWarm: env.ENGINE_KEEP_WARM,
     },
     upload: {
       maxBytes: env.MAX_UPLOAD_BYTES,

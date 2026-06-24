@@ -308,4 +308,60 @@ describePosix('PikafishEngineService warm pool', () => {
       engine.onModuleDestroy();
     }
   });
+
+  it('warmUp() pre-spawns an engine that the first getBestMove reuses', async () => {
+    const { path, spawnCountFile } = writeCountingEngine('engine-prewarm.sh');
+    const engine = new PikafishEngineService(configWith(path));
+    try {
+      await engine.warmUp();
+      expect(spawnsIn(spawnCountFile)).toBe(1); // warmed before any solve
+      const result = await engine.getBestMove({
+        fen: FEN,
+        sideToMove: 'red',
+        depth: 5,
+        moveTimeMs: 100,
+      });
+      expect(result.uci).toBe('b2e2');
+      expect(spawnsIn(spawnCountFile)).toBe(1); // reused — no second spawn
+    } finally {
+      engine.onModuleDestroy();
+    }
+  });
+
+  it('a getBestMove racing a warmUp (pool of 1) is served correctly, not corrupted', async () => {
+    const { path, spawnCountFile } = writeCountingEngine('engine-warmrace.sh');
+    const engine = new PikafishEngineService(configWithPool(path, 1));
+    try {
+      // Fire BOTH without awaiting warmUp first: the request must not grab the
+      // slot mid-handshake (it's reserved busy), and must still be served once
+      // the warmed slot is released to the queue.
+      const [, result] = await Promise.all([
+        engine.warmUp(),
+        engine.getBestMove({ fen: FEN, sideToMove: 'red', depth: 5, moveTimeMs: 100 }),
+      ]);
+      expect(result.uci).toBe('b2e2');
+      expect(spawnsIn(spawnCountFile)).toBe(1); // one warm process served both
+    } finally {
+      engine.onModuleDestroy();
+    }
+  });
+
+  it('warmUp() / onModuleInit are no-ops when the provider is mock', async () => {
+    const { path, spawnCountFile } = writeCountingEngine('engine-noprewarm.sh');
+    const mockConfig = {
+      get: (key: string): unknown =>
+        key === 'app.engine'
+          ? { provider: 'mock', pikafishBinaryPath: path, prewarm: true, poolSize: 2 }
+          : undefined,
+    } as unknown as ConfigService;
+    const engine = new PikafishEngineService(mockConfig);
+    try {
+      engine.onModuleInit();
+      await engine.warmUp();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(spawnsIn(spawnCountFile)).toBe(0); // never touched the pikafish pool
+    } finally {
+      engine.onModuleDestroy();
+    }
+  });
 });

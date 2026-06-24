@@ -59,6 +59,20 @@ export class EngineService {
     }
   }
 
+  /**
+   * Best-effort: ensure a warm engine exists for the provider that WILL run, so
+   * the cold start can overlap with the (multi-second) vision call instead of
+   * landing on the user. No-op for the mock engine; never throws.
+   */
+  async warmUp(provider?: EngineProviderName): Promise<void> {
+    if (this.effectiveProviderName(provider) !== 'pikafish') return;
+    try {
+      await this.pikafishEngine.warmUp();
+    } catch {
+      // Warm-up is purely an optimization — on-demand spawn still covers solves.
+    }
+  }
+
   /** Run a best-move query against the selected engine (memoized). */
   async getBestMove(
     input: EngineBestMoveInput,

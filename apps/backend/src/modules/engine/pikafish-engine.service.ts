@@ -1,7 +1,13 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { Injectable, Logger, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../../config/configuration';
 import {
@@ -61,6 +67,9 @@ class EngineSlot {
     variant: string,
     moveOverheadMs: number,
     private readonly onDeath: (slot: EngineSlot) => void,
+    /** Fired when the slot has been idle long enough — the POOL decides whether
+     *  to reap it (honoring keep-warm) or let it stay warm. */
+    private readonly onIdle: (slot: EngineSlot) => void,
   ) {
     // ARGS ARRAY, no shell: no command injection possible. cwd is the binary's
     // directory so a co-located "pikafish.nnue" resolves by default.
@@ -153,8 +162,9 @@ class EngineSlot {
   touchIdle(): void {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
-      // Never reap a slot mid-search; release() re-arms the timer afterwards.
-      if (!this.busy) this.kill();
+      // Never reap a slot mid-search; the pool decides (keep-warm) whether the
+      // idle slot is reaped or kept. release() re-arms the timer afterwards.
+      if (!this.busy && this.alive) this.onIdle(this);
     }, IDLE_SHUTDOWN_MS);
     this.idleTimer.unref();
   }
@@ -290,7 +300,7 @@ class EngineSlot {
  * pikafish-real-binary.integration.spec.ts (see FenService).
  */
 @Injectable()
-export class PikafishEngineService implements XiangqiEngine, OnModuleDestroy {
+export class PikafishEngineService implements XiangqiEngine, OnModuleInit, OnModuleDestroy {
   readonly name = 'pikafish';
   private readonly logger = new Logger(PikafishEngineService.name);
 
@@ -301,6 +311,66 @@ export class PikafishEngineService implements XiangqiEngine, OnModuleDestroy {
   }[] = [];
 
   constructor(private readonly config: ConfigService) {}
+
+  /** Pre-warm at boot so the first solve doesn't pay the cold start. Best-effort
+   *  and non-blocking: a failure (no binary / mock provider) just falls back to
+   *  on-demand spawning. */
+  onModuleInit(): void {
+    const engine = this.config.get<AppConfig['engine']>('app.engine');
+    if (!engine?.prewarm || engine.provider !== 'pikafish' || !engine.pikafishBinaryPath) {
+      return;
+    }
+    void this.warmUp(this.keepWarm() || 1);
+  }
+
+  /**
+   * Ensure up to [target] engines are warm (or being spawned). Idempotent and
+   * never throws — used at boot and to overlap engine warm-up with the vision
+   * call so a cold start is hidden behind work already in flight.
+   */
+  async warmUp(target = 1): Promise<void> {
+    if (!this.isPikafishConfigured()) return;
+    let binaryPath: string;
+    let nnuePath: string;
+    try {
+      binaryPath = this.resolveBinaryPath();
+      nnuePath = this.resolveNnuePath();
+    } catch (err) {
+      this.logger.warn(`Engine pre-warm skipped: ${(err as Error).message}`);
+      return;
+    }
+    const want = Math.min(target, this.poolSize());
+    while (this.slots.filter((s) => s.alive).length < want) {
+      const slot = this.spawnSlot(binaryPath, nnuePath);
+      // Reserve BEFORE publishing to the pool (same invariant as acquire() and
+      // dispatchQueue()): a concurrent acquire() must NEVER grab a slot whose
+      // UCI handshake is still in flight, or the two would clobber the slot's
+      // single waiter/buffer.
+      slot.busy = true;
+      this.slots.push(slot);
+      try {
+        await slot.ready;
+      } catch (err) {
+        slot.kill();
+        this.removeSlot(slot);
+        this.logger.warn(
+          `Engine pre-warm failed (will spawn on demand): ${(err as Error).message}`,
+        );
+        return;
+      }
+      // Handshake done — release it as a warm, available idle slot, and hand it
+      // to anything that queued while it was reserved during the handshake.
+      slot.busy = false;
+      slot.touchIdle();
+      this.dispatchQueue();
+    }
+  }
+
+  /** True when the active engine is pikafish with a configured binary path. */
+  private isPikafishConfigured(): boolean {
+    const engine = this.config.get<AppConfig['engine']>('app.engine');
+    return engine?.provider === 'pikafish' && !!engine.pikafishBinaryPath;
+  }
 
   async getBestMove(input: EngineBestMoveInput): Promise<EngineBestMoveResult> {
     const binaryPath = this.resolveBinaryPath();
@@ -463,8 +533,20 @@ export class PikafishEngineService implements XiangqiEngine, OnModuleDestroy {
         // A death may free capacity a queued request is waiting for.
         this.dispatchQueue();
       },
+      (idle) => this.reapIdle(idle),
     );
     return slot;
+  }
+
+  /** Idle-reap policy: keep at least keepWarm engines warm; reap the surplus. */
+  private reapIdle(slot: EngineSlot): void {
+    const alive = this.slots.filter((s) => s.alive).length;
+    if (alive > this.keepWarm()) {
+      slot.kill();
+    } else {
+      // Stay warm — re-arm so it checks again after the next idle window.
+      slot.touchIdle();
+    }
   }
 
   private removeSlot(slot: EngineSlot): void {
@@ -475,6 +557,13 @@ export class PikafishEngineService implements XiangqiEngine, OnModuleDestroy {
   private poolSize(): number {
     const engine = this.config.get<AppConfig['engine']>('app.engine');
     return Math.max(1, engine?.poolSize ?? 2);
+  }
+
+  /** Engines the idle reaper keeps warm (clamped to the pool size). */
+  private keepWarm(): number {
+    const engine = this.config.get<AppConfig['engine']>('app.engine');
+    const want = Math.max(0, engine?.keepWarm ?? 1);
+    return Math.min(want, this.poolSize());
   }
 
   /** Ensure the configured binary exists and is executable, else fail clearly. */
