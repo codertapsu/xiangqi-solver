@@ -5,11 +5,13 @@ import { ImagePreprocessService } from './image-preprocess.service';
 import { MockVisionProvider } from './providers/mock-vision.provider';
 import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
+import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
 
 /**
  * AI module: exposes the AiService facade and all vision provider
- * implementations (mock + Gemini + OpenAI). The facade selects per-request and
- * normalizes (downscale/recompress) uploads before any provider sees them.
+ * implementations (mock + Gemini + OpenAI + api.apikey.fun). The facade selects
+ * per-request and normalizes (downscale/recompress) uploads before any provider
+ * sees them.
  */
 @Module({
   imports: [BoardModule],
@@ -19,6 +21,7 @@ import { OpenAiVisionProvider } from './providers/openai.provider';
     MockVisionProvider,
     GeminiVisionProvider,
     OpenAiVisionProvider,
+    ApikeyFunVisionProvider,
   ],
   exports: [AiService],
 })

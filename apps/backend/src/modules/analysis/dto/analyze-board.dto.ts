@@ -16,6 +16,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export enum AiProviderEnum {
   gemini = 'gemini',
   openai = 'openai',
+  apikeyfun = 'apikeyfun',
   mock = 'mock',
 }
 

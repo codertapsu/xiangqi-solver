@@ -23,7 +23,7 @@ const boolFromEnv = (def: boolean) =>
     z.boolean(),
   );
 
-export const aiProviderSchema = z.enum(['gemini', 'openai', 'mock']);
+export const aiProviderSchema = z.enum(['gemini', 'openai', 'apikeyfun', 'mock']);
 export const engineProviderSchema = z.enum(['pikafish', 'mock']);
 
 export const envSchema = z.object({
@@ -52,6 +52,11 @@ export const envSchema = z.object({
   OPENAI_API_KEY: z.string().default(''),
   OPENAI_MODEL: z.string().default('gpt-5.4'),
   GEMINI_MODEL: z.string().default('gemini-3.5-flash'),
+  // api.apikey.fun — an OpenAI-COMPATIBLE aggregator (Bearer auth, SSE streaming).
+  // Set AI_PROVIDER=apikeyfun + APIKEYFUN_API_KEY to use it; the model is whatever
+  // that service exposes (the example uses gpt-5.5).
+  APIKEYFUN_API_KEY: z.string().default(''),
+  APIKEYFUN_MODEL: z.string().default('gpt-5.5'),
   // Vision-image normalization. Providers downscale internally anyway (OpenAI
   // "high" detail: fit in 2048px then shortest side 768px), so pixels beyond
   // that budget only cost upload time and tiles. We mirror the budget server-

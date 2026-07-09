@@ -12,8 +12,9 @@ import { ImagePreprocessService } from './image-preprocess.service';
 import { MockVisionProvider } from './providers/mock-vision.provider';
 import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
+import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
 
-export type AiProviderName = 'gemini' | 'openai' | 'mock';
+export type AiProviderName = 'gemini' | 'openai' | 'apikeyfun' | 'mock';
 
 /** Identical re-captures are common (retry taps, mode fallbacks re-reading the
  *  same screenshot) — memoizing the extraction skips a multi-second LLM call. */
@@ -41,6 +42,7 @@ export class AiService {
     private readonly mockProvider: MockVisionProvider,
     private readonly geminiProvider: GeminiVisionProvider,
     private readonly openaiProvider: OpenAiVisionProvider,
+    private readonly apikeyfunProvider: ApikeyFunVisionProvider,
   ) {}
 
   /** Resolve the configured default provider name. */
@@ -69,9 +71,11 @@ export class AiService {
         return this.geminiProvider;
       case 'openai':
         return this.openaiProvider;
+      case 'apikeyfun':
+        return this.apikeyfunProvider;
       default:
         throw new BadRequestException({
-          message: `Unknown AI provider "${String(name)}". Use "gemini", "openai", or "mock".`,
+          message: `Unknown AI provider "${String(name)}". Use "gemini", "openai", "apikeyfun", or "mock".`,
           code: 'UNKNOWN_AI_PROVIDER',
         });
     }

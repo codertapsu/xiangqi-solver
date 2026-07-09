@@ -4,6 +4,7 @@ import { ImagePreprocessService } from './image-preprocess.service';
 import { MockVisionProvider } from './providers/mock-vision.provider';
 import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
+import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
 import { ExtractBoardStateInput, ExtractBoardStateResult } from './ai-provider.interface';
 
 function buildConfig(ai: Record<string, unknown> = { provider: 'mock' }): ConfigService {
@@ -50,6 +51,7 @@ describe('AiService extraction cache', () => {
       counting as unknown as MockVisionProvider,
       {} as GeminiVisionProvider,
       {} as OpenAiVisionProvider,
+      {} as ApikeyFunVisionProvider,
     );
   });
 
@@ -92,6 +94,7 @@ describe('AiService extraction cache', () => {
       failing as unknown as MockVisionProvider,
       {} as GeminiVisionProvider,
       {} as OpenAiVisionProvider,
+      {} as ApikeyFunVisionProvider,
     );
     const input: ExtractBoardStateInput = { imageBuffer: image, mimeType: 'image/png' };
     await svc.extractBoardState(input);
@@ -158,6 +161,7 @@ describe('AiService provider enforcement', () => {
       p.mock as unknown as MockVisionProvider,
       p.gemini as unknown as GeminiVisionProvider,
       p.openai as unknown as OpenAiVisionProvider,
+      {} as ApikeyFunVisionProvider,
     );
   }
 
@@ -190,6 +194,7 @@ describe('AiService single-flight coalescing', () => {
       counting as unknown as MockVisionProvider,
       {} as GeminiVisionProvider,
       {} as OpenAiVisionProvider,
+      {} as ApikeyFunVisionProvider,
     );
     const input: ExtractBoardStateInput = {
       imageBuffer: Buffer.from('same-bytes'),
@@ -248,6 +253,7 @@ describe('AiService accuracy cascade', () => {
       {} as MockVisionProvider,
       {} as GeminiVisionProvider,
       provider as unknown as OpenAiVisionProvider,
+      {} as ApikeyFunVisionProvider,
     );
   }
   const img: ExtractBoardStateInput = { imageBuffer: Buffer.from('x'), mimeType: 'image/png' };

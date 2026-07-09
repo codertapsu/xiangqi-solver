@@ -58,8 +58,15 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
+  const ai = appConfig?.ai;
   const aiModel =
-    appConfig?.ai.provider === 'gemini' ? appConfig.ai.geminiModel : appConfig?.ai.openaiModel;
+    ai?.provider === 'gemini'
+      ? ai.geminiModel
+      : ai?.provider === 'apikeyfun'
+        ? ai.apikeyfunModel
+        : ai?.provider === 'mock'
+          ? 'mock'
+          : ai?.openaiModel;
 
   await app.listen(port, '0.0.0.0');
   logger.log(`Backend listening on http://0.0.0.0:${port}/api`);

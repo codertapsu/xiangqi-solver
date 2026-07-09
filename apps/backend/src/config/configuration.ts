@@ -8,7 +8,7 @@ export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
   ai: {
-    provider: 'gemini' | 'openai' | 'mock';
+    provider: 'gemini' | 'openai' | 'apikeyfun' | 'mock';
     /** When true, IGNORE the client-supplied provider and always use `provider`
      *  (operator authority — lets the server switch the fleet's cloud vision
      *  even for already-installed apps that send an explicit provider). */
@@ -17,6 +17,9 @@ export interface AppConfig {
     openaiApiKey: string;
     openaiModel: string;
     geminiModel: string;
+    /** api.apikey.fun (OpenAI-compatible aggregator) key + model. */
+    apikeyfunApiKey: string;
+    apikeyfunModel: string;
     /** Downscale/recompress uploads to the provider's pixel budget pre-call. */
     visionPreprocess: boolean;
     visionImageShortSide: number;
@@ -112,6 +115,8 @@ export function configuration(): { app: AppConfig } {
       openaiApiKey: env.OPENAI_API_KEY,
       openaiModel: env.OPENAI_MODEL,
       geminiModel: env.GEMINI_MODEL,
+      apikeyfunApiKey: env.APIKEYFUN_API_KEY,
+      apikeyfunModel: env.APIKEYFUN_MODEL,
       visionPreprocess: env.VISION_PREPROCESS,
       visionImageShortSide: env.VISION_IMAGE_SHORT_SIDE,
       visionImageLongSide: env.VISION_IMAGE_LONG_SIDE,

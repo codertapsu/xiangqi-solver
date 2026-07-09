@@ -6,6 +6,7 @@ import { ImagePreprocessService } from '../ai/image-preprocess.service';
 import { MockVisionProvider } from '../ai/providers/mock-vision.provider';
 import { GeminiVisionProvider } from '../ai/providers/gemini.provider';
 import { OpenAiVisionProvider } from '../ai/providers/openai.provider';
+import { ApikeyFunVisionProvider } from '../ai/providers/apikeyfun.provider';
 import { ErrorLogService } from '../logging/error-log.service';
 import { EngineService } from '../engine/engine.service';
 import { MockEngineService } from '../engine/mock-engine.service';
@@ -56,6 +57,7 @@ describe('AnalysisService', () => {
       new MockVisionProvider(),
       new GeminiVisionProvider(config, errorLog),
       new OpenAiVisionProvider(config, errorLog),
+      new ApikeyFunVisionProvider(config, errorLog),
     );
     const engineService = new EngineService(
       config,
