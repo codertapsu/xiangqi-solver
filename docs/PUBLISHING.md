@@ -31,7 +31,8 @@ AAB delivery, Play App Signing, Data Safety, AdMob + UMP consent.
 - [ ] **Privacy policy URL** (required: the app uses the Advertising ID + uploads
       screenshots). *(Already live — §10.)*
 - [ ] **A reachable backend** at the URL the app ships with (§7).
-- [ ] **Toolchain:** Flutter ≥ 3.44, **JDK 21**, Android SDK platform 36.
+- [ ] **Toolchain:** Flutter ≥ 3.44, **JDK 21**, Android SDK platform 36, and — if you
+      also deploy the backend (§7) — **Node ≥ 20** (`apps/backend/package.json` `engines`).
 
 ```sh
 flutter doctor -v
@@ -62,7 +63,7 @@ Listed so you don't re-do it and so a reviewer knows what the release expects.
 | On-device GPLv3 engine | `libpikafish.so` ships; NNUE downloaded at runtime | §8 |
 | Network security config | release allows cleartext to the one HTTP backend host | §7 |
 | Privacy policy | LIVE on codertapsu-web | §10 |
-| Version | `1.0.0+2` (`versionName 1.0.0`, `versionCode 2`) | `pubspec.yaml` |
+| Version | read `version:` from `pubspec.yaml` — it is the source of truth (§2.3) | `pubspec.yaml` |
 
 A verified **release AAB builds** (`flutter build appbundle --release`) and **launches
 clean on a real device** (R8 enabled — see §9).
@@ -105,7 +106,15 @@ the upload cert SHA-1/SHA-256 from **Setup → App integrity → App signing**.
 ### 2.3 Versioning
 `pubspec.yaml` `version: <name>+<code>` is the source of truth (Flutter maps it to
 `versionName`+`versionCode`). **`versionCode` must strictly increase on every upload**,
-even to internal tracks. Currently `1.0.0+2`. Bump the `+N` for each new upload.
+even to internal tracks. Bump the `+N` for each new upload.
+
+Read the current value from `pubspec.yaml` — this doc deliberately does **not** restate
+it, because a copy here drifts. The next upload must exceed **the highest versionCode
+Play has already accepted**, which is not necessarily the local file: check *Play Console
+→ Release → App bundle explorer*, since a local bump may never have been uploaded.
+Repo convention is a dedicated `chore: bump version to X.Y.Z+N` commit (see git log), so
+each versionCode maps to one commit — that mapping is what makes the §15 rollback
+(`git revert` + re-bump) executable.
 
 ---
 
@@ -247,13 +256,16 @@ The same backend serves dev and prod via `apps/backend/.env` (validated by
 
 ```sh
 # Real board reading + engine
-AI_PROVIDER=openai                 # or gemini (drop-in); requires the matching key
+AI_PROVIDER=openai                 # openai | gemini | apikeyfun (all drop-in); needs the matching key
 AI_PROVIDER_ENFORCE=true           # IGNORE the app's provider field so AI_PROVIDER wins even for
                                    # already-installed apps — required to switch the fleet's cloud
                                    # vision (e.g. openai -> gemini) without an app release.
 OPENAI_API_KEY=<secret>            # gpt-5.4 by default
 # GEMINI_API_KEY=<secret>          # if AI_PROVIDER=gemini (GEMINI_MODEL=gemini-3.5-flash)
+# APIKEYFUN_API_KEY=<secret>       # if AI_PROVIDER=apikeyfun (APIKEYFUN_MODEL=gpt-5.5, SSE streaming)
 ENGINE_PROVIDER=pikafish           # server-side engine (or fairy-stockfish — see MONETIZATION.md)
+ENGINE_PROVIDER_ENFORCE=true       # the engine-side twin of AI_PROVIDER_ENFORCE — without it a prod
+                                   # server still honors whatever engineProvider an installed app sends
 PIKAFISH_BINARY_PATH=<path>        # + PIKAFISH_NNUE_PATH for the net
 
 # Cost guard (hints are device-local; THIS is what bounds spend)
@@ -263,9 +275,13 @@ RATE_LIMIT_DEVICE_WINDOW_SECONDS=86400
 RATE_LIMIT_DEVICE_LIMIT=1000       # analyses / device / day
 
 # Install-grant storage (persist this dir; it's the anti-reinstall ledger + Hint Grants)
-HINTS_DATA_DIR=./data              # installs.json + grants.json
+HINTS_DATA_DIR=./data              # installs.log (append-only NDJSON ledger) + grants.json + admins.json
+                                   # a legacy object-format installs.json is auto-migrated once on boot
 HINTS_FREE_ON_INSTALL=10
 HINTS_OWN_KEY_DIVISOR=3
+LOGS_DIR=./logs                    # date-grouped error logs — what §13 monitoring reads; persist it
+ADMIN_SECRET=<long-random>         # EMPTY disables the admin write API (fail-closed) — and with it the
+                                   # live remote-config path §15 leans on. `openssl rand -hex 32`
 
 # Remote feature flags served by GET /api/config (tunable WITHOUT an app release)
 FEATURE_BANNER_ADS=true
@@ -273,10 +289,16 @@ FEATURE_REWARDED_ADS=false
 FEATURE_APP_OPEN_ADS=false
 FEATURE_USE_REAL_ADS=true          # ← MUST be true in prod to serve real ad units
 FEATURE_UI_LICENSES=true           # ← see GPLv3 note in §8
+FEATURE_UI_DEVICE_ID=true          # ← REQUIRED for the §4 Hint-Grants support flow: users read their
+                                   # Device ID off this tile. Default false = the tile doesn't exist.
+# the other FEATURE_UI_* flags (BACKEND, PROVIDERS, ENGINE_TUNING, VISION_MODEL) stay false in prod
 ONDEVICE_ENABLED=true
-ONDEVICE_NET_URL=https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue
+ONDEVICE_NET_URL=http://103.157.205.175:3000/api/engine/net   # ← SELF-HOSTED, not GitHub (which 504'd)
+ONDEVICE_NET_PATH=./release/engine/master-net.nnue            # the file served at GET /api/engine/net;
+                                   # staged (with a size check) by apps/backend/scripts/build-release.sh
 ONDEVICE_NET_BYTES=50760458
 ONDEVICE_VISION_MODEL=gpt-5.4
+STORED_SCREENSHOTS_MAX=5
 ```
 
 Deployment requirements:
@@ -287,12 +309,48 @@ Deployment requirements:
   only** (everything else stays HTTPS-only). So an installed release reaches the default
   backend out of the box. **When you add TLS**, point `BACKEND_URL` at the `https://…`
   origin and delete the cleartext exception from `network_security_config.xml`.
-- **Persist `HINTS_DATA_DIR`** on a durable volume — it's the reinstall ledger + the
-  Hint Grants allowlist. A corrupt `installs.json` makes the backend refuse to boot
-  (fail-closed), so back it up. (It's not security-critical — a wipe just re-grants the
-  free hints once per device — but losing it is annoying.)
+- **Persist `HINTS_DATA_DIR`** (and `LOGS_DIR`) on a durable volume — it's the reinstall
+  ledger + the Hint Grants allowlist. A wholly corrupt `installs.log` makes the backend
+  refuse to boot (fail-closed; the legacy `installs.json` path fails closed too), so back
+  it up. (It's not security-critical — a wipe just re-grants the free hints once per
+  device — but losing it is annoying.)
 - **`GET /api/config` is exempt from the throttle** so a NAT full of devices can't 429
   the config fetch; the client falls back to cached/default flags on any outage.
+
+### 7.1 Deploying the backend (and verifying it before you build)
+
+`apps/backend/scripts/build-release.sh` is the deploy pipeline — it compiles, stages both
+NNUE nets, and pins `ONDEVICE_NET_URL` into the release `.env`. It self-documents in its
+header; the short form:
+
+```sh
+cd apps/backend
+ONDEVICE_NET_SRC=~/Downloads/pikafish.nnue bash scripts/build-release.sh
+rsync -av --delete \
+  --exclude='/data' --exclude='/logs' --exclude='/node_modules' \
+  release/ root@103.157.205.175:/opt/xiangqi-solver/apps/backend
+ssh root@103.157.205.175 \
+  'cd /opt/xiangqi-solver/apps/backend && npm install --omit=dev && npm run start:prod'
+```
+
+> ⚠️ **The `--exclude` flags are load-bearing.** The release bundle contains no `data/`,
+> `logs/` or `node_modules/`, so `--delete` without them **wipes the hint ledger** (the
+> anti-reinstall record), the error logs, and the installed deps.
+
+**Then verify before building the app** — 30 seconds here beats discovering a bad deploy
+after you've signed an AAB on a versionCode you can never reuse:
+
+```sh
+curl -s http://103.157.205.175:3000/api/config | jq '.data | {ads, ui, onDevice}'
+#   expect ads.useReal=true, ui.licenses=true, ui.deviceId=true, onDevice.enabled=true
+curl -sI http://103.157.205.175:3000/api/engine/net | grep -i content-length
+#   expect exactly ONDEVICE_NET_BYTES (the app verifies the downloaded size and rejects a mismatch)
+```
+
+**Live config without a restart:** an admin device (its id listed in
+`<HINTS_DATA_DIR>/admins.json`) presenting `x-admin-secret` can edit the feature flags
+from the in-app admin page. That is the fastest mid-incident lever (§15) — but it only
+works if `ADMIN_SECRET` is set, since an empty secret disables the admin write API.
 
 ---
 
@@ -326,10 +384,45 @@ obligations — don't skip them:
 
 ## 9. Build the release AAB
 
+### 9.0 Ship an update — the ordered short list
+
+**This is the per-release spine.** Sections §3, §6 and §10 are one-time first-launch
+setup and are skipped on an update. Every line below is an imperative + a pointer;
+nothing here restates a value, so it can't drift.
+
+1. **Quality gate** — `bash scripts/check.sh` (backend lint/test/build + `flutter analyze`
+   + `flutter test`). Must be green *before* you burn a versionCode.
+2. **Bump the version** — `version:` in `apps/mobile/pubspec.yaml`, as its own
+   `chore: bump version to X.Y.Z+N` commit (§2.3). Must exceed the highest versionCode
+   **Play has accepted**, not just the local file.
+3. **Deploy/refresh the backend** *if any env or feature flag changed* (§7.1). Skip if
+   the server is untouched.
+4. **Verify the deployed backend** before building (§7.1) — a 30-second `curl` beats
+   discovering a bad deploy after the AAB is signed.
+5. **Build the AAB** — `flutter clean && flutter pub get && flutter build appbundle
+   --release` with **JDK 21** (§0, §9.2).
+6. **Verify the signer** — `keytool -printcert -jarfile …/app-release.aab`; the CN must be
+   your upload key, **not** `Android Debug` (§2.2). The build silently falls back to the
+   debug key when `key.properties` is missing.
+7. **Smoke-test on a real device** (§9.4) — R8-only crashes never appear in debug.
+8. **Upload to Internal testing** with **fresh** vi-VN + en-US "What's new" notes
+   (§11; the Appendix holds the v1.0.0 text as a template — don't ship it verbatim on an
+   update).
+9. **Run the §12 pre-launch checklist.**
+10. **Soak ≥ 24 h**, then promote to Production as a **staged** rollout (§11).
+11. **Monitor** crash-free rate, ANRs, and the backend error log for ~3 days (§13); §15 is
+    the rollback.
+
+> **Pre-flight, once per release:** re-check Play Console → Dashboard for a *target API
+> level* warning (§10.6). That requirement escalates annually, and bumping `targetSdk` is
+> not a same-day change — it needs a behavior-change pass plus a full §9.4 device test.
+
 ### 9.1 Pre-build checklist
+0. `bash scripts/check.sh` green — the repo's one-command gate (backend lint + test +
+   build, `flutter analyze`, `flutter test`).
 1. `key.properties` present (§2) so the AAB is upload-key signed.
-2. Backend reachable at the shipped `BACKEND_URL`, with `FEATURE_USE_REAL_ADS=true` and
-   `FEATURE_UI_LICENSES=true` (§7, §8).
+2. Backend reachable at the shipped `BACKEND_URL`, with `FEATURE_USE_REAL_ADS=true`,
+   `FEATURE_UI_LICENSES=true` and `FEATURE_UI_DEVICE_ID=true` (§7, §7.1, §8).
 3. `versionCode` bumped above any prior upload (`pubspec.yaml`).
 4. `JAVA_HOME` → JDK 21 (§0).
 
@@ -348,6 +441,15 @@ flutter build appbundle --release
 - **Never** build with `--dart-define=MOCK_MONETIZATION=true` for release — it fakes the
   wallet/ads/store.
 - Output: `build/app/outputs/bundle/release/app-release.aab` — upload **this `.aab`**.
+
+**Verify the signer before uploading** — `build.gradle.kts` *silently* falls back to the
+debug keystore when `key.properties` is missing, so the build succeeds and only Play
+rejects it:
+```sh
+keytool -printcert -jarfile build/app/outputs/bundle/release/app-release.aab | head -20
+```
+The owner/CN must be your **upload key** — if it says `CN=Android Debug`, stop and fix
+`key.properties` (§2.2).
 
 ### 9.3 R8 + crash symbolication (already configured)
 The release build runs **R8** (`isMinifyEnabled`/`isShrinkResources = true`) with
@@ -447,8 +549,13 @@ This app declares:
 > user-initiated, scoped to producing a move suggestion, and never silent**.
 
 ### 10.6 Target API level
-`targetSdk = 35` (Android 15) satisfies Play's current new-app requirement; `compileSdk
-= 36`, `minSdk = 26` (overlay needs API 26). Bump `targetSdk` if Play later flags it.
+`targetSdk = 35` (Android 15); `compileSdk = 36`, `minSdk = 26` (the overlay needs API 26).
+
+**Re-verify this every release** rather than trusting the number above: Play's minimum
+target API escalates on an annual deadline, and it applies to *updates*, not just new
+apps. Check Play Console → Dashboard for a target-API warning as a §9.0 pre-flight. Bumping
+`targetSdk` is not a same-day change — each level brings behavior changes that need a pass
+plus a full §9.4 device smoke test, so discover it early, not on release day.
 
 ---
 
@@ -565,6 +672,10 @@ adb shell dumpsys package com.codertapsu.xiangqi_solver | grep versionName
 
 Paste into the matching **listing language** (vi-VN gets Vietnamese, en-US gets English).
 Plain text, ≤ 500 chars each.
+
+> ⚠️ This is the **v1.0.0 first-launch** copy — a **template**, not something to re-ship.
+> Every update needs fresh notes in both languages (§9.0 step 8); stale first-launch text
+> on an update reads as an abandoned app.
 
 **Vietnamese (vi-VN — default listing):**
 ```

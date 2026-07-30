@@ -76,8 +76,10 @@ flutter:
   # Generate AppLocalizations from the ARB files (see l10n.yaml).
   generate: true
 
-  # NOTE: the on-device engine (Pikafish .so + NNUE) is NOT a Flutter asset and
-  # is NOT bundled in release builds — it's GPLv3 + a non-commercial net, so it
-  # must stay out of the commercial app. It ships only in DEBUG via
-  # android/app/src/debug/jniLibs/ (libpikafish.so + libpikafish_nnue.so),
-  # extracted to nativeLibraryDir. See docs/ON_DEVICE_ENGINE.md.
+  # NOTE: the on-device engine (Pikafish) is NOT a Flutter asset — it ships as a
+  # native library at android/app/src/main/jniLibs/arm64-v8a/libpikafish.so,
+  # extracted to nativeLibraryDir. It IS in RELEASE builds, so the shipped app
+  # is GPLv3 and carries the corresponding source-offer obligations (the
+  # "Open-source licenses" entry, gated by FEATURE_UI_LICENSES). The NNUE net is
+  # NOT bundled; it is downloaded at runtime from the backend's /api/engine/net.
+  # See docs/ON_DEVICE_ENGINE.md and docs/PUBLISHING.md §8.
