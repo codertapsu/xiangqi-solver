@@ -296,7 +296,7 @@ class ScreenCaptureService : Service() {
      * source unchanged.
      */
     private fun cropToRegion(source: Bitmap): Bitmap {
-        val region = CaptureRegionHolder.region ?: return source
+        val region = CaptureRegionHolder.region(this) ?: return source
         val left = (region.left * source.width).toInt().coerceIn(0, source.width - 1)
         val top = (region.top * source.height).toInt().coerceIn(0, source.height - 1)
         val right = (region.right * source.width).toInt().coerceIn(left + 1, source.width)

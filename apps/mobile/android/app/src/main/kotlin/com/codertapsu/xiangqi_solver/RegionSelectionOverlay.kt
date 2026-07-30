@@ -50,13 +50,13 @@ class RegionSelectionOverlay(private val context: Context) {
             setBackgroundColor(0xCC000000.toInt())
         }
         controls.addView(makeButton("Full screen") {
-            CaptureRegionHolder.clear()
+            CaptureRegionHolder.clear(context)
             dismiss()
         })
         controls.addView(makeButton("Cancel") { dismiss() })
         controls.addView(makeButton("Use this area") {
             val r = selector.normalizedRegion()
-            CaptureRegionHolder.set(r.left, r.top, r.right, r.bottom)
+            CaptureRegionHolder.set(context, r.left, r.top, r.right, r.bottom)
             dismiss()
         })
 
@@ -198,8 +198,31 @@ class RegionSelectionOverlay(private val context: Context) {
 
         override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
             super.onSizeChanged(w, h, oldw, oldh)
-            if (initialised) return
-            val saved = CaptureRegionHolder.region
+            if (initialised) {
+                // Defensive: if this view is ever resized after seeding, `sel`
+                // is in PIXELS and would be stranded in the OLD coordinate
+                // space — visibly misplaced, and "Use this area" would save a
+                // crop that doesn't match what's drawn. Re-map it through its
+                // own normalized form (which also preserves an in-progress edit
+                // rather than snapping back to the saved region).
+                //
+                // In practice this rarely fires: show() sizes the window in
+                // fixed pixels with FLAG_LAYOUT_NO_LIMITS, so a rotation does
+                // not re-dispatch onSizeChanged — the overlay is dismissed on
+                // any action anyway. It costs nothing and keeps the invariant
+                // true if the window ever does change size (multi-window, a
+                // foldable unfolding, a display change).
+                if (oldw > 0 && oldh > 0 && (w != oldw || h != oldh)) {
+                    sel.set(
+                        sel.left / oldw.toFloat() * w,
+                        sel.top / oldh.toFloat() * h,
+                        sel.right / oldw.toFloat() * w,
+                        sel.bottom / oldh.toFloat() * h,
+                    )
+                }
+                return
+            }
+            val saved = CaptureRegionHolder.region(context)
             if (saved != null) {
                 sel.set(saved.left * w, saved.top * h, saved.right * w, saved.bottom * h)
             } else {

@@ -83,12 +83,12 @@ class MainActivity : FlutterActivity() {
                 startRegionSelection(result)
 
             Constants.METHOD_CLEAR_CAPTURE_REGION -> {
-                CaptureRegionHolder.clear()
+                CaptureRegionHolder.clear(this)
                 result.success(null)
             }
 
             Constants.METHOD_HAS_CAPTURE_REGION ->
-                result.success(CaptureRegionHolder.hasRegion)
+                result.success(CaptureRegionHolder.hasRegion(this))
 
             Constants.METHOD_NATIVE_LIBRARY_DIR ->
                 result.success(applicationInfo.nativeLibraryDir)

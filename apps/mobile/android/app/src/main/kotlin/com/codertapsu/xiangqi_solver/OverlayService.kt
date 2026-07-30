@@ -77,6 +77,11 @@ class OverlayService : Service() {
         super.onCreate()
         touchSlop = ViewConfiguration.get(this).scaledTouchSlop
         instance = this
+        // Warm the saved capture region now: the selector seeds its box during a
+        // layout pass on the main thread, and this service can be the component
+        // that starts the process (a sticky restart runs with no Activity), so
+        // paying the first prefs read here keeps it off that path.
+        CaptureRegionHolder.init(applicationContext)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
