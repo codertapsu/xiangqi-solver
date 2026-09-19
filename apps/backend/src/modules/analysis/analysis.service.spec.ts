@@ -8,6 +8,7 @@ import { GeminiVisionProvider } from '../ai/providers/gemini.provider';
 import { OpenAiVisionProvider } from '../ai/providers/openai.provider';
 import { ApikeyFunVisionProvider } from '../ai/providers/apikeyfun.provider';
 import { LocalCodexVisionProvider } from '../ai/providers/local-codex.provider';
+import { LocalClaudeVisionProvider } from '../ai/providers/local-claude.provider';
 import { LocalCodexVisionAllowlist } from '../ai/local-codex-vision.allowlist';
 import { ErrorLogService } from '../logging/error-log.service';
 import { EngineService } from '../engine/engine.service';
@@ -61,6 +62,7 @@ describe('AnalysisService', () => {
       new OpenAiVisionProvider(config, errorLog),
       new ApikeyFunVisionProvider(config, errorLog),
       {} as LocalCodexVisionProvider,
+      {} as LocalClaudeVisionProvider,
       { canUse: async () => false } as unknown as LocalCodexVisionAllowlist,
     );
     const engineService = new EngineService(

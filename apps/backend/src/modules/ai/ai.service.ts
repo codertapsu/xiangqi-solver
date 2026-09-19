@@ -14,6 +14,7 @@ import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
 import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
 import { LocalCodexVisionProvider } from './providers/local-codex.provider';
+import { LocalClaudeVisionProvider } from './providers/local-claude.provider';
 import { LocalCodexVisionAllowlist } from './local-codex-vision.allowlist';
 
 export type AiProviderName = 'gemini' | 'openai' | 'apikeyfun' | 'mock';
@@ -22,9 +23,15 @@ export type AiProviderName = 'gemini' | 'openai' | 'apikeyfun' | 'mock';
 export interface VisionExtractionOutcome {
   result: ExtractBoardStateResult;
   providerName: string;
-  /** Present when Local Codex failed and the standard provider completed. */
+  /** Present when the local bridge failed and the standard provider completed. */
   fallbackFrom?: string;
 }
+
+/** Display names for the local bridges, used in the user-visible fallback note. */
+const LOCAL_PROVIDER_LABELS: Record<string, string> = {
+  'local-codex': 'Local Codex',
+  'local-claude': 'Local Claude',
+};
 
 /** Identical re-captures are common (retry taps, mode fallbacks re-reading the
  *  same screenshot) — memoizing the extraction skips a multi-second LLM call. */
@@ -55,7 +62,10 @@ export class AiService {
     private readonly openaiProvider: OpenAiVisionProvider,
     private readonly apikeyfunProvider: ApikeyFunVisionProvider,
     private readonly localCodexProvider: LocalCodexVisionProvider,
-    private readonly localCodexAllowlist: LocalCodexVisionAllowlist,
+    private readonly localClaudeProvider: LocalClaudeVisionProvider,
+    // One rollout, one device list: the allowlist gates whichever local bridge
+    // is selected, so it is still read from local-codex-vision-devices.json.
+    private readonly localVisionAllowlist: LocalCodexVisionAllowlist,
   ) {}
 
   /** Resolve the configured default provider name. */
@@ -103,13 +113,34 @@ export class AiService {
   }
 
   /**
-   * Device-aware request path used by screenshot endpoints. An allowlisted
-   * device gets one Local Codex attempt. If that attempt throws, run the
-   * normally resolved provider (currently apikeyfun) and report that provider
-   * as the one that actually produced the board.
+   * The local bridge this deployment runs, or null when none is selected.
    *
-   * Local Codex stays out of AiProviderName intentionally: clients cannot opt
-   * themselves into this rollout by posting a provider name.
+   * Both bridges drive a coding agent on the operator's own machine, share one
+   * device allowlist and one fallback path, so running them together would mean
+   * two competing answers for the same screenshot and no rule for choosing.
+   * AI_LOCAL_VISION_PROVIDER is therefore a single slot rather than a pair of
+   * flags: "both at once" is not a state this can be configured into.
+   */
+  private localProvider(): AiVisionProvider | null {
+    const selected = this.config.get<AppConfig['ai']>('app.ai')?.localVisionProvider ?? 'codex';
+    switch (selected) {
+      case 'codex':
+        return this.localCodexProvider;
+      case 'claude':
+        return this.localClaudeProvider;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Device-aware request path used by screenshot endpoints. An allowlisted
+   * device gets one attempt on the selected local bridge. If that attempt
+   * throws, run the normally resolved provider (currently apikeyfun) and report
+   * that provider as the one that actually produced the board.
+   *
+   * The local bridges stay out of AiProviderName intentionally: clients cannot
+   * opt themselves into this rollout by posting a provider name.
    */
   async extractBoardStateForRequest(
     input: ExtractBoardStateInput,
@@ -117,7 +148,11 @@ export class AiService {
     deviceId?: string,
   ): Promise<VisionExtractionOutcome> {
     const standard = this.resolve(provider);
-    if (!(await this.localCodexAllowlist.canUse(deviceId))) {
+    const local = this.localProvider();
+    // Check the allowlist only when a local bridge could actually serve the
+    // request — with none selected there is nothing to gate, and the file read
+    // would be pure overhead on every screenshot.
+    if (!local || !(await this.localVisionAllowlist.canUse(deviceId))) {
       return {
         result: await this.extractVia(standard, input),
         providerName: standard.name,
@@ -126,25 +161,26 @@ export class AiService {
 
     try {
       return {
-        result: await this.extractVia(this.localCodexProvider, input),
-        providerName: this.localCodexProvider.name,
+        result: await this.extractVia(local, input),
+        providerName: local.name,
       };
     } catch (err) {
       this.logger.warn(
-        `Vision extraction via "${this.localCodexProvider.name}" failed; ` +
+        `Vision extraction via "${local.name}" failed; ` +
           `falling back to "${standard.name}": ${(err as Error).message}`,
       );
+      const label = LOCAL_PROVIDER_LABELS[local.name] ?? local.name;
       const result = await this.extractVia(standard, input);
       return {
         result: {
           ...result,
           warnings: [
             ...result.warnings,
-            `Local Codex vision was unavailable; used ${standard.name} instead.`,
+            `${label} vision was unavailable; used ${standard.name} instead.`,
           ],
         },
         providerName: standard.name,
-        fallbackFrom: this.localCodexProvider.name,
+        fallbackFrom: local.name,
       };
     }
   }
@@ -208,11 +244,24 @@ export class AiService {
     return result;
   }
 
+  /** Whether this is one of the local bridges rather than a cloud provider. */
+  private isLocalBridge(impl: AiVisionProvider): boolean {
+    // Identity, not a name prefix: these are the two instances this service was
+    // constructed with, so the check cannot drift as names change.
+    return impl === this.localCodexProvider || impl === this.localClaudeProvider;
+  }
+
   /**
    * Accuracy cascade (config-gated, default off): when the primary read is
    * unusable (no board / a general missing) or below the confidence floor,
    * re-run ONCE on a stronger model and keep it if it's better. Costs a second
    * call only on ambiguous boards; a failure of the second call keeps the first.
+   *
+   * Never runs on a local bridge. VISION_CASCADE_MODEL is a single global id
+   * written for whichever cloud provider AI_PROVIDER names, and handing that id
+   * to a bridge that has never heard of it buys a second multi-minute call that
+   * can only fail. A weak local read is returned as it is; the bridge's own
+   * failure path already falls back to the cloud provider.
    */
   private async maybeCascade(
     impl: AiVisionProvider,
@@ -224,6 +273,7 @@ export class AiService {
       !cascade?.enabled ||
       !cascade.model ||
       impl.name === 'mock' ||
+      this.isLocalBridge(impl) ||
       !this.isWeak(primary, cascade.minConfidence)
     ) {
       return primary;

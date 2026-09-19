@@ -6,6 +6,7 @@ import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
 import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
 import { LocalCodexVisionProvider } from './providers/local-codex.provider';
+import { LocalClaudeVisionProvider } from './providers/local-claude.provider';
 import { LocalCodexVisionAllowlist } from './local-codex-vision.allowlist';
 import { ExtractBoardStateInput, ExtractBoardStateResult } from './ai-provider.interface';
 
@@ -20,6 +21,7 @@ const identityPreprocess = {
 } as unknown as ImagePreprocessService;
 
 const unusedLocalProvider = {} as LocalCodexVisionProvider;
+const unusedLocalClaudeProvider = {} as LocalClaudeVisionProvider;
 const noLocalDevices = {
   canUse: async () => false,
 } as LocalCodexVisionAllowlist;
@@ -60,6 +62,7 @@ describe('AiService extraction cache', () => {
       {} as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
       unusedLocalProvider,
+      unusedLocalClaudeProvider,
       noLocalDevices,
     );
   });
@@ -105,6 +108,7 @@ describe('AiService extraction cache', () => {
       {} as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
       unusedLocalProvider,
+      unusedLocalClaudeProvider,
       noLocalDevices,
     );
     const input: ExtractBoardStateInput = { imageBuffer: image, mimeType: 'image/png' };
@@ -174,6 +178,7 @@ describe('AiService provider enforcement', () => {
       p.openai as unknown as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
       unusedLocalProvider,
+      unusedLocalClaudeProvider,
       noLocalDevices,
     );
   }
@@ -209,6 +214,7 @@ describe('AiService single-flight coalescing', () => {
       {} as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
       unusedLocalProvider,
+      unusedLocalClaudeProvider,
       noLocalDevices,
     );
     const input: ExtractBoardStateInput = {
@@ -270,6 +276,7 @@ describe('AiService accuracy cascade', () => {
       provider as unknown as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
       unusedLocalProvider,
+      unusedLocalClaudeProvider,
       noLocalDevices,
     );
   }
@@ -285,6 +292,41 @@ describe('AiService accuracy cascade', () => {
     expect(result.pieces).toHaveLength(2); // the strong, usable read won
     expect(provider.calls).toBe(2);
     expect(provider.models).toEqual([undefined, 'gpt-strong']);
+  });
+
+  it('does NOT cascade on a local bridge, whose model ids are not the cloud ones', async () => {
+    // VISION_CASCADE_MODEL is a single global id written for the configured
+    // cloud provider. Sending it to a bridge that has never heard of it buys a
+    // second multi-minute call that can only fail.
+    const bridge = cascadeProvider();
+    bridge.name = 'local-claude';
+    const service = new AiService(
+      buildConfig({
+        provider: 'openai',
+        providerEnforce: true,
+        localVisionProvider: 'claude',
+        cascade: { enabled: true, model: 'gpt-strong', minConfidence: 0 },
+      }),
+      identityPreprocess,
+      {} as MockVisionProvider,
+      {} as GeminiVisionProvider,
+      {} as OpenAiVisionProvider,
+      {} as ApikeyFunVisionProvider,
+      unusedLocalProvider,
+      bridge as unknown as LocalClaudeVisionProvider,
+      { canUse: async () => true } as LocalCodexVisionAllowlist,
+    );
+
+    const outcome = await service.extractBoardStateForRequest(
+      { imageBuffer: Buffer.from('bridge-cascade'), mimeType: 'image/png' },
+      undefined,
+      'device-allowed',
+    );
+
+    // One call, with no model override — the weak read is returned as it is.
+    expect(bridge.calls).toBe(1);
+    expect(bridge.models).toEqual([undefined]);
+    expect(outcome.providerName).toBe('local-claude');
   });
 
   it('does NOT cascade when disabled (default) — returns the weak read as-is', async () => {
@@ -330,16 +372,25 @@ describe('AiService Local Codex device routing', () => {
     warnings: warning ? [warning] : [],
   });
 
-  function setup(options: { allowed: boolean; localFails?: boolean }) {
-    const local = {
-      name: 'local-codex',
+  function localBridge(name: string, options: { localFails?: boolean }) {
+    return {
+      name,
       calls: 0,
       async extractBoardState(): Promise<ExtractBoardStateResult> {
         this.calls++;
         if (options.localFails) throw new Error('bridge unavailable');
-        return usable('from local');
+        return usable(`from ${name}`);
       },
     };
+  }
+
+  function setup(options: {
+    allowed: boolean;
+    localFails?: boolean;
+    selected?: 'codex' | 'claude' | 'none';
+  }) {
+    const local = localBridge('local-codex', options);
+    const claude = localBridge('local-claude', options);
     const standard = {
       name: 'apikeyfun',
       calls: 0,
@@ -356,16 +407,23 @@ describe('AiService Local Codex device routing', () => {
       },
     };
     const service = new AiService(
-      buildConfig({ provider: 'apikeyfun', providerEnforce: true }),
+      buildConfig({
+        provider: 'apikeyfun',
+        providerEnforce: true,
+        // Omitted entirely in most cases, so the default ('codex') is exercised
+        // by the existing expectations rather than assumed.
+        ...(options.selected ? { localVisionProvider: options.selected } : {}),
+      }),
       identityPreprocess,
       {} as MockVisionProvider,
       {} as GeminiVisionProvider,
       {} as OpenAiVisionProvider,
       standard as unknown as ApikeyFunVisionProvider,
       local as unknown as LocalCodexVisionProvider,
+      claude as unknown as LocalClaudeVisionProvider,
       allowlist as unknown as LocalCodexVisionAllowlist,
     );
-    return { service, local, standard, allowlist };
+    return { service, local, claude, standard, allowlist };
   }
 
   const input: ExtractBoardStateInput = {
@@ -381,7 +439,7 @@ describe('AiService Local Codex device routing', () => {
     expect(local.calls).toBe(1);
     expect(standard.calls).toBe(0);
     expect(outcome.providerName).toBe('local-codex');
-    expect(outcome.result.warnings).toContain('from local');
+    expect(outcome.result.warnings).toContain('from local-codex');
   });
 
   it('uses the normally resolved provider when the device is not allowlisted', async () => {
@@ -410,5 +468,51 @@ describe('AiService Local Codex device routing', () => {
     options.allowed = false;
     await service.extractBoardStateForRequest(input, undefined, 'device-standard');
     expect(standard.calls).toBe(1);
+  });
+
+  it('runs Local Claude instead of Local Codex when it is the selected bridge', async () => {
+    const { service, local, claude, standard } = setup({ allowed: true, selected: 'claude' });
+    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+
+    expect(claude.calls).toBe(1);
+    // The decisive assertion: selecting one bridge does not merely prefer it,
+    // it excludes the other. Both must never run for one request.
+    expect(local.calls).toBe(0);
+    expect(standard.calls).toBe(0);
+    expect(outcome.providerName).toBe('local-claude');
+    expect(outcome.result.warnings).toContain('from local-claude');
+  });
+
+  it('names Local Claude in the fallback warning when it is the one that failed', async () => {
+    const { service, claude, standard } = setup({
+      allowed: true,
+      selected: 'claude',
+      localFails: true,
+    });
+    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+
+    expect(claude.calls).toBe(1);
+    expect(standard.calls).toBe(1);
+    expect(outcome.fallbackFrom).toBe('local-claude');
+    expect(
+      outcome.result.warnings.some((warning) =>
+        /Local Claude vision was unavailable/.test(warning),
+      ),
+    ).toBe(true);
+  });
+
+  it('skips both bridges — and the allowlist read — when none is selected', async () => {
+    const { service, local, claude, standard, allowlist } = setup({
+      allowed: true,
+      selected: 'none',
+    });
+    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+
+    expect(local.calls).toBe(0);
+    expect(claude.calls).toBe(0);
+    expect(standard.calls).toBe(1);
+    expect(outcome.providerName).toBe('apikeyfun');
+    expect(outcome.fallbackFrom).toBeUndefined();
+    expect(allowlist.seen).toEqual([]);
   });
 });

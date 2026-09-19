@@ -11,6 +11,7 @@ export type ErrorLogCategory =
   | 'gemini'
   | 'apikeyfun'
   | 'local-codex'
+  | 'local-claude'
   | 'vision-invalid';
 
 export interface ErrorLogFields {

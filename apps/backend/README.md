@@ -75,6 +75,14 @@ Every variable has a safe mock default (see `.env.example`).
 | `LOCAL_CODEX_MODEL`                | _(empty)_                      | Model override; empty inherits the bridge default                           |
 | `LOCAL_CODEX_REASONING_EFFORT`     | _(empty)_                      | Reasoning override; empty inherits the bridge default                       |
 | `LOCAL_CODEX_TIMEOUT_MS`           | `620000`                       | Local Codex request deadline                                                |
+| `AI_LOCAL_VISION_PROVIDER`         | `codex`                        | Which local bridge allowlisted devices use: `codex` \| `claude` \| `none`    |
+| `LOCAL_CLAUDE_URL`                 | `http://127.0.0.1:5612`        | Mother Claude HTTP bridge base URL for allowlisted devices                  |
+| `LOCAL_CLAUDE_TOKEN`               | _(empty)_                      | Optional bridge bearer token                                                |
+| `LOCAL_CLAUDE_MODEL`               | _(empty)_                      | Model override; empty inherits the bridge default                           |
+| `LOCAL_CLAUDE_EFFORT`              | _(empty)_                      | Effort override; empty inherits the bridge default                          |
+| `LOCAL_CLAUDE_CWD`                 | _(empty)_                      | Conversation working directory; empty uses the bridge default               |
+| `LOCAL_CLAUDE_PERMISSION_MODE`     | `default`                      | Bridge permission mode for the one-shot vision conversation                 |
+| `LOCAL_CLAUDE_TIMEOUT_MS`          | `180000`                       | Local Claude request deadline                                               |
 | `VISION_PREPROCESS`                | `true`                         | sharp preprocessing (EXIF rotate + downscale + JPEG) before the vision call |
 | `VISION_IMAGE_SHORT_SIDE`          | `768`                          | Downscale budget: shortest side (px)                                        |
 | `VISION_IMAGE_LONG_SIDE`           | `2048`                         | Downscale budget: longest side (px)                                         |
@@ -96,14 +104,65 @@ Every variable has a safe mock default (see `.env.example`).
 | `HINTS_DATA_DIR`                   | `./data`                       | Runtime ledgers and device allowlists                                       |
 | `LOGS_DIR`                         | `./logs`                       | Date-grouped error/failure logs                                             |
 
-### Device-gated Local Codex vision
+### Device-gated local vision
 
 Screenshot and extraction requests whose `x-device-id` is listed in
-`<HINTS_DATA_DIR>/local-codex-vision-devices.json` try
-`LocalCodexVisionProvider` first. Other devices continue through the normal
-`AI_PROVIDER` selection. If Local Codex times out, returns an error, or returns
-a response that cannot be parsed as a board, the request automatically falls
-back to that normal provider (currently `apikeyfun` in production).
+`<HINTS_DATA_DIR>/local-codex-vision-devices.json` try a **local bridge** first.
+Other devices continue through the normal `AI_PROVIDER` selection. If the local
+bridge times out, returns an error, or returns a response that cannot be parsed
+as a board, the request automatically falls back to that normal provider
+(currently `apikeyfun` in production).
+
+#### Choosing the bridge — exactly one, never both
+
+There are two local bridges, and `AI_LOCAL_VISION_PROVIDER` selects **at most
+one** of them:
+
+| Value    | Provider                    | Talks to                                     |
+| -------- | --------------------------- | -------------------------------------------- |
+| `codex`  | `LocalCodexVisionProvider`  | Codex HTTP bridge (`LOCAL_CODEX_URL`)        |
+| `claude` | `LocalClaudeVisionProvider` | Mother Claude HTTP bridge (`LOCAL_CLAUDE_URL`) |
+| `none`   | —                           | Nothing; every device uses `AI_PROVIDER`     |
+
+This is one setting rather than two enable flags on purpose. Both bridges drive
+a coding agent on the operator's own machine, and they share one device
+allowlist and one fallback path — running them together would mean two competing
+reads of the same screenshot with no rule for choosing between them. A single
+slot makes "both at once" a state the service cannot be configured into, rather
+than one it has to detect and reject.
+
+Switching is a restart with a different value. The device allowlist, the
+fallback behaviour and the response envelope are identical either way; only
+`vision.provider` in the response changes (`local-codex` vs `local-claude`).
+
+#### Local Claude specifics
+
+`LocalClaudeVisionProvider` gives each extraction its own conversation: it
+creates one (`POST /threads`), runs a single turn carrying the prompt and the
+image (`POST /threads/{id}/run`), then closes it (`DELETE /threads/{id}`). The
+bridge also offers a one-call `POST /chat`, which is deliberately **not** used —
+that endpoint re-points the bridge's *current* conversation, so a background
+vision read would silently hijack whichever conversation the operator was having.
+
+The conversation is created with `setting_sources: []` and a disallowed-tool
+list: a board read needs nothing from the filesystem or the network, and denying
+those tools means a stray tool call cannot park the turn on an approval prompt
+nobody is watching for. `LOCAL_CLAUDE_TIMEOUT_MS` is the backstop and defaults
+to three minutes — far shorter than the Codex deadline, because a vision turn
+should take seconds and failing fast is what lets the cloud fallback answer
+while the user is still waiting.
+
+If closing the conversation fails, the board is still returned, with a warning:
+a lingering conversation on the bridge is untidy, not wrong, and is not worth
+discarding an answer the user is waiting for.
+
+The bridge must be **started** before it will serve requests — it does not
+listen when the Mother Claude app merely opens. A request to a stopped bridge
+comes back as `bridge_not_started`, and a signed-out Claude as
+`claude_login_required`; both are reported as `VISION_UNAVAILABLE` (an operator
+problem) rather than as a model failure, and both fall back to `AI_PROVIDER`.
+`LOCAL_CLAUDE_URL` defaults to the bridge's loopback port, so a backend running
+anywhere other than the operator's own machine needs a tunnel URL here.
 
 The allowlist is a JSON object whose keys are exact device IDs; values are
 ignored and may be notes. Keys starting with `_` are comments:
@@ -122,14 +181,16 @@ synchronization. Create or copy this file separately on each deployed server and
 keep the deployment directory persistent.
 
 For ngrok, copy the public HTTPS origin exactly as shown by ngrok. It normally
-uses public port 443, so do not append the bridge's local port (`5611`). Verify
-connectivity from the deployed backend host before testing an image:
+uses public port 443, so do not append the bridge's local port (`5611` for
+Codex, `5612` for Claude). Verify connectivity from the deployed backend host
+before testing an image:
 
 ```bash
 curl -v "$LOCAL_CODEX_URL/health"
+curl -v "$LOCAL_CLAUDE_URL/health"   # also reports whether the bridge is started
 ```
 
-Each Local Codex attempt writes safe request metadata to the Nest console. A
+Each local-bridge attempt writes safe request metadata to the Nest console. A
 failure includes the endpoint, elapsed time, HTTP status or bridge error, and
 the nested Node/Undici cause (for example `ENOTFOUND`, `ECONNREFUSED`, a TLS
 error, or `UND_ERR_CONNECT_TIMEOUT`). Bearer tokens and image data are never

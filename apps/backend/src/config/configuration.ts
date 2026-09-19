@@ -20,6 +20,9 @@ export interface AppConfig {
     /** api.apikey.fun (OpenAI-compatible aggregator) key + model. */
     apikeyfunApiKey: string;
     apikeyfunModel: string;
+    /** Which local bridge an allowlisted device tries first. At most one runs:
+     *  Local Codex and Local Claude are mutually exclusive by construction. */
+    localVisionProvider: 'codex' | 'claude' | 'none';
     /** Codex HTTP bridge used for device-gated Local Codex vision. */
     localCodexUrl: string;
     localCodexToken: string;
@@ -27,6 +30,16 @@ export interface AppConfig {
     localCodexModel: string;
     localCodexReasoningEffort: string;
     localCodexTimeoutMs: number;
+    /** Mother Claude HTTP bridge used for device-gated Local Claude vision. */
+    localClaudeUrl: string;
+    localClaudeToken: string;
+    /** Blank model/effort values inherit the bridge server defaults. */
+    localClaudeModel: string;
+    localClaudeEffort: string;
+    /** Blank runs in the bridge's own default working directory. */
+    localClaudeCwd: string;
+    localClaudePermissionMode: string;
+    localClaudeTimeoutMs: number;
     /** Downscale/recompress uploads to the provider's pixel budget pre-call. */
     visionPreprocess: boolean;
     visionImageShortSide: number;
@@ -129,6 +142,14 @@ export function configuration(): { app: AppConfig } {
       localCodexModel: env.LOCAL_CODEX_MODEL,
       localCodexReasoningEffort: env.LOCAL_CODEX_REASONING_EFFORT,
       localCodexTimeoutMs: env.LOCAL_CODEX_TIMEOUT_MS,
+      localVisionProvider: env.AI_LOCAL_VISION_PROVIDER,
+      localClaudeUrl: env.LOCAL_CLAUDE_URL,
+      localClaudeToken: env.LOCAL_CLAUDE_TOKEN,
+      localClaudeModel: env.LOCAL_CLAUDE_MODEL,
+      localClaudeEffort: env.LOCAL_CLAUDE_EFFORT,
+      localClaudeCwd: env.LOCAL_CLAUDE_CWD,
+      localClaudePermissionMode: env.LOCAL_CLAUDE_PERMISSION_MODE,
+      localClaudeTimeoutMs: env.LOCAL_CLAUDE_TIMEOUT_MS,
       visionPreprocess: env.VISION_PREPROCESS,
       visionImageShortSide: env.VISION_IMAGE_SHORT_SIDE,
       visionImageLongSide: env.VISION_IMAGE_LONG_SIDE,

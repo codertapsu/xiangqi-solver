@@ -67,6 +67,30 @@ export const envSchema = z.object({
     .enum(['', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'])
     .default(''),
   LOCAL_CODEX_TIMEOUT_MS: intFromEnv(620_000, 1_000, 1_800_000),
+  // Which local bridge an allowlisted device tries first. Exactly one may run:
+  // both bridges drive a coding agent on the operator's own machine, and there
+  // is one allowlist and one fallback path, so this is a single slot rather
+  // than a pair of flags that could contradict each other. `none` keeps every
+  // device on AI_PROVIDER while leaving the bridge settings in place.
+  AI_LOCAL_VISION_PROVIDER: z.enum(['codex', 'claude', 'none']).default('codex'),
+  // Device-gated Mother Claude HTTP bridge. Model/effort are optional: blank
+  // values inherit the bridge's own defaults, which are chosen on its API
+  // screen. The default URL is the bridge's loopback port — a backend running
+  // anywhere other than the operator's machine needs a tunnel URL here.
+  LOCAL_CLAUDE_URL: z.string().url().default('http://127.0.0.1:5612'),
+  LOCAL_CLAUDE_TOKEN: z.string().default(''),
+  LOCAL_CLAUDE_MODEL: z.string().default(''),
+  LOCAL_CLAUDE_EFFORT: z.enum(['', 'low', 'medium', 'high', 'xhigh', 'max']).default(''),
+  // Blank runs in the bridge's own default directory. A board read touches no
+  // files, so this only decides where the conversation is rooted.
+  LOCAL_CLAUDE_CWD: z.string().default(''),
+  LOCAL_CLAUDE_PERMISSION_MODE: z
+    .enum(['default', 'plan', 'acceptEdits', 'dontAsk', 'auto'])
+    .default('default'),
+  // Far shorter than the Codex deadline on purpose: a vision turn should take
+  // seconds, and failing fast is what lets the cloud fallback answer while the
+  // user is still waiting.
+  LOCAL_CLAUDE_TIMEOUT_MS: intFromEnv(180_000, 1_000, 1_800_000),
   // Vision-image normalization. Providers downscale internally anyway (OpenAI
   // "high" detail: fit in 2048px then shortest side 768px), so pixels beyond
   // that budget only cost upload time and tiles. We mirror the budget server-
