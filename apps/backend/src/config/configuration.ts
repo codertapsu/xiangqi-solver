@@ -20,6 +20,13 @@ export interface AppConfig {
     /** api.apikey.fun (OpenAI-compatible aggregator) key + model. */
     apikeyfunApiKey: string;
     apikeyfunModel: string;
+    /** Codex HTTP bridge used for device-gated Local Codex vision. */
+    localCodexUrl: string;
+    localCodexToken: string;
+    /** Blank model/effort values inherit the bridge server defaults. */
+    localCodexModel: string;
+    localCodexReasoningEffort: string;
+    localCodexTimeoutMs: number;
     /** Downscale/recompress uploads to the provider's pixel budget pre-call. */
     visionPreprocess: boolean;
     visionImageShortSide: number;
@@ -59,7 +66,7 @@ export interface AppConfig {
   upload: {
     maxBytes: number;
   };
-  /** Install-grant store (JSON files). */
+  /** Runtime data directory for grant ledgers and device allowlists. */
   hints: {
     dataDir: string;
   };
@@ -117,6 +124,11 @@ export function configuration(): { app: AppConfig } {
       geminiModel: env.GEMINI_MODEL,
       apikeyfunApiKey: env.APIKEYFUN_API_KEY,
       apikeyfunModel: env.APIKEYFUN_MODEL,
+      localCodexUrl: env.LOCAL_CODEX_URL,
+      localCodexToken: env.LOCAL_CODEX_TOKEN,
+      localCodexModel: env.LOCAL_CODEX_MODEL,
+      localCodexReasoningEffort: env.LOCAL_CODEX_REASONING_EFFORT,
+      localCodexTimeoutMs: env.LOCAL_CODEX_TIMEOUT_MS,
       visionPreprocess: env.VISION_PREPROCESS,
       visionImageShortSide: env.VISION_IMAGE_SHORT_SIDE,
       visionImageLongSide: env.VISION_IMAGE_LONG_SIDE,

@@ -35,17 +35,17 @@ No `.env` file is needed. To customize, copy `.env.example` to `.env`.
 
 ### Common scripts
 
-| Script              | Purpose                                  |
-| ------------------- | ---------------------------------------- |
-| `npm run build`     | Compile to `dist/` (strict `tsc`)        |
-| `npm start`         | Start (no watch)                         |
-| `npm run start:dev` | Start with watch                         |
-| `npm run start:prod`| Run compiled `dist/main.js`              |
-| `npm run lint`      | ESLint (flat config, must exit 0)        |
-| `npm run format`    | Prettier write                           |
-| `npm test`          | Unit tests                               |
-| `npm run test:cov`  | Unit tests with coverage                 |
-| `npm run test:e2e`  | Supertest end-to-end suite               |
+| Script               | Purpose                           |
+| -------------------- | --------------------------------- |
+| `npm run build`      | Compile to `dist/` (strict `tsc`) |
+| `npm start`          | Start (no watch)                  |
+| `npm run start:dev`  | Start with watch                  |
+| `npm run start:prod` | Run compiled `dist/main.js`       |
+| `npm run lint`       | ESLint (flat config, must exit 0) |
+| `npm run format`     | Prettier write                    |
+| `npm test`           | Unit tests                        |
+| `npm run test:cov`   | Unit tests with coverage          |
+| `npm run test:e2e`   | Supertest end-to-end suite        |
 
 ### Docker
 
@@ -59,35 +59,86 @@ docker compose up --build      # backend on http://localhost:3000/api
 
 Every variable has a safe mock default (see `.env.example`).
 
-| Variable                     | Default                  | Description                                              |
-| ---------------------------- | ------------------------ | -------------------------------------------------------- |
-| `PORT`                       | `3000`                   | HTTP port (binds `0.0.0.0`)                              |
-| `AI_PROVIDER`                | `mock`                   | `gemini` \| `openai` \| `mock`                          |
-| `ENGINE_PROVIDER`            | `mock`                   | `pikafish` \| `mock`                                    |
-| `GEMINI_API_KEY`             | _(empty)_                | Required only when `AI_PROVIDER=gemini`                 |
-| `OPENAI_API_KEY`             | _(empty)_                | Required only when `AI_PROVIDER=openai`                 |
-| `OPENAI_MODEL`               | `gpt-5.4`                | OpenAI vision model                                     |
-| `GEMINI_MODEL`               | `gemini-3.5-flash` | Gemini vision model                                     |
-| `VISION_PREPROCESS`          | `true`                   | sharp preprocessing (EXIF rotate + downscale + JPEG) before the vision call |
-| `VISION_IMAGE_SHORT_SIDE`    | `768`                    | Downscale budget: shortest side (px)                    |
-| `VISION_IMAGE_LONG_SIDE`     | `2048`                   | Downscale budget: longest side (px)                     |
-| `PIKAFISH_BINARY_PATH`       | _(empty)_                | Path to the Pikafish UCI binary                         |
-| `PIKAFISH_NNUE_PATH`         | _(empty)_                | Path to `pikafish.nnue` (empty = next to the binary)    |
-| `ENGINE_UCI_VARIANT`         | _(empty)_                | `UCI_Variant`; empty for Pikafish, `xiangqi` for Fairy-Stockfish |
-| `ENGINE_DEFAULT_DEPTH`       | `12`                     | Default search depth (1..30)                            |
-| `ENGINE_DEFAULT_MOVE_TIME_MS`| `1000`                   | Default move time ms (50..60000)                        |
-| `ENGINE_THREADS`             | `1`                      | UCI `Threads` per engine process                        |
-| `ENGINE_HASH_MB`             | `128`                    | UCI `Hash` (MB) per engine process                      |
-| `ENGINE_MULTIPV`             | `1`                      | Top-N ranked candidate moves                            |
-| `ENGINE_MOVE_OVERHEAD_MS`    | `10`                     | UCI `Move Overhead`                                     |
-| `ENGINE_POOL_SIZE`           | `2`                      | Warm engine pool size = hard cap on concurrent searches |
-| `MAX_UPLOAD_BYTES`           | `8388608`                | Max screenshot size (8 MB)                              |
-| `RATE_LIMIT_TTL`             | `60`                     | Global per-IP throttle window (seconds)                 |
-| `RATE_LIMIT_LIMIT`           | `30`                     | Max requests per window                                 |
-| `RATE_LIMIT_DEVICE_WINDOW_SECONDS` | `86400`            | Per-device window for the analysis endpoints (`x-device-id` header) |
-| `RATE_LIMIT_DEVICE_LIMIT`    | `100`                    | Max analysis requests per device per window             |
-| `HINTS_DATA_DIR`             | `./data`                 | Install-grant ledger + manual hint grants (JSON files)  |
-| `LOGS_DIR`                   | `./logs`                 | Date-grouped error/failure logs                         |
+| Variable                           | Default                        | Description                                                                 |
+| ---------------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| `PORT`                             | `3000`                         | HTTP port (binds `0.0.0.0`)                                                 |
+| `AI_PROVIDER`                      | `mock`                         | `gemini` \| `openai` \| `apikeyfun` \| `mock`                               |
+| `ENGINE_PROVIDER`                  | `mock`                         | `pikafish` \| `mock`                                                        |
+| `GEMINI_API_KEY`                   | _(empty)_                      | Required only when `AI_PROVIDER=gemini`                                     |
+| `OPENAI_API_KEY`                   | _(empty)_                      | Required only when `AI_PROVIDER=openai`                                     |
+| `OPENAI_MODEL`                     | `gpt-5.4`                      | OpenAI vision model                                                         |
+| `GEMINI_MODEL`                     | `gemini-3.5-flash`             | Gemini vision model                                                         |
+| `APIKEYFUN_API_KEY`                | _(empty)_                      | Required only when `AI_PROVIDER=apikeyfun`                                  |
+| `APIKEYFUN_MODEL`                  | `gpt-5.5`                      | api.apikey.fun vision model                                                 |
+| `LOCAL_CODEX_URL`                  | `https://codertapsu.ngrok.app` | Codex HTTP bridge base URL for allowlisted devices                          |
+| `LOCAL_CODEX_TOKEN`                | _(empty)_                      | Optional bridge bearer token                                                |
+| `LOCAL_CODEX_MODEL`                | _(empty)_                      | Model override; empty inherits the bridge default                           |
+| `LOCAL_CODEX_REASONING_EFFORT`     | _(empty)_                      | Reasoning override; empty inherits the bridge default                       |
+| `LOCAL_CODEX_TIMEOUT_MS`           | `620000`                       | Local Codex request deadline                                                |
+| `VISION_PREPROCESS`                | `true`                         | sharp preprocessing (EXIF rotate + downscale + JPEG) before the vision call |
+| `VISION_IMAGE_SHORT_SIDE`          | `768`                          | Downscale budget: shortest side (px)                                        |
+| `VISION_IMAGE_LONG_SIDE`           | `2048`                         | Downscale budget: longest side (px)                                         |
+| `PIKAFISH_BINARY_PATH`             | _(empty)_                      | Path to the Pikafish UCI binary                                             |
+| `PIKAFISH_NNUE_PATH`               | _(empty)_                      | Path to `pikafish.nnue` (empty = next to the binary)                        |
+| `ENGINE_UCI_VARIANT`               | _(empty)_                      | `UCI_Variant`; empty for Pikafish, `xiangqi` for Fairy-Stockfish            |
+| `ENGINE_DEFAULT_DEPTH`             | `12`                           | Default search depth (1..30)                                                |
+| `ENGINE_DEFAULT_MOVE_TIME_MS`      | `1000`                         | Default move time ms (50..60000)                                            |
+| `ENGINE_THREADS`                   | `1`                            | UCI `Threads` per engine process                                            |
+| `ENGINE_HASH_MB`                   | `128`                          | UCI `Hash` (MB) per engine process                                          |
+| `ENGINE_MULTIPV`                   | `1`                            | Top-N ranked candidate moves                                                |
+| `ENGINE_MOVE_OVERHEAD_MS`          | `10`                           | UCI `Move Overhead`                                                         |
+| `ENGINE_POOL_SIZE`                 | `2`                            | Warm engine pool size = hard cap on concurrent searches                     |
+| `MAX_UPLOAD_BYTES`                 | `8388608`                      | Max screenshot size (8 MB)                                                  |
+| `RATE_LIMIT_TTL`                   | `60`                           | Global per-IP throttle window (seconds)                                     |
+| `RATE_LIMIT_LIMIT`                 | `30`                           | Max requests per window                                                     |
+| `RATE_LIMIT_DEVICE_WINDOW_SECONDS` | `86400`                        | Per-device window for the analysis endpoints (`x-device-id` header)         |
+| `RATE_LIMIT_DEVICE_LIMIT`          | `100`                          | Max analysis requests per device per window                                 |
+| `HINTS_DATA_DIR`                   | `./data`                       | Runtime ledgers and device allowlists                                       |
+| `LOGS_DIR`                         | `./logs`                       | Date-grouped error/failure logs                                             |
+
+### Device-gated Local Codex vision
+
+Screenshot and extraction requests whose `x-device-id` is listed in
+`<HINTS_DATA_DIR>/local-codex-vision-devices.json` try
+`LocalCodexVisionProvider` first. Other devices continue through the normal
+`AI_PROVIDER` selection. If Local Codex times out, returns an error, or returns
+a response that cannot be parsed as a board, the request automatically falls
+back to that normal provider (currently `apikeyfun` in production).
+
+The allowlist is a JSON object whose keys are exact device IDs; values are
+ignored and may be notes. Keys starting with `_` are comments:
+
+```json
+{
+  "_comment": "Devices allowed to use Local Codex vision",
+  "device-id-from-the-app": "test phone"
+}
+```
+
+The file is reloaded when its modification time changes. Missing, malformed, or
+unreadable files produce an empty allowlist, so requests safely use the existing
+provider. `data/` is runtime state: it is gitignored and excluded from release
+synchronization. Create or copy this file separately on each deployed server and
+keep the deployment directory persistent.
+
+For ngrok, copy the public HTTPS origin exactly as shown by ngrok. It normally
+uses public port 443, so do not append the bridge's local port (`5611`). Verify
+connectivity from the deployed backend host before testing an image:
+
+```bash
+curl -v "$LOCAL_CODEX_URL/health"
+```
+
+Each Local Codex attempt writes safe request metadata to the Nest console. A
+failure includes the endpoint, elapsed time, HTTP status or bridge error, and
+the nested Node/Undici cause (for example `ENOTFOUND`, `ECONNREFUSED`, a TLS
+error, or `UND_ERR_CONNECT_TIMEOUT`). Bearer tokens and image data are never
+included. The same structured failure is appended to
+`<LOGS_DIR>/<YYYY-MM-DD>.log` (UTC), which can be watched with:
+
+```bash
+tail -f "${LOGS_DIR:-./logs}/$(date -u +%F).log"
+```
 
 Remote config / feature flags served by `GET /api/config` (so the mobile app is
 tunable without a release) live in their own groups — `FEATURE_*` (ads + optional
@@ -168,9 +219,9 @@ engine) while keeping the AI key server-side.
   "sideToMove": "red",
   "pieces": [
     { "color": "red", "type": "king", "file": 4, "rank": 0 },
-    { "color": "black", "type": "king", "file": 4, "rank": 9 }
+    { "color": "black", "type": "king", "file": 4, "rank": 9 },
   ],
-  "engineDepth": 12          // optional
+  "engineDepth": 12, // optional
 }
 ```
 
@@ -185,16 +236,20 @@ Returns `AnalysisResult` (vision is bypassed).
     "sideToMove": "red",
     "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
     "pieces": [{ "type": "rook", "color": "black", "position": { "file": 0, "rank": 9 } }],
-    "confidence": 0.9
+    "confidence": 0.9,
   },
   "bestMove": {
-    "from": { "file": 1, "rank": 2 }, "to": { "file": 4, "rank": 2 },
-    "uci": "b2e2", "human": "B3 to E3", "score": "+0.30", "depth": 12
+    "from": { "file": 1, "rank": 2 },
+    "to": { "file": 4, "rank": 2 },
+    "uci": "b2e2",
+    "human": "B3 to E3",
+    "score": "+0.30",
+    "depth": 12,
   },
   "explanation": "For Red to move, the mock engine recommends B3 to E3 ...",
   "warnings": [],
   "engine": { "provider": "mock", "ok": true },
-  "vision": { "provider": "mock", "ok": true }
+  "vision": { "provider": "mock", "ok": true },
 }
 ```
 

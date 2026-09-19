@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../../config/configuration';
 import { LruCache } from '../../common/utils/lru-cache';
@@ -13,8 +13,18 @@ import { MockVisionProvider } from './providers/mock-vision.provider';
 import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
 import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
+import { LocalCodexVisionProvider } from './providers/local-codex.provider';
+import { LocalCodexVisionAllowlist } from './local-codex-vision.allowlist';
 
 export type AiProviderName = 'gemini' | 'openai' | 'apikeyfun' | 'mock';
+
+/** Device-aware extraction result, including the provider that produced it. */
+export interface VisionExtractionOutcome {
+  result: ExtractBoardStateResult;
+  providerName: string;
+  /** Present when Local Codex failed and the standard provider completed. */
+  fallbackFrom?: string;
+}
 
 /** Identical re-captures are common (retry taps, mode fallbacks re-reading the
  *  same screenshot) — memoizing the extraction skips a multi-second LLM call. */
@@ -32,6 +42,7 @@ const VISION_CACHE_ENTRIES = 100;
  */
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger(AiService.name);
   private readonly cache = new LruCache<ExtractBoardStateResult>(VISION_CACHE_ENTRIES);
   /** Single-flight: concurrent identical extractions share ONE provider call. */
   private readonly inFlight = new Map<string, Promise<ExtractBoardStateResult>>();
@@ -43,6 +54,8 @@ export class AiService {
     private readonly geminiProvider: GeminiVisionProvider,
     private readonly openaiProvider: OpenAiVisionProvider,
     private readonly apikeyfunProvider: ApikeyFunVisionProvider,
+    private readonly localCodexProvider: LocalCodexVisionProvider,
+    private readonly localCodexAllowlist: LocalCodexVisionAllowlist,
   ) {}
 
   /** Resolve the configured default provider name. */
@@ -86,8 +99,61 @@ export class AiService {
     input: ExtractBoardStateInput,
     provider?: AiProviderName,
   ): Promise<ExtractBoardStateResult> {
-    const impl = this.resolve(provider);
+    return this.extractVia(this.resolve(provider), input);
+  }
 
+  /**
+   * Device-aware request path used by screenshot endpoints. An allowlisted
+   * device gets one Local Codex attempt. If that attempt throws, run the
+   * normally resolved provider (currently apikeyfun) and report that provider
+   * as the one that actually produced the board.
+   *
+   * Local Codex stays out of AiProviderName intentionally: clients cannot opt
+   * themselves into this rollout by posting a provider name.
+   */
+  async extractBoardStateForRequest(
+    input: ExtractBoardStateInput,
+    provider?: AiProviderName,
+    deviceId?: string,
+  ): Promise<VisionExtractionOutcome> {
+    const standard = this.resolve(provider);
+    if (!(await this.localCodexAllowlist.canUse(deviceId))) {
+      return {
+        result: await this.extractVia(standard, input),
+        providerName: standard.name,
+      };
+    }
+
+    try {
+      return {
+        result: await this.extractVia(this.localCodexProvider, input),
+        providerName: this.localCodexProvider.name,
+      };
+    } catch (err) {
+      this.logger.warn(
+        `Vision extraction via "${this.localCodexProvider.name}" failed; ` +
+          `falling back to "${standard.name}": ${(err as Error).message}`,
+      );
+      const result = await this.extractVia(standard, input);
+      return {
+        result: {
+          ...result,
+          warnings: [
+            ...result.warnings,
+            `Local Codex vision was unavailable; used ${standard.name} instead.`,
+          ],
+        },
+        providerName: standard.name,
+        fallbackFrom: this.localCodexProvider.name,
+      };
+    }
+  }
+
+  /** Run one concrete provider with provider-specific cache/single-flight keys. */
+  private async extractVia(
+    impl: AiVisionProvider,
+    input: ExtractBoardStateInput,
+  ): Promise<ExtractBoardStateResult> {
     // Key on the ORIGINAL upload bytes so a cache hit skips both the LLM call
     // and the (sharp) preprocessing work entirely.
     const hash = createHash('sha256').update(input.imageBuffer).digest('hex');

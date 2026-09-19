@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Headers,
   HttpException,
   Post,
   Res,
@@ -11,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
-import { ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiHeader, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AppConfig } from '../../config/configuration';
 import { SkipEnvelope } from '../../common/decorators/skip-envelope.decorator';
@@ -48,10 +49,16 @@ export class AnalysisController {
    */
   @Post('screenshot')
   @ApiConsumes('multipart/form-data')
+  @ApiHeader({
+    name: 'x-device-id',
+    required: false,
+    description: 'Stable device ID used for server-managed vision-provider routing.',
+  })
   @UseInterceptors(FileInterceptor('screenshot'))
   async analyzeScreenshot(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: AnalyzeScreenshotDto,
+    @Headers('x-device-id') deviceId?: string,
   ): Promise<AnalysisResult> {
     const upload = this.validateUpload(file);
 
@@ -60,6 +67,7 @@ export class AnalysisController {
       // Use the type sniffed from the bytes, NOT the client-declared mime, so a
       // mislabeled-but-valid image is sent to the vision API correctly.
       mimeType: upload.mimeType,
+      deviceId: this.normalizeDeviceId(deviceId),
       provider: dto.provider,
       sideToMove: dto.sideToMove,
       engineProvider: dto.engineProvider,
@@ -88,11 +96,17 @@ export class AnalysisController {
   @Post('screenshot/stream')
   @SkipEnvelope()
   @ApiConsumes('multipart/form-data')
+  @ApiHeader({
+    name: 'x-device-id',
+    required: false,
+    description: 'Stable device ID used for server-managed vision-provider routing.',
+  })
   @UseInterceptors(FileInterceptor('screenshot'))
   async analyzeScreenshotStream(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: AnalyzeScreenshotDto,
     @Res() res: Response,
+    @Headers('x-device-id') deviceId?: string,
   ): Promise<void> {
     // Validate BEFORE any byte is written: these errors still get the normal
     // envelope + HTTP status via the global exception filter.
@@ -112,6 +126,7 @@ export class AnalysisController {
       const result = await this.analysisService.analyzeScreenshot({
         imageBuffer: upload.buffer,
         mimeType: upload.mimeType,
+        deviceId: this.normalizeDeviceId(deviceId),
         provider: dto.provider,
         sideToMove: dto.sideToMove,
         engineProvider: dto.engineProvider,
@@ -157,15 +172,22 @@ export class AnalysisController {
    */
   @Post('extract')
   @ApiConsumes('multipart/form-data')
+  @ApiHeader({
+    name: 'x-device-id',
+    required: false,
+    description: 'Stable device ID used for server-managed vision-provider routing.',
+  })
   @UseInterceptors(FileInterceptor('screenshot'))
   async extractScreenshot(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: ExtractScreenshotDto,
+    @Headers('x-device-id') deviceId?: string,
   ): Promise<ExtractionResult> {
     const upload = this.validateUpload(file);
     return this.analysisService.extractBoard({
       imageBuffer: upload.buffer,
       mimeType: upload.mimeType,
+      deviceId: this.normalizeDeviceId(deviceId),
       provider: dto.provider,
       sideToMove: dto.sideToMove,
     });
@@ -232,5 +254,11 @@ export class AnalysisController {
     }
 
     return { buffer: file.buffer, mimeType: detected };
+  }
+
+  /** Invalid/missing IDs simply stay on the standard provider path. */
+  private normalizeDeviceId(deviceId: string | undefined): string | undefined {
+    const id = (deviceId ?? '').trim();
+    return id.length >= 8 && id.length <= 256 ? id : undefined;
   }
 }

@@ -43,6 +43,8 @@ export interface BoardStagePayload {
 export interface AnalyzeScreenshotParams extends EngineOptions {
   imageBuffer: Buffer;
   mimeType: string;
+  /** Stable x-device-id used for server-side provider rollout routing. */
+  deviceId?: string;
   provider?: AiProviderName;
   sideToMove?: SideToMove;
   language?: NotationLanguage;
@@ -58,6 +60,8 @@ export interface AnalyzeScreenshotParams extends EngineOptions {
 export interface ExtractScreenshotParams {
   imageBuffer: Buffer;
   mimeType: string;
+  /** Stable x-device-id used for server-side provider rollout routing. */
+  deviceId?: string;
   provider?: AiProviderName;
   sideToMove?: SideToMove;
 }
@@ -137,17 +141,20 @@ export class AnalysisService {
   }> {
     // Reflect the provider that ACTUALLY runs (enforcement may override the
     // client's choice) so the response envelope's vision.provider is honest.
-    const visionName = this.aiService.effectiveProviderName(params.provider);
+    let visionName: string = this.aiService.effectiveProviderName(params.provider);
     let extraction: ExtractBoardStateResult;
     try {
-      extraction = await this.aiService.extractBoardState(
+      const outcome = await this.aiService.extractBoardStateForRequest(
         {
           imageBuffer: params.imageBuffer,
           mimeType: params.mimeType,
           sideToMoveHint: params.sideToMove,
         },
         params.provider,
+        params.deviceId,
       );
+      extraction = outcome.result;
+      visionName = outcome.providerName;
     } catch (err) {
       // Surface provider errors (e.g. missing key) directly to the caller.
       this.logger.warn(`Vision extraction failed via "${visionName}": ${(err as Error).message}`);

@@ -1,10 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
 import { AnalysisController } from './analysis.controller';
 import { AnalysisService } from './analysis.service';
-import { AnalysisResult } from './analysis.types';
+import { AnalysisResult, ExtractionResult } from './analysis.types';
 import { AnalyzeScreenshotDto } from './dto/analyze-screenshot.dto';
 import { AnalyzeBoardDto, SideToMoveEnum } from './dto/analyze-board.dto';
+import { ExtractScreenshotDto } from './dto/extract-screenshot.dto';
 
 /** A real, minimal 1x1 PNG (valid signature) so magic-byte validation passes. */
 const VALID_PNG = Buffer.from(
@@ -26,13 +28,23 @@ const sampleResult: AnalysisResult = {
   vision: { provider: 'mock', ok: true },
 };
 
+const sampleExtraction: ExtractionResult = {
+  extractionId: '00000000-0000-4000-8000-000000000001',
+  board: sampleResult.board,
+  warnings: [],
+  vision: { provider: 'mock', ok: true },
+};
+
 function buildController(): {
   controller: AnalysisController;
-  service: jest.Mocked<Pick<AnalysisService, 'analyzeScreenshot' | 'analyzeBoard'>>;
+  service: jest.Mocked<
+    Pick<AnalysisService, 'analyzeScreenshot' | 'analyzeBoard' | 'extractBoard'>
+  >;
 } {
   const service = {
     analyzeScreenshot: jest.fn().mockResolvedValue(sampleResult),
     analyzeBoard: jest.fn().mockResolvedValue(sampleResult),
+    extractBoard: jest.fn().mockResolvedValue(sampleExtraction),
   };
   const config = {
     get: () => ({ maxBytes: 8_388_608 }),
@@ -102,10 +114,49 @@ describe('AnalysisController', () => {
     it('delegates a valid upload to the service', async () => {
       const { controller, service } = buildController();
       const dto = new AnalyzeScreenshotDto();
-      const result = await controller.analyzeScreenshot(fakeFile(), dto);
+      const result = await controller.analyzeScreenshot(fakeFile(), dto, '  device-main  ');
       expect(service.analyzeScreenshot).toHaveBeenCalledTimes(1);
+      expect(service.analyzeScreenshot).toHaveBeenCalledWith(
+        expect.objectContaining({ deviceId: 'device-main' }),
+      );
       expect(result).toBe(sampleResult);
     });
+  });
+
+  it('forwards the device ID for streaming screenshot analysis', async () => {
+    const { controller, service } = buildController();
+    const response = {
+      status: jest.fn().mockReturnThis(),
+      setHeader: jest.fn(),
+      write: jest.fn(),
+      end: jest.fn(),
+    } as unknown as Response;
+
+    await controller.analyzeScreenshotStream(
+      fakeFile(),
+      new AnalyzeScreenshotDto(),
+      response,
+      '  device-stream  ',
+    );
+
+    expect(service.analyzeScreenshot).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId: 'device-stream' }),
+    );
+  });
+
+  it('forwards the device ID for vision-only extraction', async () => {
+    const { controller, service } = buildController();
+
+    const result = await controller.extractScreenshot(
+      fakeFile(),
+      new ExtractScreenshotDto(),
+      '  device-extract  ',
+    );
+
+    expect(service.extractBoard).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId: 'device-extract' }),
+    );
+    expect(result).toBe(sampleExtraction);
   });
 
   describe('analyzeBoard', () => {

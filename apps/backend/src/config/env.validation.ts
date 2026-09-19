@@ -57,6 +57,16 @@ export const envSchema = z.object({
   // that service exposes (the example uses gpt-5.5).
   APIKEYFUN_API_KEY: z.string().default(''),
   APIKEYFUN_MODEL: z.string().default('gpt-5.5'),
+  // Device-gated Codex HTTP bridge. Model/reasoning are optional: blank values
+  // inherit the bridge's own server-level defaults. The timeout deliberately
+  // exceeds the bridge's default ten-minute request deadline.
+  LOCAL_CODEX_URL: z.string().url().default('https://codertapsu.ngrok.app'),
+  LOCAL_CODEX_TOKEN: z.string().default(''),
+  LOCAL_CODEX_MODEL: z.string().default(''),
+  LOCAL_CODEX_REASONING_EFFORT: z
+    .enum(['', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'])
+    .default(''),
+  LOCAL_CODEX_TIMEOUT_MS: intFromEnv(620_000, 1_000, 1_800_000),
   // Vision-image normalization. Providers downscale internally anyway (OpenAI
   // "high" detail: fit in 2048px then shortest side 768px), so pixels beyond
   // that budget only cost upload time and tiles. We mirror the budget server-
@@ -130,10 +140,9 @@ export const envSchema = z.object({
   RATE_LIMIT_DEVICE_WINDOW_SECONDS: intFromEnv(86400, 1, 2592000),
   RATE_LIMIT_DEVICE_LIMIT: intFromEnv(100, 1, 100000),
 
-  // Install-grant data dir (POST /api/hints/claim). Holds `installs.json` (the
-  // ledger that stops a reinstall from re-granting the free starter hints) and
-  // `grants.json` (the manual per-device "Hint Grants" allowlist). Simple JSON
-  // files; gitignored. Put it on a persistent volume in production.
+  // Runtime data dir. Holds install-grant ledgers plus hand-edited device
+  // allowlists such as local-codex-vision-devices.json. These files are
+  // gitignored; put the directory on a persistent volume in production.
   HINTS_DATA_DIR: z.string().default('./data'),
 
   // Directory for date-grouped error/failure logs (<LOGS_DIR>/<YYYY-MM-DD>.log),

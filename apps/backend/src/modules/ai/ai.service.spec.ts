@@ -5,6 +5,8 @@ import { MockVisionProvider } from './providers/mock-vision.provider';
 import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
 import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
+import { LocalCodexVisionProvider } from './providers/local-codex.provider';
+import { LocalCodexVisionAllowlist } from './local-codex-vision.allowlist';
 import { ExtractBoardStateInput, ExtractBoardStateResult } from './ai-provider.interface';
 
 function buildConfig(ai: Record<string, unknown> = { provider: 'mock' }): ConfigService {
@@ -16,6 +18,11 @@ function buildConfig(ai: Record<string, unknown> = { provider: 'mock' }): Config
 const identityPreprocess = {
   normalizeForVision: async (buffer: Buffer, mimeType: string) => ({ buffer, mimeType }),
 } as unknown as ImagePreprocessService;
+
+const unusedLocalProvider = {} as LocalCodexVisionProvider;
+const noLocalDevices = {
+  canUse: async () => false,
+} as LocalCodexVisionAllowlist;
 
 /** Mock provider stand-in that counts real extractions. */
 class CountingProvider {
@@ -52,6 +59,8 @@ describe('AiService extraction cache', () => {
       {} as GeminiVisionProvider,
       {} as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
+      unusedLocalProvider,
+      noLocalDevices,
     );
   });
 
@@ -95,6 +104,8 @@ describe('AiService extraction cache', () => {
       {} as GeminiVisionProvider,
       {} as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
+      unusedLocalProvider,
+      noLocalDevices,
     );
     const input: ExtractBoardStateInput = { imageBuffer: image, mimeType: 'image/png' };
     await svc.extractBoardState(input);
@@ -162,6 +173,8 @@ describe('AiService provider enforcement', () => {
       p.gemini as unknown as GeminiVisionProvider,
       p.openai as unknown as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
+      unusedLocalProvider,
+      noLocalDevices,
     );
   }
 
@@ -195,6 +208,8 @@ describe('AiService single-flight coalescing', () => {
       {} as GeminiVisionProvider,
       {} as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
+      unusedLocalProvider,
+      noLocalDevices,
     );
     const input: ExtractBoardStateInput = {
       imageBuffer: Buffer.from('same-bytes'),
@@ -254,6 +269,8 @@ describe('AiService accuracy cascade', () => {
       {} as GeminiVisionProvider,
       provider as unknown as OpenAiVisionProvider,
       {} as ApikeyFunVisionProvider,
+      unusedLocalProvider,
+      noLocalDevices,
     );
   }
   const img: ExtractBoardStateInput = { imageBuffer: Buffer.from('x'), mimeType: 'image/png' };
@@ -298,5 +315,100 @@ describe('AiService accuracy cascade', () => {
     const result = await service.extractBoardState(img);
     expect(result.pieces).toHaveLength(1); // fell back to the primary
     expect(provider.calls).toBe(2);
+  });
+});
+
+describe('AiService Local Codex device routing', () => {
+  const usable = (warning = ''): ExtractBoardStateResult => ({
+    boardDetected: true,
+    sideToMove: 'red',
+    confidence: 0.95,
+    pieces: [
+      { color: 'red', type: 'king', file: 4, rank: 0 },
+      { color: 'black', type: 'king', file: 4, rank: 9 },
+    ],
+    warnings: warning ? [warning] : [],
+  });
+
+  function setup(options: { allowed: boolean; localFails?: boolean }) {
+    const local = {
+      name: 'local-codex',
+      calls: 0,
+      async extractBoardState(): Promise<ExtractBoardStateResult> {
+        this.calls++;
+        if (options.localFails) throw new Error('bridge unavailable');
+        return usable('from local');
+      },
+    };
+    const standard = {
+      name: 'apikeyfun',
+      calls: 0,
+      async extractBoardState(): Promise<ExtractBoardStateResult> {
+        this.calls++;
+        return usable('from standard');
+      },
+    };
+    const allowlist = {
+      seen: [] as (string | undefined)[],
+      async canUse(deviceId?: string): Promise<boolean> {
+        this.seen.push(deviceId);
+        return options.allowed;
+      },
+    };
+    const service = new AiService(
+      buildConfig({ provider: 'apikeyfun', providerEnforce: true }),
+      identityPreprocess,
+      {} as MockVisionProvider,
+      {} as GeminiVisionProvider,
+      {} as OpenAiVisionProvider,
+      standard as unknown as ApikeyFunVisionProvider,
+      local as unknown as LocalCodexVisionProvider,
+      allowlist as unknown as LocalCodexVisionAllowlist,
+    );
+    return { service, local, standard, allowlist };
+  }
+
+  const input: ExtractBoardStateInput = {
+    imageBuffer: Buffer.from('device-routed-image'),
+    mimeType: 'image/png',
+  };
+
+  it('uses Local Codex only for an allowlisted device and reports it', async () => {
+    const { service, local, standard, allowlist } = setup({ allowed: true });
+    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+
+    expect(allowlist.seen).toEqual(['device-allowed']);
+    expect(local.calls).toBe(1);
+    expect(standard.calls).toBe(0);
+    expect(outcome.providerName).toBe('local-codex');
+    expect(outcome.result.warnings).toContain('from local');
+  });
+
+  it('uses the normally resolved provider when the device is not allowlisted', async () => {
+    const { service, local, standard } = setup({ allowed: false });
+    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-standard');
+
+    expect(local.calls).toBe(0);
+    expect(standard.calls).toBe(1);
+    expect(outcome.providerName).toBe('apikeyfun');
+    expect(outcome.fallbackFrom).toBeUndefined();
+  });
+
+  it('falls back after a Local Codex exception and caches under the standard provider', async () => {
+    const options = { allowed: true, localFails: true };
+    const { service, local, standard } = setup(options);
+    const first = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+
+    expect(local.calls).toBe(1);
+    expect(standard.calls).toBe(1);
+    expect(first.providerName).toBe('apikeyfun');
+    expect(first.fallbackFrom).toBe('local-codex');
+    expect(first.result.warnings.some((warning) => /used apikeyfun/i.test(warning))).toBe(true);
+
+    // A standard-path request for the same image reuses the fallback provider's
+    // own cache entry. It is never stored under the Local Codex cache key.
+    options.allowed = false;
+    await service.extractBoardStateForRequest(input, undefined, 'device-standard');
+    expect(standard.calls).toBe(1);
   });
 });

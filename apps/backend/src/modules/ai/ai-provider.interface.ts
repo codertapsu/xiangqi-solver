@@ -19,7 +19,7 @@ export interface ExtractBoardStateResult {
   warnings: string[];
 }
 
-/** Pluggable AI vision provider contract (mock / Gemini / OpenAI). */
+/** Pluggable AI vision provider contract shared by every vision backend. */
 export interface AiVisionProvider {
   /** Human-readable provider name surfaced in AnalysisResult.vision.provider. */
   readonly name: string;

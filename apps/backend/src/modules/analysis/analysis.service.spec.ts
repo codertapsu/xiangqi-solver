@@ -7,6 +7,8 @@ import { MockVisionProvider } from '../ai/providers/mock-vision.provider';
 import { GeminiVisionProvider } from '../ai/providers/gemini.provider';
 import { OpenAiVisionProvider } from '../ai/providers/openai.provider';
 import { ApikeyFunVisionProvider } from '../ai/providers/apikeyfun.provider';
+import { LocalCodexVisionProvider } from '../ai/providers/local-codex.provider';
+import { LocalCodexVisionAllowlist } from '../ai/local-codex-vision.allowlist';
 import { ErrorLogService } from '../logging/error-log.service';
 import { EngineService } from '../engine/engine.service';
 import { MockEngineService } from '../engine/mock-engine.service';
@@ -58,6 +60,8 @@ describe('AnalysisService', () => {
       new GeminiVisionProvider(config, errorLog),
       new OpenAiVisionProvider(config, errorLog),
       new ApikeyFunVisionProvider(config, errorLog),
+      {} as LocalCodexVisionProvider,
+      { canUse: async () => false } as unknown as LocalCodexVisionAllowlist,
     );
     const engineService = new EngineService(
       config,
@@ -77,17 +81,20 @@ describe('AnalysisService', () => {
 
   /** Build a service whose vision stub returns a fixed board (sideToMove 'red')
    *  + the given pieces — for exercising the post-vision pipeline directly. */
-  function serviceWithExtraction(pieces: unknown[]): AnalysisService {
+  function serviceWithExtraction(pieces: unknown[], providerName = 'mock'): AnalysisService {
     const config = buildConfig();
     const aiStub = {
       defaultProvider: 'mock',
       effectiveProviderName: (p?: string) => p ?? 'mock',
-      extractBoardState: async () => ({
-        boardDetected: true,
-        sideToMove: 'red',
-        confidence: 0.5,
-        pieces,
-        warnings: [],
+      extractBoardStateForRequest: async () => ({
+        providerName,
+        result: {
+          boardDetected: true,
+          sideToMove: 'red',
+          confidence: 0.5,
+          pieces,
+          warnings: [],
+        },
       }),
     } as unknown as AiService;
     const engineService = new EngineService(
@@ -224,6 +231,19 @@ describe('AnalysisService', () => {
           provider: 'openai',
         }),
       ).rejects.toThrow(/OPENAI_API_KEY/i);
+    });
+
+    it('reports the provider that actually produced the device-routed extraction', async () => {
+      const result = await serviceWithExtraction(
+        buildStartPosition(),
+        'apikeyfun',
+      ).analyzeScreenshot({
+        imageBuffer: Buffer.from('fake-png'),
+        mimeType: 'image/png',
+        deviceId: 'device-allowed',
+      });
+
+      expect(result.vision).toEqual({ provider: 'apikeyfun', ok: true });
     });
   });
 

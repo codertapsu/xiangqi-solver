@@ -5,7 +5,13 @@ import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../../config/configuration';
 
 /** Which kind of failure an entry records (for grep/filtering within a day's file). */
-export type ErrorLogCategory = 'request' | 'openai' | 'gemini' | 'apikeyfun' | 'vision-invalid';
+export type ErrorLogCategory =
+  | 'request'
+  | 'openai'
+  | 'gemini'
+  | 'apikeyfun'
+  | 'local-codex'
+  | 'vision-invalid';
 
 export interface ErrorLogFields {
   /** Short human-readable summary. */

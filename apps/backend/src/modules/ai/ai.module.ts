@@ -6,12 +6,14 @@ import { MockVisionProvider } from './providers/mock-vision.provider';
 import { GeminiVisionProvider } from './providers/gemini.provider';
 import { OpenAiVisionProvider } from './providers/openai.provider';
 import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
+import { LocalCodexVisionProvider } from './providers/local-codex.provider';
+import { LocalCodexVisionAllowlist } from './local-codex-vision.allowlist';
 
 /**
  * AI module: exposes the AiService facade and all vision provider
- * implementations (mock + Gemini + OpenAI + api.apikey.fun). The facade selects
- * per-request and normalizes (downscale/recompress) uploads before any provider
- * sees them.
+ * implementations, including the device-gated Local Codex backend. The facade
+ * selects per request and normalizes (downscale/recompress) uploads before any
+ * provider sees them.
  */
 @Module({
   imports: [BoardModule],
@@ -22,6 +24,8 @@ import { ApikeyFunVisionProvider } from './providers/apikeyfun.provider';
     GeminiVisionProvider,
     OpenAiVisionProvider,
     ApikeyFunVisionProvider,
+    LocalCodexVisionProvider,
+    LocalCodexVisionAllowlist,
   ],
   exports: [AiService],
 })
