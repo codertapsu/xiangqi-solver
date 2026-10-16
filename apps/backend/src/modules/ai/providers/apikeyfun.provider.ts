@@ -10,14 +10,19 @@ import { BOARD_EXTRACTION_PROMPT } from '../prompts/board-extraction.prompt';
 import { parseVisionResponse } from '../vision-response.schema';
 import { ErrorLogFields, ErrorLogService } from '../../logging/error-log.service';
 import { AttemptResult, isTransientStatus, withRetries } from './vision-retry.util';
+import {
+  transportFailure,
+  truncationFailure,
+  VendorError,
+  vendorHttpFailure,
+  vendorStreamFailure,
+  VisionApiError,
+} from './vision-api-error';
 
 const APIKEYFUN_URL = 'https://api.apikey.fun/v1/chat/completions';
 // Streaming can legitimately run longer than a single-shot call (the proxy may
 // queue behind an upstream), so allow more headroom than the direct providers.
 const REQUEST_TIMEOUT_MS = 60_000;
-
-/** An OpenAI-style error object, either HTTP-body or in-band SSE `{error:{…}}`. */
-type ApiError = { message?: string; code?: string; type?: string };
 
 /**
  * Vision provider backed by api.apikey.fun — an OpenAI-COMPATIBLE aggregator
@@ -118,17 +123,12 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
 
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
-        const apiError = this.parseApiError(detail);
         return {
           ok: false,
           retryable: isTransientStatus(res.status),
-          error: new ServiceUnavailableException({
-            message:
-              `api.apikey.fun request failed (HTTP ${res.status})` +
-              `${apiError.message ? `: ${apiError.message}` : '.'}`,
-            code: apiError.code ?? 'VISION_API_ERROR',
-            details: detail.slice(0, 500),
-          }),
+          // Fixed user-facing message + stable code, identical to the other
+          // cloud providers; the aggregator's own reason is log-only diagnostics.
+          error: vendorHttpFailure(res.status, detail),
         };
       }
 
@@ -140,15 +140,12 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
       // handle it here: surface the real upstream reason and retry it when it
       // looks transient (rate-limit / overloaded / upstream 5xx).
       if (apiError) {
-        const upstream = [apiError.code, apiError.message].filter(Boolean).join(': ');
         return {
           ok: false,
-          retryable: this.isTransientApiError(apiError),
-          error: new ServiceUnavailableException({
-            message: `api.apikey.fun upstream error${upstream ? `: ${upstream}` : '.'}`,
-            code: 'VISION_API_ERROR',
-            details: upstream || undefined,
-          }),
+          retryable: this.isTransientVendorError(apiError),
+          // The upstream's wording is still vendor text even though it arrived
+          // in-band after a 200: it goes to the log, not to the app.
+          error: vendorStreamFailure(apiError),
         };
       }
 
@@ -161,11 +158,9 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
         return {
           ok: false,
           retryable: false,
-          error: new ServiceUnavailableException({
-            message:
-              'api.apikey.fun truncated the response at the output-token cap. Raise VISION_MAX_OUTPUT_TOKENS or disable it (0).',
-            code: 'VISION_OUTPUT_TRUNCATED',
-          }),
+          error: truncationFailure(
+            'api.apikey.fun truncated the response at the output-token cap. Raise VISION_MAX_OUTPUT_TOKENS or disable it (0).',
+          ),
         };
       }
 
@@ -191,14 +186,9 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
           }),
         };
       }
-      return {
-        ok: false,
-        retryable: true,
-        error: new ServiceUnavailableException({
-          message: `api.apikey.fun request error: ${(err as Error).message}`,
-          code: 'VISION_API_ERROR',
-        }),
-      };
+      // Node's transport text names hosts and error codes — diagnostics, not a
+      // sentence to render in the app.
+      return { ok: false, retryable: true, error: transportFailure(err) };
     } finally {
       clearTimeout(timeout);
     }
@@ -212,7 +202,7 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
    */
   private async readStream(
     res: Response,
-  ): Promise<{ content: string; finishReason?: string; apiError?: ApiError }> {
+  ): Promise<{ content: string; finishReason?: string; apiError?: VendorError }> {
     const stream = res.body;
     if (!stream) return { content: '' };
     const reader = stream.getReader();
@@ -220,7 +210,7 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
     let buffer = '';
     let content = '';
     let finishReason: string | undefined;
-    let apiError: ApiError | undefined;
+    let apiError: VendorError | undefined;
 
     const consume = (frame: string): void => {
       const data = frame
@@ -232,7 +222,7 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
       try {
         const chunk = JSON.parse(data) as {
           choices?: { delta?: { content?: string }; finish_reason?: string }[];
-          error?: ApiError;
+          error?: VendorError;
         };
         // An in-band upstream failure (HTTP 200, then `data: {"error":{…}}`) —
         // keep the first one so attempt() can classify + surface the real cause.
@@ -276,7 +266,7 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
    * rate-limit, an overload, or an upstream 5xx surfaced as an OpenAI-style
    * error object. Permanent errors (bad request, auth, quota) are not retried.
    */
-  private isTransientApiError(err: ApiError): boolean {
+  private isTransientVendorError(err: VendorError): boolean {
     const s = `${err.code ?? ''} ${err.type ?? ''}`.toLowerCase();
     return (
       s.includes('rate_limit') ||
@@ -296,16 +286,6 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
       : '';
   }
 
-  /** Best-effort extraction of an OpenAI-style { error: { message, code } } body. */
-  private parseApiError(raw: string): { message?: string; code?: string } {
-    try {
-      const parsed = JSON.parse(raw) as { error?: { message?: string; code?: string } };
-      return { message: parsed.error?.message, code: parsed.error?.code };
-    } catch {
-      return {};
-    }
-  }
-
   /** Append a failure to the date-grouped error log (never the key/image bytes). */
   private logFailure(
     category: 'apikeyfun' | 'vision-invalid',
@@ -322,7 +302,12 @@ export class ApikeyFunVisionProvider implements AiVisionProvider {
       mimeType: input.mimeType,
       sideToMoveHint: input.sideToMoveHint,
     };
-    if (err instanceof HttpException) {
+    // The aggregator's real reason travels on the DIAGNOSTIC channel only (never
+    // in the exception body the client sees) — copy it into the log here.
+    if (err instanceof VisionApiError) {
+      fields.code = err.code;
+      Object.assign(fields, err.diagnostics);
+    } else if (err instanceof HttpException) {
       const res = err.getResponse();
       if (res && typeof res === 'object') {
         const o = res as Record<string, unknown>;

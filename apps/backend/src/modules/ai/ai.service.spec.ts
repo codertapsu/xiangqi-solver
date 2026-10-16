@@ -23,8 +23,8 @@ const identityPreprocess = {
 const unusedLocalProvider = {} as LocalCodexVisionProvider;
 const unusedLocalClaudeProvider = {} as LocalClaudeVisionProvider;
 const noLocalDevices = {
-  canUse: async () => false,
-} as LocalCodexVisionAllowlist;
+  authorize: async () => false,
+} as unknown as LocalCodexVisionAllowlist;
 
 /** Mock provider stand-in that counts real extractions. */
 class CountingProvider {
@@ -314,13 +314,13 @@ describe('AiService accuracy cascade', () => {
       {} as ApikeyFunVisionProvider,
       unusedLocalProvider,
       bridge as unknown as LocalClaudeVisionProvider,
-      { canUse: async () => true } as LocalCodexVisionAllowlist,
+      { authorize: async () => true } as unknown as LocalCodexVisionAllowlist,
     );
 
     const outcome = await service.extractBoardStateForRequest(
       { imageBuffer: Buffer.from('bridge-cascade'), mimeType: 'image/png' },
       undefined,
-      'device-allowed',
+      { deviceId: 'device-allowed', rolloutToken: 'rollout-secret' },
     );
 
     // One call, with no model override — the weak read is returned as it is.
@@ -361,6 +361,8 @@ describe('AiService accuracy cascade', () => {
 });
 
 describe('AiService Local Codex device routing', () => {
+  /** Stands in for LOCAL_VISION_ROLLOUT_TOKEN; only requests carrying it may route. */
+  const ROLLOUT_TOKEN = 'rollout-secret';
   const usable = (warning = ''): ExtractBoardStateResult => ({
     boardDetected: true,
     sideToMove: 'red',
@@ -400,10 +402,12 @@ describe('AiService Local Codex device routing', () => {
       },
     };
     const allowlist = {
-      seen: [] as (string | undefined)[],
-      async canUse(deviceId?: string): Promise<boolean> {
-        this.seen.push(deviceId);
-        return options.allowed;
+      seen: [] as { deviceId?: string; token?: string }[],
+      // Mirrors the real two-factor gate: an allowlisted device ID is not enough
+      // on its own, the rollout token must be presented with it.
+      async authorize(deviceId?: string, token?: string): Promise<boolean> {
+        this.seen.push({ deviceId, token });
+        return token === ROLLOUT_TOKEN && options.allowed;
       },
     };
     const service = new AiService(
@@ -433,9 +437,12 @@ describe('AiService Local Codex device routing', () => {
 
   it('uses Local Codex only for an allowlisted device and reports it', async () => {
     const { service, local, standard, allowlist } = setup({ allowed: true });
-    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+    const outcome = await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-allowed',
+      rolloutToken: ROLLOUT_TOKEN,
+    });
 
-    expect(allowlist.seen).toEqual(['device-allowed']);
+    expect(allowlist.seen).toEqual([{ deviceId: 'device-allowed', token: ROLLOUT_TOKEN }]);
     expect(local.calls).toBe(1);
     expect(standard.calls).toBe(0);
     expect(outcome.providerName).toBe('local-codex');
@@ -444,7 +451,10 @@ describe('AiService Local Codex device routing', () => {
 
   it('uses the normally resolved provider when the device is not allowlisted', async () => {
     const { service, local, standard } = setup({ allowed: false });
-    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-standard');
+    const outcome = await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-standard',
+      rolloutToken: ROLLOUT_TOKEN,
+    });
 
     expect(local.calls).toBe(0);
     expect(standard.calls).toBe(1);
@@ -455,7 +465,10 @@ describe('AiService Local Codex device routing', () => {
   it('falls back after a Local Codex exception and caches under the standard provider', async () => {
     const options = { allowed: true, localFails: true };
     const { service, local, standard } = setup(options);
-    const first = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+    const first = await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-allowed',
+      rolloutToken: ROLLOUT_TOKEN,
+    });
 
     expect(local.calls).toBe(1);
     expect(standard.calls).toBe(1);
@@ -466,13 +479,19 @@ describe('AiService Local Codex device routing', () => {
     // A standard-path request for the same image reuses the fallback provider's
     // own cache entry. It is never stored under the Local Codex cache key.
     options.allowed = false;
-    await service.extractBoardStateForRequest(input, undefined, 'device-standard');
+    await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-standard',
+      rolloutToken: ROLLOUT_TOKEN,
+    });
     expect(standard.calls).toBe(1);
   });
 
   it('runs Local Claude instead of Local Codex when it is the selected bridge', async () => {
     const { service, local, claude, standard } = setup({ allowed: true, selected: 'claude' });
-    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+    const outcome = await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-allowed',
+      rolloutToken: ROLLOUT_TOKEN,
+    });
 
     expect(claude.calls).toBe(1);
     // The decisive assertion: selecting one bridge does not merely prefer it,
@@ -489,7 +508,10 @@ describe('AiService Local Codex device routing', () => {
       selected: 'claude',
       localFails: true,
     });
-    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+    const outcome = await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-allowed',
+      rolloutToken: ROLLOUT_TOKEN,
+    });
 
     expect(claude.calls).toBe(1);
     expect(standard.calls).toBe(1);
@@ -501,12 +523,38 @@ describe('AiService Local Codex device routing', () => {
     ).toBe(true);
   });
 
+  // Regression: `x-device-id` is PUBLISHED to users (Settings renders it so it
+  // can be shared to receive hint grants), so knowing an allowlisted ID must not
+  // be enough to aim uploads at the operator's own machine and subscription.
+  it.each([
+    ['no rollout token at all', undefined],
+    ['a wrong rollout token', 'not-the-rollout-secret'],
+    ['a prefix of the rollout token', ROLLOUT_TOKEN.slice(0, 5)],
+  ])('keeps an allowlisted device on the standard provider with %s', async (_case, token) => {
+    const { service, local, claude, standard } = setup({ allowed: true });
+    const outcome = await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-allowed',
+      rolloutToken: token,
+    });
+
+    expect(local.calls).toBe(0);
+    expect(claude.calls).toBe(0);
+    expect(standard.calls).toBe(1);
+    // The envelope must not confirm the guess either: it names the cloud
+    // provider, exactly as it would for any non-rollout device.
+    expect(outcome.providerName).toBe('apikeyfun');
+    expect(outcome.fallbackFrom).toBeUndefined();
+  });
+
   it('skips both bridges — and the allowlist read — when none is selected', async () => {
     const { service, local, claude, standard, allowlist } = setup({
       allowed: true,
       selected: 'none',
     });
-    const outcome = await service.extractBoardStateForRequest(input, undefined, 'device-allowed');
+    const outcome = await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-allowed',
+      rolloutToken: ROLLOUT_TOKEN,
+    });
 
     expect(local.calls).toBe(0);
     expect(claude.calls).toBe(0);

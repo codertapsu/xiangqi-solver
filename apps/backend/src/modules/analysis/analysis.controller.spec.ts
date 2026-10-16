@@ -114,13 +114,39 @@ describe('AnalysisController', () => {
     it('delegates a valid upload to the service', async () => {
       const { controller, service } = buildController();
       const dto = new AnalyzeScreenshotDto();
-      const result = await controller.analyzeScreenshot(fakeFile(), dto, '  device-main  ');
+      const result = await controller.analyzeScreenshot(
+        fakeFile(),
+        dto,
+        '  device-main  ',
+        '  rollout-secret  ',
+      );
       expect(service.analyzeScreenshot).toHaveBeenCalledTimes(1);
       expect(service.analyzeScreenshot).toHaveBeenCalledWith(
-        expect.objectContaining({ deviceId: 'device-main' }),
+        expect.objectContaining({ deviceId: 'device-main', localVisionToken: 'rollout-secret' }),
       );
       expect(result).toBe(sampleResult);
     });
+  });
+
+  // The device ID is published to users (Settings shows it so it can be shared
+  // to receive hint grants), so the local-bridge rollout is authorized by a
+  // separate secret header. Both must reach the service for the gate to work.
+  it.each([
+    ['no token header', undefined],
+    ['a blank token header', '   '],
+  ])('forwards an undefined local-vision token when the request sends %s', async (_c, header) => {
+    const { controller, service } = buildController();
+
+    await controller.extractScreenshot(
+      fakeFile(),
+      new ExtractScreenshotDto(),
+      'device-extract',
+      header,
+    );
+
+    expect(service.extractBoard).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId: 'device-extract', localVisionToken: undefined }),
+    );
   });
 
   it('forwards the device ID for streaming screenshot analysis', async () => {
@@ -137,10 +163,11 @@ describe('AnalysisController', () => {
       new AnalyzeScreenshotDto(),
       response,
       '  device-stream  ',
+      'rollout-secret',
     );
 
     expect(service.analyzeScreenshot).toHaveBeenCalledWith(
-      expect.objectContaining({ deviceId: 'device-stream' }),
+      expect.objectContaining({ deviceId: 'device-stream', localVisionToken: 'rollout-secret' }),
     );
   });
 
@@ -151,10 +178,11 @@ describe('AnalysisController', () => {
       fakeFile(),
       new ExtractScreenshotDto(),
       '  device-extract  ',
+      '  rollout-secret  ',
     );
 
     expect(service.extractBoard).toHaveBeenCalledWith(
-      expect.objectContaining({ deviceId: 'device-extract' }),
+      expect.objectContaining({ deviceId: 'device-extract', localVisionToken: 'rollout-secret' }),
     );
     expect(result).toBe(sampleExtraction);
   });

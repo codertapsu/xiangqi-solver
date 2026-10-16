@@ -13,10 +13,17 @@ exactly.
 - **Rate limiting:** a global per-IP throttle covers all routes
   (`RATE_LIMIT_LIMIT` requests per `RATE_LIMIT_TTL` seconds; defaults **30 /
   60 s**). The `/api/analysis/*` endpoints and `POST /api/hints/claim` are
-  additionally capped **per device** via the `x-device-id` header (rolling
-  window: `RATE_LIMIT_DEVICE_LIMIT` per `RATE_LIMIT_DEVICE_WINDOW_SECONDS`;
-  defaults **100 / day**; falls back to the client IP when the header is
-  absent). Exceeding either cap returns **429**. `GET /api/config`,
+  additionally capped over a rolling `RATE_LIMIT_DEVICE_WINDOW_SECONDS` window
+  (default **1 day**) by TWO buckets, both of which must be under their limit:
+  **per device** via the `x-device-id` header (`RATE_LIMIT_DEVICE_LIMIT`,
+  default **100**) and **per source IP** (`RATE_LIMIT_IP_LIMIT`, default **0** =
+  five times the device cap). The header is client-supplied and unauthenticated, so the IP bucket
+  is counted on every request — a rotating or absent device id degrades to the
+  network cap instead of escaping metering — and a device id outside 8–256
+  characters is ignored as a bucket key. Exceeding any cap returns **429**. Both
+IP-keyed caps read `req.ip`, so a deployment behind a reverse proxy must set
+`TRUST_PROXY` (e.g. `loopback` for the bundled Caddy config) or every request
+appears to come from the proxy and the whole fleet shares one bucket. `GET /api/config`,
   `GET /api/engine/net`, and the `/api/admin/*` routes skip the per-IP
   throttle (cheap, low-volume calls that must not share the analysis budget).
 
@@ -247,6 +254,13 @@ Recognize a board from a screenshot, normalize it, then run the engine.
 
 **Content-Type:** `multipart/form-data`
 
+**Headers:**
+
+| Header                 | Required | Notes                                                                                                                                                                        |
+| ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap and identifies a local-vision rollout device. **Public value** (Settings shows it so users can share it for hint grants) — it authorizes nothing on its own. |
+| `x-local-vision-token` | no       | Must equal `LOCAL_VISION_ROLLOUT_TOKEN` for an allowlisted device to be served by a local bridge. Missing/wrong simply uses `AI_PROVIDER` — never an error, so the path cannot be probed. |
+
 **Fields:**
 
 | Field             | Type        | Required | Notes                                                              |
@@ -300,6 +314,19 @@ curl -s -X POST http://localhost:3000/api/analysis/screenshot \
 | 400  | `UNSUPPORTED_MEDIA_TYPE` | Magic bytes are not a real PNG/JPEG/WebP.                   |
 | 400  | `NO_BOARD_DETECTED`      | Vision found no pieces after board repair.                  |
 | 503  | `ENGINE_BUSY`            | Warm engine pool's wait queue is full (>32 waiting).        |
+| 503  | `VISION_UNAVAILABLE`     | The vision backend rejected our credentials (HTTP 401/403), or no key is configured. |
+| 503  | `VISION_API_ERROR`       | Any other vision-API or transport failure.                  |
+| 503  | `VISION_TIMEOUT`         | The vision call exceeded the provider deadline.             |
+| 503  | `VISION_OUTPUT_TRUNCATED`| The model hit `VISION_MAX_OUTPUT_TOKENS` mid-answer — raise or disable the cap. |
+| 503  | `VISION_EMPTY_RESPONSE`  | The provider returned a 200 with no content.                |
+| 503  | `VISION_INVALID_RESPONSE`| The response came back but could not be read as a board.    |
+
+The `VISION_*` vocabulary is **identical across all cloud providers** and the
+messages are fixed strings written by this project: a vendor's own error text
+(which for OpenAI includes the partially masked API key and a billing URL) is
+never returned to clients. It is written to `<LOGS_DIR>/<YYYY-MM-DD>.log`
+instead, as `vendorMessage` / `vendorCode` / `vendorBody` / `httpStatus` /
+`cause` fields alongside our `code`.
 
 **Example error (file too large):**
 
@@ -322,8 +349,8 @@ response is `application/x-ndjson` — one JSON object per line as each stage
 completes, so the client can render the recognized board while the engine is
 still searching. **Not** wrapped in the response envelope.
 
-**Content-Type (request):** `multipart/form-data` — identical fields to
-`/screenshot`.
+**Content-Type (request):** `multipart/form-data` — identical fields **and
+headers** (`x-device-id`, `x-local-vision-token`) to `/screenshot`.
 
 **Response headers:** `200 OK`, `Content-Type: application/x-ndjson;
 charset=utf-8`, `Cache-Control: no-cache`, `X-Accel-Buffering: no` (disables
@@ -377,6 +404,13 @@ running the engine**. Intended for clients that compute the move themselves
 [ON_DEVICE_ENGINE.md](ON_DEVICE_ENGINE.md).
 
 **Content-Type:** `multipart/form-data`
+
+**Headers:**
+
+| Header                 | Required | Notes                                                                                                                                                                        |
+| ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap and identifies a local-vision rollout device. **Public value** (Settings shows it so users can share it for hint grants) — it authorizes nothing on its own. |
+| `x-local-vision-token` | no       | Must equal `LOCAL_VISION_ROLLOUT_TOKEN` for an allowlisted device to be served by a local bridge. Missing/wrong simply uses `AI_PROVIDER` — never an error, so the path cannot be probed. |
 
 **Fields:**
 

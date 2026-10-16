@@ -76,6 +76,7 @@ Every variable has a safe mock default (see `.env.example`).
 | `LOCAL_CODEX_REASONING_EFFORT`     | _(empty)_                      | Reasoning override; empty inherits the bridge default                       |
 | `LOCAL_CODEX_TIMEOUT_MS`           | `620000`                       | Local Codex request deadline                                                |
 | `AI_LOCAL_VISION_PROVIDER`         | `codex`                        | Which local bridge allowlisted devices use: `codex` \| `claude` \| `none`    |
+| `LOCAL_VISION_ROLLOUT_TOKEN`       | _(empty)_                      | Secret (`x-local-vision-token`) required with the allowlist; empty = local bridges OFF |
 | `LOCAL_CLAUDE_URL`                 | `http://127.0.0.1:5612`        | Mother Claude HTTP bridge base URL for allowlisted devices                  |
 | `LOCAL_CLAUDE_TOKEN`               | _(empty)_                      | Optional bridge bearer token                                                |
 | `LOCAL_CLAUDE_MODEL`               | _(empty)_                      | Model override; empty inherits the bridge default                           |
@@ -97,21 +98,44 @@ Every variable has a safe mock default (see `.env.example`).
 | `ENGINE_MOVE_OVERHEAD_MS`          | `10`                           | UCI `Move Overhead`                                                         |
 | `ENGINE_POOL_SIZE`                 | `2`                            | Warm engine pool size = hard cap on concurrent searches                     |
 | `MAX_UPLOAD_BYTES`                 | `8388608`                      | Max screenshot size (8 MB)                                                  |
+| `TRUST_PROXY`                      | _(empty)_                      | Express `trust proxy`; set `loopback` behind the bundled Caddy, else both IP caps see only the proxy |
 | `RATE_LIMIT_TTL`                   | `60`                           | Global per-IP throttle window (seconds)                                     |
 | `RATE_LIMIT_LIMIT`                 | `30`                           | Max requests per window                                                     |
 | `RATE_LIMIT_DEVICE_WINDOW_SECONDS` | `86400`                        | Per-device window for the analysis endpoints (`x-device-id` header)         |
 | `RATE_LIMIT_DEVICE_LIMIT`          | `100`                          | Max analysis requests per device per window                                 |
+| `RATE_LIMIT_IP_LIMIT`              | `0`                            | Max analysis requests per source IP per window (always counted); `0` = 5x the device cap |
 | `HINTS_DATA_DIR`                   | `./data`                       | Runtime ledgers and device allowlists                                       |
 | `LOGS_DIR`                         | `./logs`                       | Date-grouped error/failure logs                                             |
 
 ### Device-gated local vision
 
 Screenshot and extraction requests whose `x-device-id` is listed in
-`<HINTS_DATA_DIR>/local-codex-vision-devices.json` try a **local bridge** first.
-Other devices continue through the normal `AI_PROVIDER` selection. If the local
+`<HINTS_DATA_DIR>/local-codex-vision-devices.json` **and** that present the
+rollout secret in `x-local-vision-token` try a **local bridge** first. Every
+other device continues through the normal `AI_PROVIDER` selection. If the local
 bridge times out, returns an error, or returns a response that cannot be parsed
 as a board, the request automatically falls back to that normal provider
 (currently `apikeyfun` in production).
+
+#### Two factors, because the device ID is public
+
+The allowlist is identity, not authorization. `x-device-id` is a **published**
+value: Settings renders a "Device ID" tile whose documented purpose is for users
+to share it with the operator to receive hint grants, and the same id is the
+admin identity key in `admins.json`. Routing on it alone would mean that anyone
+who saw a tester's id in a support chat could send arbitrary images to the
+operator's own machine, on the operator's personal subscription, holding a
+socket for the whole `LOCAL_CODEX_TIMEOUT_MS` — and `vision.provider` in the
+response would confirm each guess.
+
+So the bridge path needs both: an allowlisted `x-device-id` **and**
+`x-local-vision-token` equal to `LOCAL_VISION_ROLLOUT_TOKEN` (constant-time
+compare, same shape as `ADMIN_SECRET`/`x-admin-secret`). An unset token disables
+local vision for every device, and a request that fails either factor is served
+by `AI_PROVIDER` with no error — a prober learns nothing. Generate one with
+`openssl rand -base64 32`, set it on the backend, and make the tester build send
+the header; without that client change the rollout stays off and every device
+uses the cloud provider.
 
 #### Choosing the bridge — exactly one, never both
 

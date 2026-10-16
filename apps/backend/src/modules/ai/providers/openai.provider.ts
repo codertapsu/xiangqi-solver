@@ -10,6 +10,12 @@ import { BOARD_EXTRACTION_PROMPT } from '../prompts/board-extraction.prompt';
 import { parseVisionResponse } from '../vision-response.schema';
 import { ErrorLogFields, ErrorLogService } from '../../logging/error-log.service';
 import { AttemptResult, isTransientStatus, withRetries } from './vision-retry.util';
+import {
+  transportFailure,
+  truncationFailure,
+  vendorHttpFailure,
+  VisionApiError,
+} from './vision-api-error';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -114,8 +120,12 @@ export class OpenAiVisionProvider implements AiVisionProvider {
       mimeType: input.mimeType,
       sideToMoveHint: input.sideToMoveHint,
     };
-    // Surface OpenAI's real code/details carried on our ServiceUnavailableException.
-    if (err instanceof HttpException) {
+    // OpenAI's real reason travels on the DIAGNOSTIC channel only (never in the
+    // exception body the client sees) — copy it into the log here.
+    if (err instanceof VisionApiError) {
+      fields.code = err.code;
+      Object.assign(fields, err.diagnostics);
+    } else if (err instanceof HttpException) {
       const res = err.getResponse();
       if (res && typeof res === 'object') {
         const o = res as Record<string, unknown>;
@@ -134,20 +144,11 @@ export class OpenAiVisionProvider implements AiVisionProvider {
       : '';
   }
 
-  /** Best-effort extraction of OpenAI's { error: { message, code } } body. */
-  private parseApiError(raw: string): { message?: string; code?: string } {
-    try {
-      const parsed = JSON.parse(raw) as { error?: { message?: string; code?: string } };
-      return { message: parsed.error?.message, code: parsed.error?.code };
-    } catch {
-      return {};
-    }
-  }
-
   /**
    * One OpenAI request. Returns a classified outcome (never throws) so the
-   * retry policy can decide: HTTP 429/5xx + timeouts + empty bodies are
-   * retryable; a 4xx (bad key / unreadable image) is not.
+   * retry policy can decide: HTTP 429/5xx, timeouts and transport errors are
+   * retryable; a 4xx (bad key / unreadable image), a truncated completion and an
+   * empty body are not — re-asking at temperature 0 reproduces them.
    */
   private async attempt(apiKey: string, body: unknown): Promise<AttemptResult<string>> {
     const controller = new AbortController();
@@ -162,22 +163,13 @@ export class OpenAiVisionProvider implements AiVisionProvider {
 
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
-        const apiError = this.parseApiError(detail);
-        const hint =
-          apiError.code === 'image_parse_error'
-            ? ' The screenshot may be too small, corrupted, or not a real image.'
-            : '';
         return {
           ok: false,
           retryable: isTransientStatus(res.status),
-          error: new ServiceUnavailableException({
-            // Include OpenAI's real reason so the cause is visible in logs.
-            message:
-              `OpenAI API request failed (HTTP ${res.status})` +
-              `${apiError.message ? `: ${apiError.message}` : '.'}${hint}`,
-            code: apiError.code ?? 'VISION_API_ERROR',
-            details: detail.slice(0, 500),
-          }),
+          // Fixed user-facing message + stable code; OpenAI's own reason (which
+          // embeds the masked key and a billing URL on a 401) is carried as
+          // log-only diagnostics.
+          error: vendorHttpFailure(res.status, detail),
         };
       }
 
@@ -186,20 +178,31 @@ export class OpenAiVisionProvider implements AiVisionProvider {
       };
       const choice = json.choices?.[0];
       const text = choice?.message?.content;
+
+      // Truncated at the output-token cap (finish_reason "length"): the JSON is
+      // incomplete whether the content was empty or a PARTIAL object, so this is
+      // checked BEFORE emptiness. A partial body that skipped this guard would
+      // fail in parseVisionResponse and be reported to the user as an unclear
+      // screenshot — sending them to retake a screenshot that was never the
+      // problem. Deterministic, so it is never retried; the remedy is the cap.
+      if (choice?.finish_reason === 'length') {
+        return {
+          ok: false,
+          retryable: false,
+          error: truncationFailure(
+            'OpenAI truncated the response at the output-token cap. Raise VISION_MAX_OUTPUT_TOKENS (a reasoning model needs more) or disable it (0).',
+          ),
+        };
+      }
+
       if (!text) {
-        // A truncated completion (finish_reason "length") is DETERMINISTIC —
-        // retrying just burns another paid call for the same empty body. Surface
-        // it as a clear, non-retryable "raise the cap" error. Other empties are
-        // likewise not retried (same temperature-0 request → same empty).
-        const truncated = choice?.finish_reason === 'length';
+        // Not retried either: the same temperature-0 request yields the same empty.
         return {
           ok: false,
           retryable: false,
           error: new ServiceUnavailableException({
-            message: truncated
-              ? 'OpenAI truncated the response at the output-token cap. Raise VISION_MAX_OUTPUT_TOKENS (a reasoning model needs more) or disable it (0).'
-              : 'OpenAI API returned an empty response.',
-            code: truncated ? 'VISION_OUTPUT_TRUNCATED' : 'VISION_EMPTY_RESPONSE',
+            message: 'OpenAI API returned an empty response.',
+            code: 'VISION_EMPTY_RESPONSE',
           }),
         };
       }
@@ -215,14 +218,9 @@ export class OpenAiVisionProvider implements AiVisionProvider {
           }),
         };
       }
-      return {
-        ok: false,
-        retryable: true,
-        error: new ServiceUnavailableException({
-          message: `OpenAI API request error: ${(err as Error).message}`,
-          code: 'VISION_API_ERROR',
-        }),
-      };
+      // Node's transport text ("getaddrinfo ENOTFOUND api.openai.com") is a
+      // diagnostic, not something to render in the app.
+      return { ok: false, retryable: true, error: transportFailure(err) };
     } finally {
       clearTimeout(timeout);
     }

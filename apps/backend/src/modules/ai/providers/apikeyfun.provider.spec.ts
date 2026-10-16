@@ -171,6 +171,29 @@ describe('ApikeyFunVisionProvider (streaming, OpenAI-compatible)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('sends the truncation remedy to the log, not to the user', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(
+        okStream([
+          frame({ choices: [{ delta: {}, finish_reason: 'length' }] }),
+          'data: [DONE]\n\n',
+        ]),
+      ) as unknown as typeof fetch;
+
+    const provider = new ApikeyFunVisionProvider(configWith({ maxOutputTokens: 1536 }), errorLog);
+    const err = (await provider
+      .extractBoardState(input)
+      .catch((e: unknown) => e)) as ServiceUnavailableException;
+    const body = err.getResponse() as Record<string, unknown>;
+
+    expect(body.message).not.toMatch(/screenshot|VISION_MAX_OUTPUT_TOKENS/i);
+    expect(logMock).toHaveBeenCalledWith(
+      'apikeyfun',
+      expect.objectContaining({ remedy: expect.stringContaining('VISION_MAX_OUTPUT_TOKENS') }),
+    );
+  });
+
   it('surfaces a partial-then-truncated stream (finish_reason=length WITH content) as VISION_OUTPUT_TRUNCATED, not VISION_INVALID_RESPONSE', async () => {
     // The model streams part of the JSON, then hits the output-token cap. The
     // partial body is non-empty, so the truncation must be detected by
@@ -231,15 +254,60 @@ describe('ApikeyFunVisionProvider (streaming, OpenAI-compatible)', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const provider = new ApikeyFunVisionProvider(configWith({ maxRetries: 3 }), errorLog);
-    // The real upstream reason survives into both the surfaced error and the log.
-    await expect(provider.extractBoardState(input)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'VISION_API_ERROR' }),
-      message: expect.stringContaining('context length exceeded'),
+    const err = (await provider
+      .extractBoardState(input)
+      .catch((e: unknown) => e)) as ServiceUnavailableException;
+    const body = err.getResponse() as Record<string, unknown>;
+
+    // The real upstream reason reaches the LOG only: an aggregator's wording is
+    // still vendor text, even when it arrives in-band after a 200.
+    expect(body).toEqual({
+      code: 'VISION_API_ERROR',
+      message: 'Board reading failed. Please try again in a moment.',
     });
     expect(fetchMock).toHaveBeenCalledTimes(1); // non-transient → never retried
     expect(logMock).toHaveBeenCalledWith(
       'apikeyfun',
-      expect.objectContaining({ message: expect.stringContaining('context length exceeded') }),
+      expect.objectContaining({
+        inBandError: true,
+        vendorCode: 'invalid_request_error',
+        vendorMessage: 'context length exceeded',
+      }),
+    );
+  });
+
+  // Regression: the aggregator's HTTP error body used to be embedded in the
+  // client-facing message and copied into `details`, and its `code` became the
+  // public error code — so the app displayed vendor text and clients could not
+  // branch on a stable vocabulary.
+  it('keeps the vendor message, code and raw body OUT of the client-facing error', async () => {
+    const vendorBody = JSON.stringify({
+      error: { message: 'Incorrect API key provided: sk-fun-****1234.', code: 'invalid_api_key' },
+    });
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 401, text: async () => vendorBody })
+      .mockName('fetch') as unknown as typeof fetch;
+
+    const provider = new ApikeyFunVisionProvider(configWith({ maxRetries: 2 }), errorLog);
+    const err = (await provider
+      .extractBoardState(input)
+      .catch((e: unknown) => e)) as ServiceUnavailableException;
+    const body = err.getResponse() as Record<string, unknown>;
+
+    expect(body).toEqual({
+      code: 'VISION_UNAVAILABLE',
+      message: 'Board reading is unavailable right now. Please try again later.',
+    });
+    expect(JSON.stringify(body)).not.toMatch(/sk-fun|invalid_api_key/);
+    expect(logMock).toHaveBeenCalledWith(
+      'apikeyfun',
+      expect.objectContaining({
+        code: 'VISION_UNAVAILABLE',
+        httpStatus: 401,
+        vendorCode: 'invalid_api_key',
+        vendorMessage: 'Incorrect API key provided: sk-fun-****1234.',
+      }),
     );
   });
 

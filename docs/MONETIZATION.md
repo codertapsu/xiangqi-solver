@@ -129,7 +129,10 @@ Hints are client-owned, so a tampered counter CAN mint local hints. What actuall
 bounds our OpenAI/engine spend is the cap on the paid analysis endpoints:
 `DeviceRateLimitGuard` allows at most `RATE_LIMIT_DEVICE_LIMIT` (default **100**)
 analyses per `RATE_LIMIT_DEVICE_WINDOW_SECONDS` (default **86 400** — daily) rolling
-window per `x-device-id` (IP fallback), layered on the global per-IP throttler.
+window per `x-device-id`, layered on the global per-IP throttler. The same window
+also caps each **source IP** at `RATE_LIMIT_IP_LIMIT` (default: 5x the device cap),
+counted on every request — `x-device-id` is client-supplied, so without that
+second bucket a caller rotating the header would never reach any cap at all.
 In-memory and per-instance — deliberately a soft cap, not per-user server state.
 
 ### Charge rules — charged by what ACTUALLY ran

@@ -19,6 +19,9 @@ const input: ExtractBoardStateInput = {
   sideToMoveHint: 'red',
 };
 
+/** The head of a board JSON — what a completion cut off at the cap looks like. */
+const PARTIAL_BOARD = '{"boardDetected":true,"sideToMove":"red","pieces":[{"color":"red",';
+
 /** A valid board JSON the parser accepts (one piece is enough for this test). */
 const VALID_BOARD = JSON.stringify({
   boardDetected: true,
@@ -60,7 +63,90 @@ describe('OpenAiVisionProvider error logging', () => {
         model: 'gpt-5.4',
         imageBytes: input.imageBuffer.byteLength,
         mimeType: 'image/png',
-        code: 'invalid_api_key',
+        // Our stable code, plus OpenAI's own reason on the diagnostic channel.
+        code: 'VISION_UNAVAILABLE',
+        httpStatus: 401,
+        vendorCode: 'invalid_api_key',
+        vendorMessage: 'Invalid key',
+        vendorBody: expect.stringContaining('invalid_api_key'),
+      }),
+    );
+  });
+
+  // Regression: OpenAI's 401 text embeds the partially masked key it was given
+  // plus a platform.openai.com billing URL, and the whole body reaches the phone
+  // (AnalysisService rethrows -> AllExceptionsFilter copies message/details ->
+  // the app renders it). The client channel must carry neither.
+  it('keeps the vendor message, code and raw body OUT of the client-facing error', async () => {
+    const vendorMessage =
+      'Incorrect API key provided: sk-proj-6Xa*********7bQd. You can find your API key at ' +
+      'https://platform.openai.com/account/api-keys.';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: async () =>
+        JSON.stringify({ error: { message: vendorMessage, code: 'invalid_api_key' } }),
+    }) as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(configWithKey(), errorLog);
+    const err = (await provider
+      .extractBoardState(input)
+      .catch((e: unknown) => e)) as ServiceUnavailableException;
+    const body = err.getResponse() as Record<string, unknown>;
+
+    expect(body.code).toBe('VISION_UNAVAILABLE');
+    expect(body.message).toBe('Board reading is unavailable right now. Please try again later.');
+    expect(body).not.toHaveProperty('details');
+    expect(JSON.stringify(body)).not.toMatch(/sk-proj|platform\.openai\.com|invalid_api_key/);
+  });
+
+  it('uses the stable VISION_API_ERROR code for a non-auth vendor failure', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () =>
+        JSON.stringify({ error: { message: 'bad image', code: 'image_parse_error' } }),
+    }) as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(configWithKey(), errorLog);
+    const err = (await provider
+      .extractBoardState(input)
+      .catch((e: unknown) => e)) as ServiceUnavailableException;
+    const body = err.getResponse() as Record<string, unknown>;
+
+    expect(body.code).toBe('VISION_API_ERROR');
+    // A rejected IMAGE is the one upstream failure the user can act on, so the
+    // fixed message gains our own hint — never the vendor's wording.
+    expect(body.message).toContain('The screenshot may be too small');
+    expect(body.message).not.toContain('bad image');
+    expect(logMock).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({ vendorCode: 'image_parse_error', vendorMessage: 'bad image' }),
+    );
+  });
+
+  it('keeps a transport error message out of the client channel and in the log', async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(
+        new Error('getaddrinfo ENOTFOUND api.openai.com'),
+      ) as unknown as typeof fetch;
+
+    const provider = new OpenAiVisionProvider(configWithKey({ maxRetries: 0 }), errorLog);
+    const err = (await provider
+      .extractBoardState(input)
+      .catch((e: unknown) => e)) as ServiceUnavailableException;
+    const body = err.getResponse() as Record<string, unknown>;
+
+    expect(body).toEqual({
+      code: 'VISION_API_ERROR',
+      message: 'Board reading failed. Please try again in a moment.',
+    });
+    // Node hides the real reason in `cause`, so the log keeps the walked chain.
+    expect(logMock).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({
+        cause: expect.objectContaining({ message: 'getaddrinfo ENOTFOUND api.openai.com' }),
       }),
     );
   });
@@ -170,6 +256,41 @@ describe('OpenAiVisionProvider retry + request shape', () => {
       response: expect.objectContaining({ code: 'VISION_OUTPUT_TRUNCATED' }),
     });
     expect(fetchMock).toHaveBeenCalledTimes(1); // deterministic — never retried
+  });
+
+  // Regression: the truncation signal used to be read only INSIDE the empty-body
+  // guard. A completion that emitted PART of the JSON and then hit the cap is
+  // non-empty, so it was returned as a success, failed in JSON.parse, and the
+  // user was told "the screenshot may not clearly show a board" — sending them
+  // to retake a perfectly good screenshot while the real cause was the cap.
+  it('surfaces a partial-then-truncated completion as VISION_OUTPUT_TRUNCATED, not VISION_INVALID_RESPONSE', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: PARTIAL_BOARD }, finish_reason: 'length' }],
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const errorLogMock = jest.fn();
+    const provider = new OpenAiVisionProvider(
+      configWithKey({ maxOutputTokens: 1536, maxRetries: 2 }),
+      { log: errorLogMock } as unknown as ErrorLogService,
+    );
+    const err = (await provider
+      .extractBoardState(input)
+      .catch((e: unknown) => e)) as ServiceUnavailableException;
+    const body = err.getResponse() as Record<string, unknown>;
+
+    expect(body.code).toBe('VISION_OUTPUT_TRUNCATED');
+    expect(fetchMock).toHaveBeenCalledTimes(1); // deterministic — never retried
+    // The user must not be told to retake a screenshot that was never the
+    // problem, nor handed the operator's env-var remedy — that goes to the log.
+    expect(body.message).not.toMatch(/screenshot|VISION_MAX_OUTPUT_TOKENS/i);
+    expect(errorLogMock).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({ remedy: expect.stringContaining('VISION_MAX_OUTPUT_TOKENS') }),
+    );
   });
 
   it('does NOT retry an ordinary empty response either', async () => {

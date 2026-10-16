@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../../../config/configuration';
 import {
@@ -8,8 +8,14 @@ import {
 } from '../ai-provider.interface';
 import { BOARD_EXTRACTION_PROMPT } from '../prompts/board-extraction.prompt';
 import { parseVisionResponse } from '../vision-response.schema';
-import { ErrorLogService } from '../../logging/error-log.service';
+import { ErrorLogFields, ErrorLogService } from '../../logging/error-log.service';
 import { AttemptResult, isTransientStatus, withRetries } from './vision-retry.util';
+import {
+  transportFailure,
+  truncationFailure,
+  vendorHttpFailure,
+  VisionApiError,
+} from './vision-api-error';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -97,15 +103,29 @@ export class GeminiVisionProvider implements AiVisionProvider {
     err: unknown,
     rawText?: string,
   ): void {
-    this.errorLog.log(category, {
+    const fields: ErrorLogFields = {
       message: err instanceof Error ? err.message : String(err),
       provider: this.name,
       model,
       imageBytes: input.imageBuffer.byteLength,
       mimeType: input.mimeType,
       sideToMoveHint: input.sideToMoveHint,
-      ...(rawText !== undefined ? { rawResponseSnippet: rawText.slice(0, 2000) } : {}),
-    });
+    };
+    // Google's real reason travels on the DIAGNOSTIC channel only (never in the
+    // exception body the client sees) — copy it into the log here.
+    if (err instanceof VisionApiError) {
+      fields.code = err.code;
+      Object.assign(fields, err.diagnostics);
+    } else if (err instanceof HttpException) {
+      const res = err.getResponse();
+      if (res && typeof res === 'object') {
+        const o = res as Record<string, unknown>;
+        if (typeof o.code === 'string') fields.code = o.code;
+        if (o.details !== undefined) fields.geminiDetails = o.details;
+      }
+    }
+    if (rawText !== undefined) fields.rawResponseSnippet = rawText.slice(0, 2000);
+    this.errorLog.log(category, fields);
   }
 
   /** The variable turn hint as a standalone user part (empty when none). */
@@ -117,8 +137,9 @@ export class GeminiVisionProvider implements AiVisionProvider {
 
   /**
    * One Gemini request. Returns a classified outcome (never throws) so the
-   * retry policy can decide: 429/5xx + timeouts + empty bodies are retryable; a
-   * 4xx (bad key / unreadable image) is not.
+   * retry policy can decide: 429/5xx, timeouts and transport errors are
+   * retryable; a 4xx (bad key / unreadable image), a truncated response and an
+   * empty body are not — re-asking at temperature 0 reproduces them.
    */
   private async attempt(
     url: string,
@@ -140,11 +161,9 @@ export class GeminiVisionProvider implements AiVisionProvider {
         return {
           ok: false,
           retryable: isTransientStatus(res.status),
-          error: new ServiceUnavailableException({
-            message: `Gemini API request failed (HTTP ${res.status}).`,
-            code: 'VISION_API_ERROR',
-            details: detail.slice(0, 500),
-          }),
+          // Fixed user-facing message + stable code, identical to the other
+          // cloud providers; Google's own reason is log-only diagnostics.
+          error: vendorHttpFailure(res.status, detail),
         };
       }
 
@@ -153,19 +172,30 @@ export class GeminiVisionProvider implements AiVisionProvider {
       };
       const candidate = json.candidates?.[0];
       const text = candidate?.content?.parts?.map((p) => p.text ?? '').join('');
+
+      // finishReason "MAX_TOKENS" = truncated at the output cap. Checked BEFORE
+      // emptiness because the model may emit PART of the JSON and then hit the
+      // cap: that partial body is non-empty, would fail in parseVisionResponse,
+      // and the user would be told their screenshot was unclear when the real
+      // cause is the token cap. Deterministic, so it is never retried.
+      if (candidate?.finishReason === 'MAX_TOKENS') {
+        return {
+          ok: false,
+          retryable: false,
+          error: truncationFailure(
+            'Gemini truncated the response at the output-token cap. Raise VISION_MAX_OUTPUT_TOKENS (its thinking budget counts against this) or disable it (0).',
+          ),
+        };
+      }
+
       if (!text) {
-        // finishReason "MAX_TOKENS" = truncated at the output cap: deterministic,
-        // so don't retry (a re-send burns another paid call for the same empty
-        // body). Other empties are likewise not retried (temperature 0).
-        const truncated = candidate?.finishReason === 'MAX_TOKENS';
+        // Not retried either: the same temperature-0 request yields the same empty.
         return {
           ok: false,
           retryable: false,
           error: new ServiceUnavailableException({
-            message: truncated
-              ? 'Gemini truncated the response at the output-token cap. Raise VISION_MAX_OUTPUT_TOKENS (its thinking budget counts against this) or disable it (0).'
-              : 'Gemini API returned an empty response.',
-            code: truncated ? 'VISION_OUTPUT_TRUNCATED' : 'VISION_EMPTY_RESPONSE',
+            message: 'Gemini API returned an empty response.',
+            code: 'VISION_EMPTY_RESPONSE',
           }),
         };
       }
@@ -181,14 +211,9 @@ export class GeminiVisionProvider implements AiVisionProvider {
           }),
         };
       }
-      return {
-        ok: false,
-        retryable: true,
-        error: new ServiceUnavailableException({
-          message: `Gemini API request error: ${(err as Error).message}`,
-          code: 'VISION_API_ERROR',
-        }),
-      };
+      // Node's transport text names hosts and error codes — diagnostics, not a
+      // sentence to render in the app.
+      return { ok: false, retryable: true, error: transportFailure(err) };
     } finally {
       clearTimeout(timeout);
     }

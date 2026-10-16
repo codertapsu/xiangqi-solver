@@ -45,6 +45,8 @@ export interface AnalyzeScreenshotParams extends EngineOptions {
   mimeType: string;
   /** Stable x-device-id used for server-side provider rollout routing. */
   deviceId?: string;
+  /** x-local-vision-token — the secret that authorizes the local-bridge path. */
+  localVisionToken?: string;
   provider?: AiProviderName;
   sideToMove?: SideToMove;
   language?: NotationLanguage;
@@ -62,6 +64,8 @@ export interface ExtractScreenshotParams {
   mimeType: string;
   /** Stable x-device-id used for server-side provider rollout routing. */
   deviceId?: string;
+  /** x-local-vision-token — the secret that authorizes the local-bridge path. */
+  localVisionToken?: string;
   provider?: AiProviderName;
   sideToMove?: SideToMove;
 }
@@ -151,7 +155,7 @@ export class AnalysisService {
           sideToMoveHint: params.sideToMove,
         },
         params.provider,
-        params.deviceId,
+        { deviceId: params.deviceId, rolloutToken: params.localVisionToken },
       );
       extraction = outcome.result;
       visionName = outcome.providerName;

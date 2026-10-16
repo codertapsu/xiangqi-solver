@@ -15,6 +15,11 @@
 #  3. The Android cleartext exception (network_security_config.xml) and the
 #     iOS ATS concern both become unnecessary for the new URL.
 #  4. Optionally firewall port 3000 to localhost only — Caddy proxies to it.
+#  5. REQUIRED: set TRUST_PROXY=loopback in .env and restart the backend. Both
+#     rate caps (the global per-IP throttle and the per-source-IP analysis cap)
+#     key on req.ip; without this every request arrives from 127.0.0.1 and the
+#     whole fleet shares one bucket. Caddy sets X-Forwarded-For itself, so
+#     `loopback` is the correct, non-spoofable value here.
 
 xiangqi.example.com {
 	# NDJSON streaming (/api/analysis/screenshot/stream) must not be buffered.

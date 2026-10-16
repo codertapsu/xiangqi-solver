@@ -54,11 +54,20 @@ export class AnalysisController {
     required: false,
     description: 'Stable device ID used for server-managed vision-provider routing.',
   })
+  @ApiHeader({
+    name: 'x-local-vision-token',
+    required: false,
+    description:
+      'Rollout secret (LOCAL_VISION_ROLLOUT_TOKEN) that authorizes the local-bridge ' +
+      'vision path. Required alongside an allowlisted x-device-id; the device ID is ' +
+      'public and never sufficient on its own.',
+  })
   @UseInterceptors(FileInterceptor('screenshot'))
   async analyzeScreenshot(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: AnalyzeScreenshotDto,
     @Headers('x-device-id') deviceId?: string,
+    @Headers('x-local-vision-token') localVisionToken?: string,
   ): Promise<AnalysisResult> {
     const upload = this.validateUpload(file);
 
@@ -68,6 +77,7 @@ export class AnalysisController {
       // mislabeled-but-valid image is sent to the vision API correctly.
       mimeType: upload.mimeType,
       deviceId: this.normalizeDeviceId(deviceId),
+      localVisionToken: this.normalizeToken(localVisionToken),
       provider: dto.provider,
       sideToMove: dto.sideToMove,
       engineProvider: dto.engineProvider,
@@ -101,12 +111,21 @@ export class AnalysisController {
     required: false,
     description: 'Stable device ID used for server-managed vision-provider routing.',
   })
+  @ApiHeader({
+    name: 'x-local-vision-token',
+    required: false,
+    description:
+      'Rollout secret (LOCAL_VISION_ROLLOUT_TOKEN) that authorizes the local-bridge ' +
+      'vision path. Required alongside an allowlisted x-device-id; the device ID is ' +
+      'public and never sufficient on its own.',
+  })
   @UseInterceptors(FileInterceptor('screenshot'))
   async analyzeScreenshotStream(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: AnalyzeScreenshotDto,
     @Res() res: Response,
     @Headers('x-device-id') deviceId?: string,
+    @Headers('x-local-vision-token') localVisionToken?: string,
   ): Promise<void> {
     // Validate BEFORE any byte is written: these errors still get the normal
     // envelope + HTTP status via the global exception filter.
@@ -127,6 +146,7 @@ export class AnalysisController {
         imageBuffer: upload.buffer,
         mimeType: upload.mimeType,
         deviceId: this.normalizeDeviceId(deviceId),
+        localVisionToken: this.normalizeToken(localVisionToken),
         provider: dto.provider,
         sideToMove: dto.sideToMove,
         engineProvider: dto.engineProvider,
@@ -177,17 +197,27 @@ export class AnalysisController {
     required: false,
     description: 'Stable device ID used for server-managed vision-provider routing.',
   })
+  @ApiHeader({
+    name: 'x-local-vision-token',
+    required: false,
+    description:
+      'Rollout secret (LOCAL_VISION_ROLLOUT_TOKEN) that authorizes the local-bridge ' +
+      'vision path. Required alongside an allowlisted x-device-id; the device ID is ' +
+      'public and never sufficient on its own.',
+  })
   @UseInterceptors(FileInterceptor('screenshot'))
   async extractScreenshot(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: ExtractScreenshotDto,
     @Headers('x-device-id') deviceId?: string,
+    @Headers('x-local-vision-token') localVisionToken?: string,
   ): Promise<ExtractionResult> {
     const upload = this.validateUpload(file);
     return this.analysisService.extractBoard({
       imageBuffer: upload.buffer,
       mimeType: upload.mimeType,
       deviceId: this.normalizeDeviceId(deviceId),
+      localVisionToken: this.normalizeToken(localVisionToken),
       provider: dto.provider,
       sideToMove: dto.sideToMove,
     });
@@ -260,5 +290,14 @@ export class AnalysisController {
   private normalizeDeviceId(deviceId: string | undefined): string | undefined {
     const id = (deviceId ?? '').trim();
     return id.length >= 8 && id.length <= 256 ? id : undefined;
+  }
+
+  /**
+   * The rollout secret, trimmed. Absent or blank means "no local bridge" — the
+   * request simply stays on the standard provider, with no 4xx that would tell
+   * a prober whether a device ID is allowlisted.
+   */
+  private normalizeToken(token: string | undefined): string | undefined {
+    return (token ?? '').trim() || undefined;
   }
 }

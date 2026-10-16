@@ -183,7 +183,8 @@ removes a lot of what older guides assumed.
   from **Settings → Privacy → Device ID** and send it to support.
 - **Server-side cost guard:** the only abuse protection is the per-IP throttle
   (`RATE_LIMIT_*`) + a per-device daily cap (`RATE_LIMIT_DEVICE_*`, keyed by
-  `x-device-id`). Tune these to bound your OpenAI spend (§7).
+  `x-device-id`) and a per-source-IP cap (`RATE_LIMIT_IP_LIMIT`) that a rotating
+  device header cannot escape. Tune these to bound your OpenAI spend (§7).
 
 See [MONETIZATION.md](MONETIZATION.md) for the per-pack economics.
 
@@ -273,6 +274,8 @@ RATE_LIMIT_TTL=60
 RATE_LIMIT_LIMIT=30                # per-IP requests / TTL
 RATE_LIMIT_DEVICE_WINDOW_SECONDS=86400
 RATE_LIMIT_DEVICE_LIMIT=1000       # analyses / device / day
+RATE_LIMIT_IP_LIMIT=0              # 0 = 5x the device cap; also caps a rotating x-device-id
+TRUST_PROXY=                       # set `loopback` if you put Caddy in front, else both IP caps see only Caddy
 
 # Install-grant storage (persist this dir; it's the anti-reinstall ledger + Hint Grants)
 HINTS_DATA_DIR=./data              # installs.log (append-only NDJSON ledger) + grants.json + admins.json

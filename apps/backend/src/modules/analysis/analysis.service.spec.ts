@@ -63,7 +63,7 @@ describe('AnalysisService', () => {
       new ApikeyFunVisionProvider(config, errorLog),
       {} as LocalCodexVisionProvider,
       {} as LocalClaudeVisionProvider,
-      { canUse: async () => false } as unknown as LocalCodexVisionAllowlist,
+      { authorize: async () => false } as unknown as LocalCodexVisionAllowlist,
     );
     const engineService = new EngineService(
       config,

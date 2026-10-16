@@ -73,6 +73,15 @@ export const envSchema = z.object({
   // than a pair of flags that could contradict each other. `none` keeps every
   // device on AI_PROVIDER while leaving the bridge settings in place.
   AI_LOCAL_VISION_PROVIDER: z.enum(['codex', 'claude', 'none']).default('codex'),
+  // Shared secret that AUTHORIZES the local-bridge path, presented as the
+  // `x-local-vision-token` header. The device allowlist alone cannot authorize
+  // it: `x-device-id` is a PUBLIC identifier (Settings shows a "Device ID" tile
+  // precisely so users can share it to receive hint grants), so anyone who sees
+  // a tester's id could otherwise aim uploads at the operator's own machine and
+  // personal subscription. Empty = local-bridge routing DISABLED for every
+  // device (fail closed), mirroring ADMIN_SECRET. Generate with
+  // `openssl rand -base64 32` and set it on the backend AND the tester build.
+  LOCAL_VISION_ROLLOUT_TOKEN: z.string().default(''),
   // Device-gated Mother Claude HTTP bridge. Model/effort are optional: blank
   // values inherit the bridge's own defaults, which are chosen on its API
   // screen. The default URL is the bridge's loopback port — a backend running
@@ -154,6 +163,17 @@ export const envSchema = z.object({
   // Upload guardrails.
   MAX_UPLOAD_BYTES: intFromEnv(8_388_608, 1, 64 * 1024 * 1024),
 
+  // Which reverse-proxy hops Express may trust for the client IP. EMPTY (the
+  // default) uses the socket peer, which is correct when the app talks to this
+  // process directly. Behind the documented Caddy setup (deploy/Caddyfile
+  // proxies to 127.0.0.1:3000) set TRUST_PROXY=loopback, or BOTH IP-based caps
+  // — the global throttle and the per-source-IP analysis cap — see only Caddy
+  // and become one fleet-wide bucket. Do NOT set 'true' unless the proxy in
+  // front REPLACES X-Forwarded-For: a spoofable header is worse than no header.
+  // Accepts '', 'loopback' | 'linklocal' | 'uniquelocal', a hop count, 'true',
+  // or a comma-separated IP/CIDR list.
+  TRUST_PROXY: z.string().default(''),
+
   // Rate limiting.
   // Global per-IP throttle (all endpoints).
   RATE_LIMIT_TTL: intFromEnv(60, 1, 86400),
@@ -163,6 +183,15 @@ export const envSchema = z.object({
   // server-side abuse cap that bounds OpenAI cost per device. Defaults: 100/day.
   RATE_LIMIT_DEVICE_WINDOW_SECONDS: intFromEnv(86400, 1, 2592000),
   RATE_LIMIT_DEVICE_LIMIT: intFromEnv(100, 1, 100000),
+  // Companion cap on the SOURCE IP over the same window, counted on every
+  // analysis request (not only when x-device-id is absent). The header is
+  // client-controlled, so a caller rotating it would otherwise get an unlimited
+  // budget; this is the floor that a rotating or missing id falls back to.
+  // 0 (the default) means AUTO: five times RATE_LIMIT_DEVICE_LIMIT. Deriving it
+  // matters — a fixed default would sit BELOW a deployment that raised the
+  // device cap and would silently become every user's real limit. The multiple
+  // is there because several phones legitimately share one NAT.
+  RATE_LIMIT_IP_LIMIT: intFromEnv(0, 0, 100000),
 
   // Runtime data dir. Holds install-grant ledgers plus hand-edited device
   // allowlists such as local-codex-vision-devices.json. These files are

@@ -7,6 +7,8 @@ import { validateEnv } from './env.validation';
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
+  /** Express `trust proxy` value; empty = trust nothing (use the socket peer). */
+  trustProxy: string;
   ai: {
     provider: 'gemini' | 'openai' | 'apikeyfun' | 'mock';
     /** When true, IGNORE the client-supplied provider and always use `provider`
@@ -23,6 +25,10 @@ export interface AppConfig {
     /** Which local bridge an allowlisted device tries first. At most one runs:
      *  Local Codex and Local Claude are mutually exclusive by construction. */
     localVisionProvider: 'codex' | 'claude' | 'none';
+    /** Shared secret (header `x-local-vision-token`) required ALONGSIDE the
+     *  device allowlist before any request reaches a local bridge. Empty
+     *  disables the local-bridge path entirely. */
+    localVisionRolloutToken: string;
     /** Codex HTTP bridge used for device-gated Local Codex vision. */
     localCodexUrl: string;
     localCodexToken: string;
@@ -94,6 +100,9 @@ export interface AppConfig {
     deviceWindowSeconds: number;
     /** Max analyses per device within that window. */
     deviceLimit: number;
+    /** Max analyses per source IP within that window (always counted).
+     *  Resolved value: RATE_LIMIT_IP_LIMIT, or 5x deviceLimit when it is 0. */
+    ipLimit: number;
   };
   /** Remote config served to the app by GET /api/config. */
   features: {
@@ -128,6 +137,7 @@ export function configuration(): { app: AppConfig } {
   const app: AppConfig = {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
+    trustProxy: env.TRUST_PROXY,
     ai: {
       provider: env.AI_PROVIDER,
       providerEnforce: env.AI_PROVIDER_ENFORCE,
@@ -143,6 +153,7 @@ export function configuration(): { app: AppConfig } {
       localCodexReasoningEffort: env.LOCAL_CODEX_REASONING_EFFORT,
       localCodexTimeoutMs: env.LOCAL_CODEX_TIMEOUT_MS,
       localVisionProvider: env.AI_LOCAL_VISION_PROVIDER,
+      localVisionRolloutToken: env.LOCAL_VISION_ROLLOUT_TOKEN,
       localClaudeUrl: env.LOCAL_CLAUDE_URL,
       localClaudeToken: env.LOCAL_CLAUDE_TOKEN,
       localClaudeModel: env.LOCAL_CLAUDE_MODEL,
@@ -192,6 +203,9 @@ export function configuration(): { app: AppConfig } {
       limit: env.RATE_LIMIT_LIMIT,
       deviceWindowSeconds: env.RATE_LIMIT_DEVICE_WINDOW_SECONDS,
       deviceLimit: env.RATE_LIMIT_DEVICE_LIMIT,
+      // 0 = auto. Tracking the device cap keeps the IP bucket a backstop for
+      // unmetered callers rather than a lower ceiling on honest ones.
+      ipLimit: env.RATE_LIMIT_IP_LIMIT || env.RATE_LIMIT_DEVICE_LIMIT * 5,
     },
     features: {
       ads: {
