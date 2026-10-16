@@ -282,8 +282,9 @@ ATS/cleartext (§2.3). No other hardcoded cleartext URLs; third-party calls are 
 **Phase 1 — Scaffold & build**
 - [ ] `flutter create --platforms=ios .` in `apps/mobile` (won't touch `lib/` or `android/`);
       commit the new `ios/` tree.
-- [ ] `cd ios && pod install`. Set `IPHONEOS_DEPLOYMENT_TARGET ≥ 13` (google_mobile_ads 8.x +
-      in_app_purchase_storekit 0.4.x need a modern minimum).
+- [ ] Resolve native deps with `flutter build ios` (Swift Package Manager — CocoaPods was
+      removed in the Oct 2026 refresh, see §9). `IPHONEOS_DEPLOYMENT_TARGET = 15.0` (Flutter
+      3.47's floor).
 - [ ] Remove unused `permission_handler` from pubspec.
 - [ ] Verify the cloud flow works against the https backend.
 
@@ -316,7 +317,7 @@ ATS/cleartext (§2.3). No other hardcoded cleartext URLs; third-party calls are 
 
 - [ ] Apple Developer Program active; bundle id registered
 - [ ] Backend on **HTTPS** (no ATS exception needed) — or scoped `NSExceptionDomains` if interim
-- [ ] `ios/` scaffolded, deployment target ≥ 13, `pod install` clean
+- [ ] `ios/` scaffolded, deployment target 15.0, `flutter build ios` clean (SPM)
 - [ ] Solver Mode card + on-device toggles **hidden** on iOS
 - [ ] Share Extension (App Group + URL scheme) delivering to `analyzeRequests`; PULL FAB optional
 - [ ] **Double-fire dedupe** verified (cold `getInitialMedia` + warm `getMediaStream`)
@@ -371,6 +372,27 @@ The iOS scaffold + the entire share-in pipeline are **implemented and build-veri
 Flutter tests green; `flutter analyze` clean). Toolchain used: Flutter 3.44.1, Xcode 26.5,
 CocoaPods 1.16.2. iOS bundle id: **`com.codertapsu.xiangqiSolver`** (Apple bundle ids disallow
 the `_` in the Android `applicationId`, so Flutter camel-cases it).
+
+> **Update — Oct 2026 dependency refresh (Flutter 3.47.7, Xcode 27).** Supersedes the toolchain
+> notes below where they differ:
+> - **Minimum iOS is now 15.0** (was 13.0). Flutter 3.47 raised its own floor and migrated every
+>   target (Runner, RunnerTests, ShareExtension).
+> - **No more CocoaPods — plugins resolve through Swift Package Manager.** `receive_sharing_intent`
+>   1.9 ships no podspec, and every other plugin now has a `Package.swift`, so the Podfile was
+>   deintegrated. SPM is enabled for this project only (`flutter: config:
+>   enable-swift-package-manager: true` in `pubspec.yaml`); versions are pinned in
+>   `ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved`. There is no `pod install`
+>   step any more — `flutter build ios` resolves packages itself.
+> - `receive_sharing_intent` 1.9 receives the share URL on the **scene** lifecycle
+>   (`addSceneDelegate` + `scene(_:openURLContexts:)`), and our `SceneDelegate` is a
+>   `FlutterSceneDelegate`, which forwards it — this addresses the URL-forwarding risk in item 5
+>   of the to-do list below by design (still verify on a device). The handoff contract the
+>   ShareExtension replicates (App Group suite, `ShareKey`, `ShareMedia-` scheme) is unchanged.
+> - `flutter_secure_storage` 10 moved iOS into `flutter_secure_storage_darwin`, which uses the same
+>   Keychain service (`flutter_secure_storage_service`) and default accessibility as v9, so keys
+>   saved by earlier builds stay readable.
+> - Verified: `flutter build ios --release --no-codesign` ✓, `ShareExtension.appex` embedded,
+>   `MinimumOSVersion` 15.0.
 
 **Done (in-repo, verified to build):**
 - `ios/` scaffolded (`flutter create --platforms=ios`), `IPHONEOS_DEPLOYMENT_TARGET = 13.0`,
