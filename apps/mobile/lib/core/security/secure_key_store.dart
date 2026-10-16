@@ -2,15 +2,17 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Securely stores the user's own API key for On-device (BYO-key) mode.
 ///
-/// Backed by the platform keystore (Android EncryptedSharedPreferences / iOS
+/// Backed by the platform keystore (Android Keystore-wrapped AES-GCM / iOS
 /// Keychain) via flutter_secure_storage — never in plain SharedPreferences.
+///
+/// Releases up to 1.0.0+6 used flutter_secure_storage 9 with
+/// `encryptedSharedPreferences: true`. v10's default options migrate that
+/// Jetpack store to its own ciphers on first access (and fall back to the old
+/// store if migration fails), so existing keys survive the upgrade. Do not move
+/// to v11 until a 10.x release has shipped: v11 can no longer read the old store.
 class SecureKeyStore {
   SecureKeyStore([FlutterSecureStorage? storage])
-    : _storage =
-          storage ??
-          const FlutterSecureStorage(
-            aOptions: AndroidOptions(encryptedSharedPreferences: true),
-          );
+    : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
 

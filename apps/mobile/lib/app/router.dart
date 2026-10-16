@@ -34,53 +34,76 @@ GoRouter buildRouter() {
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
-        builder: (context, state) => const HomePage(),
+        pageBuilder: (context, state) => _page(state, const HomePage()),
       ),
       GoRoute(
         path: AppRoutes.result,
         name: 'result',
-        builder: (context, state) => const ResultPage(),
+        pageBuilder: (context, state) => _page(state, const ResultPage()),
       ),
       GoRoute(
         path: AppRoutes.settings,
         name: 'settings',
-        builder: (context, state) => const SettingsPage(),
+        pageBuilder: (context, state) => _page(state, const SettingsPage()),
       ),
       GoRoute(
         path: AppRoutes.history,
         name: 'history',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.uri.queryParameters['id'];
-          return HistoryPage(selectedId: id);
+          return _page(state, HistoryPage(selectedId: id));
         },
       ),
       GoRoute(
         path: AppRoutes.admin,
         name: 'admin',
-        builder: (context, state) => const AdminPage(),
+        pageBuilder: (context, state) => _page(state, const AdminPage()),
       ),
       GoRoute(
         path: AppRoutes.adminConfig,
         name: 'adminConfig',
-        builder: (context, state) => const AdminConfigPage(),
+        pageBuilder: (context, state) => _page(state, const AdminConfigPage()),
       ),
       GoRoute(
         path: AppRoutes.adminGrants,
         name: 'adminGrants',
-        builder: (context, state) => const AdminGrantsPage(),
+        pageBuilder: (context, state) => _page(state, const AdminGrantsPage()),
       ),
       GoRoute(
         path: AppRoutes.adminInstalls,
         name: 'adminInstalls',
-        builder: (context, state) => const AdminInstallsPage(),
+        pageBuilder: (context, state) => _page(state, const AdminInstallsPage()),
       ),
     ],
-    errorBuilder: (context, state) {
+    errorPageBuilder: (context, state) {
       final l10n = AppLocalizations.of(context);
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.routeNotFound)),
-        body: Center(child: Text(l10n.routeNoRoute(state.uri.toString()))),
+      return _page(
+        state,
+        Scaffold(
+          appBar: AppBar(title: Text(l10n.routeNotFound)),
+          body: Center(child: Text(l10n.routeNoRoute(state.uri.toString()))),
+        ),
       );
     },
   );
 }
+
+/// Wraps a screen in a framework [MaterialPage].
+///
+/// go_router >= 18 picks its default page type by looking for `material_ui`'s
+/// `MaterialApp` above the router. This app is built on the framework's
+/// `package:flutter/material.dart`, whose `MaterialApp` is a different class,
+/// so that lookup fails and a plain `builder:` route falls back to a
+/// `NoTransitionPage` — no Material slide/zoom and no predictive-back
+/// animation. Building the page here keeps them. The arguments mirror what
+/// go_router passes to its own Material page builder.
+///
+/// Drop this once the app migrates to `package:material_ui` (then go_router's
+/// detection succeeds and plain `builder:` routes get Material pages again).
+Page<void> _page(GoRouterState state, Widget child) => MaterialPage<void>(
+  key: state.pageKey,
+  name: state.name ?? state.path,
+  arguments: <String, String>{...state.pathParameters, ...state.uri.queryParameters},
+  restorationId: state.pageKey.value,
+  child: child,
+);

@@ -69,7 +69,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final settings = ref.watch(settingsProvider);
     final remoteConfig = ref.watch(remoteConfigProvider);
     // Admin entry — only for an admin device (server says so). Hidden otherwise.
-    final isAdmin = ref.watch(adminStatusProvider).valueOrNull ?? false;
+    final isAdmin = ref.watch(adminStatusProvider).value ?? false;
     return Scaffold(
       appBar: AppBar(title: Text(_l10n.settingsTitle)),
       body: SafeArea(

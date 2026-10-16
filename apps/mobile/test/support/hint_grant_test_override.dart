@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:xiangqi_solver/core/network/dio_client.dart';
 import 'package:xiangqi_solver/features/monetization/data/hint_grant_api.dart';
 import 'package:xiangqi_solver/features/monetization/presentation/wallet_providers.dart';

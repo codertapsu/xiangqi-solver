@@ -126,7 +126,10 @@ class DioClient {
       DioExceptionType.connectionTimeout =>
         AppL10n.current.netConnectTimeout(baseUrl),
       DioExceptionType.sendTimeout => AppL10n.current.netSendTimeout,
-      DioExceptionType.receiveTimeout => AppL10n.current.netReceiveTimeout,
+      // transformTimeout (dio 5.11) bounds decoding of an already-received
+      // body; to the user it is the same "response came too slowly" failure.
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.transformTimeout => AppL10n.current.netReceiveTimeout,
       DioExceptionType.connectionError =>
         AppL10n.current.netConnectError(baseUrl),
       DioExceptionType.badCertificate => AppL10n.current.netBadCert,

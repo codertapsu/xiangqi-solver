@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:xiangqi_solver/core/remote_config/remote_config.dart';
 import 'package:xiangqi_solver/core/remote_config/remote_config_provider.dart';
 

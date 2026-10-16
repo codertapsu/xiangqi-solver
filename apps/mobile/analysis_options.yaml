@@ -13,6 +13,10 @@ analyzer:
     # Treat a few common foot-guns as errors to keep the codebase honest.
     always_declare_return_types: error
     unawaited_futures: error
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
 
 linter:
   rules:

@@ -43,6 +43,12 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
+      // Riverpod 3 retries a failing provider on its own (up to 10 times,
+      // backing off to 6.4 s), and `await provider.future` waits through every
+      // attempt. This app already surfaces or handles each failure itself, so
+      // keep Riverpod 2's fail-fast behaviour — e.g. a broken on-device engine
+      // must not stall a solve for ~40 s before reporting.
+      retry: (retryCount, error) => null,
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
       ],

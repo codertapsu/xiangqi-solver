@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../features/solver/presentation/providers/solver_providers.dart'
     show dioClientProvider, sharedPreferencesProvider;
