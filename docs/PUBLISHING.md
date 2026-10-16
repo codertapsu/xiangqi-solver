@@ -1,7 +1,7 @@
 # Publishing to Google Play — end-to-end guide
 
 Ship **Quân Sư Cờ Tướng / Xiangqi Strategist** (`com.codertapsu.xiangqi_solver`) to
-the Google Play Console. Targets Play's 2026 baseline: target API 35 (Android 15),
+the Google Play Console. Targets Play's 2026 baseline: target API 36 (Android 16),
 AAB delivery, Play App Signing, Data Safety, AdMob + UMP consent.
 
 > ✦ This is a **process** guide, not a copy-paste recipe. Read each section, confirm
@@ -31,18 +31,20 @@ AAB delivery, Play App Signing, Data Safety, AdMob + UMP consent.
 - [ ] **Privacy policy URL** (required: the app uses the Advertising ID + uploads
       screenshots). *(Already live — §10.)*
 - [ ] **A reachable backend** at the URL the app ships with (§7).
-- [ ] **Toolchain:** Flutter ≥ 3.44, **JDK 21**, Android SDK platform 36, and — if you
-      also deploy the backend (§7) — **Node ≥ 20** (`apps/backend/package.json` `engines`).
+- [ ] **Toolchain:** Flutter ≥ 3.47, **JDK 17+**, Android SDK platform 37 (AGP downloads it
+      if missing), and — if you also deploy the backend (§7) — **Node ≥ 20**
+      (`apps/backend/package.json` `engines`).
 
 ```sh
 flutter doctor -v
-flutter --version            # ≥ 3.44.x
-java -version                # 21.x  (NOT 26 — Gradle 9.1 rejects JDK 26)
+flutter --version            # ≥ 3.47.x
+java -version                # 17 or newer
 ```
 
-> ⚠️ **Use JDK 21**, not the system JDK 26. Gradle 9.1.0 doesn't support JDK 26;
-> Flutter normally auto-selects the Android Studio bundled JBR (21). If `JAVA_HOME`
-> points at 26, `flutter build` fails. Confirm with `flutter doctor -v` (Java section).
+> Gradle 9 / AGP 9 need **JDK 17+**. The current release was built and verified on both
+> Android Studio's bundled JBR (JDK 25, which Flutter picks by default) and Oracle JDK 26.
+> (The old "JDK 26 breaks the build" problem was Gradle 9.1; Gradle 9.8.1 runs on 26.)
+> Confirm which JDK Flutter uses with `flutter doctor -v` (Java section).
 
 ---
 
@@ -53,8 +55,8 @@ Listed so you don't re-do it and so a reviewer knows what the release expects.
 | Concern | State | Where |
 |---|---|---|
 | Application ID | `com.codertapsu.xiangqi_solver` (namespace + applicationId) | `android/app/build.gradle.kts` |
-| AGP / Gradle / Kotlin | 9.0.1 / 9.1.0 / 2.3.20 | `android/settings.gradle.kts`, `gradle-wrapper.properties` |
-| `compileSdk` / `targetSdk` / `minSdk` | 36 / 35 / 26 | `android/app/build.gradle.kts` |
+| AGP / Gradle / Kotlin | 9.4.1 / 9.8.1 / 2.4.21 | `android/settings.gradle.kts`, `gradle-wrapper.properties` |
+| `compileSdk` / `targetSdk` / `minSdk` | 37 / 36 / 26 | `android/app/build.gradle.kts` |
 | Release signing | shared `upload` key wired (`key.properties` + `app/upload-keystore.jks`, gitignored) | §2 |
 | R8 minify + resource shrink | **ON**, with keep rules + native debug symbols | §9, `proguard-rules.pro` |
 | Dynamic app name + full i18n (vi/en) | Vietnamese-first; launcher + UI localized | §3 |
@@ -403,7 +405,7 @@ nothing here restates a value, so it can't drift.
 4. **Verify the deployed backend** before building (§7.1) — a 30-second `curl` beats
    discovering a bad deploy after the AAB is signed.
 5. **Build the AAB** — `flutter clean && flutter pub get && flutter build appbundle
-   --release` with **JDK 21** (§0, §9.2).
+   --release` with **JDK 17+** (§0, §9.2).
 6. **Verify the signer** — `keytool -printcert -jarfile …/app-release.aab`; the CN must be
    your upload key, **not** `Android Debug` (§2.2). The build silently falls back to the
    debug key when `key.properties` is missing.
@@ -427,7 +429,7 @@ nothing here restates a value, so it can't drift.
 2. Backend reachable at the shipped `BACKEND_URL`, with `FEATURE_USE_REAL_ADS=true`,
    `FEATURE_UI_LICENSES=true` and `FEATURE_UI_DEVICE_ID=true` (§7, §7.1, §8).
 3. `versionCode` bumped above any prior upload (`pubspec.yaml`).
-4. `JAVA_HOME` → JDK 21 (§0).
+4. JDK 17+ (§0) — Flutter normally uses Android Studio's bundled JBR.
 
 ### 9.2 Build
 ```sh
@@ -552,7 +554,17 @@ This app declares:
 > user-initiated, scoped to producing a move suggestion, and never silent**.
 
 ### 10.6 Target API level
-`targetSdk = 35` (Android 15); `compileSdk = 36`, `minSdk = 26` (the overlay needs API 26).
+`targetSdk = 36` (Android 16); `compileSdk = 37`, `minSdk = 26` (the overlay needs API 26).
+`compileSdk` is 37 only because androidx.core 1.19 and receive_sharing_intent 1.9 require it
+to compile; it doesn't change runtime behavior.
+
+The move to 36 was audited against Android 16's target-36 behavior changes: predictive back
+is now on by default (`onBackPressed`/`KEYCODE_BACK` no longer delivered — the app's Kotlin
+uses neither, and the Dart side has no `WillPopScope`), the edge-to-edge opt-out is gone (the
+app never used it), large-screen orientation locks are ignored (none are set), and
+`scheduleAtFixedRate` catch-up changed (unused). Local-network protection and stricter intent
+matching are still opt-in at 36 — re-audit both before the next target bump, since the former
+governs LAN backends.
 
 **Re-verify this every release** rather than trusting the number above: Play's minimum
 target API escalates on an annual deadline, and it applies to *updates*, not just new
@@ -625,7 +637,7 @@ real products, the production backend) before promoting.
 - [ ] Privacy policy URL set + reachable; Data Safety completed + consistent (device ID,
       screenshots, purchases, AdMob).
 - [ ] Ads = Yes; content rating, target audience, app access done.
-- [ ] Target API 35 accepted with no warning.
+- [ ] Target API 36 accepted with no warning.
 
 ---
 
@@ -654,7 +666,7 @@ adb shell dumpsys package com.codertapsu.xiangqi_solver | grep versionName
 | "Test ads in production" | Set `FEATURE_USE_REAL_ADS=true` on the prod backend (no build flag). |
 | Launch crash on the release track only | A missing R8 keep — add it to `proguard-rules.pro` and re-run §9.4. |
 | Cloud analysis returns a fake board | A `mock` provider shipped — rebuild without `--dart-define=*_PROVIDER=mock` (§9.2). |
-| Target API < 35 | Confirm `targetSdk = 35`, rebuild. |
+| Target API < 36 | Confirm `targetSdk = 36`, rebuild. |
 
 ---
 

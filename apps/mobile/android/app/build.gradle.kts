@@ -20,11 +20,11 @@ if (hasReleaseKeystore) {
 
 android {
     namespace = "com.codertapsu.xiangqi_solver"
-    // Compile against SDK 36: the AndroidX libraries Flutter resolves
-    // (activity 1.12.x, core 1.18.x) require compileSdk >= 36. SDK 36 is
-    // installed in this environment. targetSdk stays at 35 per the contract,
-    // since compileSdk and targetSdk are independent knobs.
-    compileSdk = 36
+    // Compile against SDK 37: androidx.core 1.19 and receive_sharing_intent 1.9
+    // declare a minimum compileSdk of 37 (the AAR-metadata check fails the build
+    // below that). compileSdk only selects the APIs we compile against; runtime
+    // behavior follows targetSdk below, which is deliberately independent.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -46,7 +46,14 @@ android {
         applicationId = "com.codertapsu.xiangqi_solver"
         // TYPE_APPLICATION_OVERLAY (floating widget) requires API 26.
         minSdk = 26
-        targetSdk = 35
+        // Google Play requires API 36 (Android 16) for new apps and updates.
+        // Audited against the Android 16 target-36 behavior changes: no
+        // onBackPressed/KEYCODE_BACK handling (predictive back is on by
+        // default), no edge-to-edge opt-out, no orientation locks, no
+        // scheduleAtFixedRate. Re-audit before raising it further: local-network
+        // protection (opt-in at 36, enforced in a later release) would gate the
+        // LAN backends this app is pointed at during development.
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -122,6 +129,6 @@ flutter {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.appcompat:appcompat:1.8.0")
 }
