@@ -22,12 +22,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionOpenSettings => 'Open Settings';
 
   @override
-  String get actionStart => 'Start';
-
-  @override
-  String get actionStop => 'Stop';
-
-  @override
   String get actionSave => 'Save';
 
   @override
@@ -72,24 +66,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Opens a floating button and screen capture so you can analyze the board inside any app.';
 
   @override
-  String get homeSolverModeUnsupported =>
-      'Solver Mode needs a real Android device. Everything else still works here for testing.';
-
-  @override
   String get homeYourSide => 'Your side';
-
-  @override
-  String get homeYourSideDesc => 'Whose turn it is when you analyze.';
-
-  @override
-  String get homeTryMockTitle => 'Try it (test mode)';
-
-  @override
-  String get homeTryMockDesc =>
-      'Pick an image to run the full upload and analysis flow without screen capture.';
-
-  @override
-  String get homePickImage => 'Pick an image & analyze (test)';
 
   @override
   String get homeShareInTitle => 'Analyze a board photo';
@@ -142,40 +119,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resultTitle => 'Analysis';
 
   @override
-  String get resultIdle => 'No analysis yet. Start one from the Home screen.';
-
-  @override
   String resultErrorCode(String code) {
     return 'Code: $code';
   }
-
-  @override
-  String get resultBestMove => 'Best move';
 
   @override
   String get resultTopMoves => 'Top moves';
 
   @override
   String get resultExplanation => 'Explanation';
-
-  @override
-  String get resultNoExplanation => 'No explanation provided.';
-
-  @override
-  String get resultBoard => 'Board';
-
-  @override
-  String resultBoardInfo(String side, int count) {
-    return '$side to move • $count pieces';
-  }
-
-  @override
-  String resultFen(String fen) {
-    return 'FEN: $fen';
-  }
-
-  @override
-  String get resultPipeline => 'How it was solved';
 
   @override
   String get resultScreenshotUnavailable => 'Screenshot preview unavailable';
@@ -204,22 +156,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bestMoveNone => 'No move for this position.';
 
   @override
-  String get labelWxf => 'WXF';
-
-  @override
   String get labelUci => 'UCI';
 
   @override
   String get labelScore => 'Score';
-
-  @override
-  String get labelDepth => 'Depth';
-
-  @override
-  String get labelFrom => 'From';
-
-  @override
-  String get labelTo => 'To';
 
   @override
   String get privacyBannerTitle => 'Privacy & AI';
@@ -275,9 +215,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsTitle => 'Settings';
-
-  @override
-  String get settingsAnalysisMode => 'Analysis mode';
 
   @override
   String get settingsBoardReading => 'Board reading (AI key)';
@@ -399,9 +336,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsUseFullScreen => 'Use full screen';
-
-  @override
-  String get settingsLanguageCard => 'Language';
 
   @override
   String get settingsAppLanguage => 'App language';
@@ -736,9 +670,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyBestMoveUci => 'Best move (UCI)';
 
   @override
-  String get historyBestMove => 'Best move';
-
-  @override
   String get historyVisionProvider => 'Board-reading AI';
 
   @override
@@ -746,9 +677,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyConfidence => 'Confidence';
-
-  @override
-  String get historyScreenshot => 'Screenshot';
 
   @override
   String get routeNotFound => 'Not found';

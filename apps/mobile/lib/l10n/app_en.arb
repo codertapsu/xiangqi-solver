@@ -7,8 +7,6 @@
   "actionRetry": "Retry",
   "actionClose": "Close",
   "actionOpenSettings": "Open Settings",
-  "actionStart": "Start",
-  "actionStop": "Stop",
   "actionSave": "Save",
   "actionClear": "Clear",
   "actionCancel": "Cancel",
@@ -26,12 +24,7 @@
 
   "homeSolverMode": "Solver Mode",
   "homeSolverModeDesc": "Opens a floating button and screen capture so you can analyze the board inside any app.",
-  "homeSolverModeUnsupported": "Solver Mode needs a real Android device. Everything else still works here for testing.",
   "homeYourSide": "Your side",
-  "homeYourSideDesc": "Whose turn it is when you analyze.",
-  "homeTryMockTitle": "Try it (test mode)",
-  "homeTryMockDesc": "Pick an image to run the full upload and analysis flow without screen capture.",
-  "homePickImage": "Pick an image & analyze (test)",
 
   "homeShareInTitle": "Analyze a board photo",
   "homeShareInDesc": "Screenshot your Xiangqi game in any app, then share it into this app — or pick a photo below. We'll read the board and show the best move.",
@@ -57,19 +50,10 @@
   "statusAnalysisFailed": "Analysis failed",
 
   "resultTitle": "Analysis",
-  "resultIdle": "No analysis yet. Start one from the Home screen.",
   "resultErrorCode": "Code: {code}",
   "@resultErrorCode": { "placeholders": { "code": { "type": "String" } } },
-  "resultBestMove": "Best move",
   "resultTopMoves": "Top moves",
   "resultExplanation": "Explanation",
-  "resultNoExplanation": "No explanation provided.",
-  "resultBoard": "Board",
-  "resultBoardInfo": "{side} to move • {count} pieces",
-  "@resultBoardInfo": { "placeholders": { "side": { "type": "String" }, "count": { "type": "int" } } },
-  "resultFen": "FEN: {fen}",
-  "@resultFen": { "placeholders": { "fen": { "type": "String" } } },
-  "resultPipeline": "How it was solved",
   "resultScreenshotUnavailable": "Screenshot preview unavailable",
   "resultWarnings": "Heads-up",
 
@@ -81,12 +65,8 @@
   "@percentValue": { "placeholders": { "pct": { "type": "int" } } },
 
   "bestMoveNone": "No move for this position.",
-  "labelWxf": "WXF",
   "labelUci": "UCI",
   "labelScore": "Score",
-  "labelDepth": "Depth",
-  "labelFrom": "From",
-  "labelTo": "To",
 
   "privacyBannerTitle": "Privacy & AI",
   "privacyBannerBody": "To read the board, the screenshot you analyze is sent to OpenAI — through our service, or directly when you use your own API key. Images aren't kept on this device unless you turn on history in Settings. Avoid capturing anything private.",
@@ -110,7 +90,6 @@
   "engineLocationOnDevice": "On-device",
 
   "settingsTitle": "Settings",
-  "settingsAnalysisMode": "Analysis mode",
   "settingsBoardReading": "Board reading (AI key)",
   "settingsOurKeyShort": "Cloud",
   "settingsMyKeyShort": "My key",
@@ -153,7 +132,6 @@
   "settingsSelectArea": "Select area",
   "settingsUseFullScreen": "Use full screen",
 
-  "settingsLanguageCard": "Language",
   "settingsAppLanguage": "App language",
   "settingsMoveNotationLanguage": "Move-notation language",
   "languageSystem": "System default",
@@ -274,11 +252,9 @@
   "historyAnalysisId": "Analysis ID",
   "historySideToMove": "Side to move",
   "historyBestMoveUci": "Best move (UCI)",
-  "historyBestMove": "Best move",
   "historyVisionProvider": "Board-reading AI",
   "historyEngineProvider": "Move engine",
   "historyConfidence": "Confidence",
-  "historyScreenshot": "Screenshot",
 
   "routeNotFound": "Not found",
   "routeNoRoute": "No screen for {uri}",

@@ -22,12 +22,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get actionOpenSettings => 'Mở Cài đặt';
 
   @override
-  String get actionStart => 'Bắt đầu';
-
-  @override
-  String get actionStop => 'Dừng';
-
-  @override
   String get actionSave => 'Lưu';
 
   @override
@@ -72,24 +66,7 @@ class AppLocalizationsVi extends AppLocalizations {
       'Mở một nút nổi và chụp màn hình để bạn phân tích bàn cờ ngay trong mọi ứng dụng.';
 
   @override
-  String get homeSolverModeUnsupported =>
-      'Chế độ Quân Sư cần một thiết bị Android thật. Các phần khác vẫn dùng được ở đây để thử nghiệm.';
-
-  @override
   String get homeYourSide => 'Bên của bạn';
-
-  @override
-  String get homeYourSideDesc => 'Đến lượt ai đi khi bạn phân tích.';
-
-  @override
-  String get homeTryMockTitle => 'Dùng thử (chế độ thử nghiệm)';
-
-  @override
-  String get homeTryMockDesc =>
-      'Chọn một ảnh để chạy toàn bộ quy trình tải lên và phân tích mà không cần chụp màn hình.';
-
-  @override
-  String get homePickImage => 'Chọn ảnh & phân tích (thử)';
 
   @override
   String get homeShareInTitle => 'Phân tích ảnh bàn cờ';
@@ -142,41 +119,15 @@ class AppLocalizationsVi extends AppLocalizations {
   String get resultTitle => 'Phân tích';
 
   @override
-  String get resultIdle =>
-      'Chưa có phân tích nào. Hãy bắt đầu từ màn hình Trang chủ.';
-
-  @override
   String resultErrorCode(String code) {
     return 'Mã: $code';
   }
-
-  @override
-  String get resultBestMove => 'Nước đi tốt nhất';
 
   @override
   String get resultTopMoves => 'Các nước hay nhất';
 
   @override
   String get resultExplanation => 'Giải thích';
-
-  @override
-  String get resultNoExplanation => 'Không có giải thích.';
-
-  @override
-  String get resultBoard => 'Bàn cờ';
-
-  @override
-  String resultBoardInfo(String side, int count) {
-    return '$side đi • $count quân';
-  }
-
-  @override
-  String resultFen(String fen) {
-    return 'FEN: $fen';
-  }
-
-  @override
-  String get resultPipeline => 'Cách giải';
 
   @override
   String get resultScreenshotUnavailable => 'Không xem được ảnh chụp';
@@ -205,22 +156,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get bestMoveNone => 'Không có nước đi cho thế cờ này.';
 
   @override
-  String get labelWxf => 'WXF';
-
-  @override
   String get labelUci => 'UCI';
 
   @override
   String get labelScore => 'Điểm';
-
-  @override
-  String get labelDepth => 'Độ sâu';
-
-  @override
-  String get labelFrom => 'Từ';
-
-  @override
-  String get labelTo => 'Đến';
 
   @override
   String get privacyBannerTitle => 'Quyền riêng tư & AI';
@@ -276,9 +215,6 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get settingsTitle => 'Cài đặt';
-
-  @override
-  String get settingsAnalysisMode => 'Chế độ phân tích';
 
   @override
   String get settingsBoardReading => 'Đọc bàn cờ (khóa AI)';
@@ -402,9 +338,6 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get settingsUseFullScreen => 'Dùng toàn màn hình';
-
-  @override
-  String get settingsLanguageCard => 'Ngôn ngữ';
 
   @override
   String get settingsAppLanguage => 'Ngôn ngữ ứng dụng';
@@ -738,9 +671,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get historyBestMoveUci => 'Nước đi tốt nhất (UCI)';
 
   @override
-  String get historyBestMove => 'Nước đi tốt nhất';
-
-  @override
   String get historyVisionProvider => 'AI đọc bàn cờ';
 
   @override
@@ -748,9 +678,6 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get historyConfidence => 'Độ tin cậy';
-
-  @override
-  String get historyScreenshot => 'Ảnh chụp';
 
   @override
   String get routeNotFound => 'Không tìm thấy';

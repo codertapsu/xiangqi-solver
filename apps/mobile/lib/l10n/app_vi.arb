@@ -6,8 +6,6 @@
   "actionRetry": "Thử lại",
   "actionClose": "Đóng",
   "actionOpenSettings": "Mở Cài đặt",
-  "actionStart": "Bắt đầu",
-  "actionStop": "Dừng",
   "actionSave": "Lưu",
   "actionClear": "Xóa",
   "actionCancel": "Hủy",
@@ -24,12 +22,7 @@
 
   "homeSolverMode": "Chế độ Quân Sư",
   "homeSolverModeDesc": "Mở một nút nổi và chụp màn hình để bạn phân tích bàn cờ ngay trong mọi ứng dụng.",
-  "homeSolverModeUnsupported": "Chế độ Quân Sư cần một thiết bị Android thật. Các phần khác vẫn dùng được ở đây để thử nghiệm.",
   "homeYourSide": "Bên của bạn",
-  "homeYourSideDesc": "Đến lượt ai đi khi bạn phân tích.",
-  "homeTryMockTitle": "Dùng thử (chế độ thử nghiệm)",
-  "homeTryMockDesc": "Chọn một ảnh để chạy toàn bộ quy trình tải lên và phân tích mà không cần chụp màn hình.",
-  "homePickImage": "Chọn ảnh & phân tích (thử)",
 
   "homeShareInTitle": "Phân tích ảnh bàn cờ",
   "homeShareInDesc": "Chụp màn hình ván cờ trong bất kỳ ứng dụng nào, rồi chia sẻ ảnh vào ứng dụng này — hoặc chọn ảnh bên dưới. Chúng tôi sẽ đọc bàn cờ và chỉ ra nước đi tốt nhất.",
@@ -49,16 +42,9 @@
   "statusAnalysisFailed": "Phân tích thất bại",
 
   "resultTitle": "Phân tích",
-  "resultIdle": "Chưa có phân tích nào. Hãy bắt đầu từ màn hình Trang chủ.",
   "resultErrorCode": "Mã: {code}",
-  "resultBestMove": "Nước đi tốt nhất",
   "resultTopMoves": "Các nước hay nhất",
   "resultExplanation": "Giải thích",
-  "resultNoExplanation": "Không có giải thích.",
-  "resultBoard": "Bàn cờ",
-  "resultBoardInfo": "{side} đi • {count} quân",
-  "resultFen": "FEN: {fen}",
-  "resultPipeline": "Cách giải",
   "resultScreenshotUnavailable": "Không xem được ảnh chụp",
   "resultWarnings": "Lưu ý",
 
@@ -69,12 +55,8 @@
   "percentValue": "{pct}%",
 
   "bestMoveNone": "Không có nước đi cho thế cờ này.",
-  "labelWxf": "WXF",
   "labelUci": "UCI",
   "labelScore": "Điểm",
-  "labelDepth": "Độ sâu",
-  "labelFrom": "Từ",
-  "labelTo": "Đến",
 
   "privacyBannerTitle": "Quyền riêng tư & AI",
   "privacyBannerBody": "Để đọc bàn cờ, ảnh chụp bạn phân tích sẽ được gửi tới OpenAI — qua dịch vụ của chúng tôi, hoặc gửi trực tiếp khi bạn dùng khóa API riêng. Ảnh không được lưu trên máy trừ khi bạn bật Lịch sử trong Cài đặt. Hãy tránh chụp những nội dung riêng tư.",
@@ -98,7 +80,6 @@
   "engineLocationOnDevice": "Trên thiết bị",
 
   "settingsTitle": "Cài đặt",
-  "settingsAnalysisMode": "Chế độ phân tích",
   "settingsBoardReading": "Đọc bàn cờ (khóa AI)",
   "settingsOurKeyShort": "Máy chủ",
   "settingsMyKeyShort": "Khóa của tôi",
@@ -132,7 +113,6 @@
   "settingsSelectArea": "Chọn vùng",
   "settingsUseFullScreen": "Dùng toàn màn hình",
 
-  "settingsLanguageCard": "Ngôn ngữ",
   "settingsAppLanguage": "Ngôn ngữ ứng dụng",
   "settingsMoveNotationLanguage": "Ngôn ngữ ghi nước đi",
   "languageSystem": "Theo hệ thống",
@@ -231,11 +211,9 @@
   "historyAnalysisId": "Mã phân tích",
   "historySideToMove": "Bên tới lượt",
   "historyBestMoveUci": "Nước đi tốt nhất (UCI)",
-  "historyBestMove": "Nước đi tốt nhất",
   "historyVisionProvider": "AI đọc bàn cờ",
   "historyEngineProvider": "Công cụ tính nước",
   "historyConfidence": "Độ tin cậy",
-  "historyScreenshot": "Ảnh chụp",
 
   "routeNotFound": "Không tìm thấy",
   "routeNoRoute": "Không có màn hình cho {uri}",

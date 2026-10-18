@@ -122,18 +122,6 @@ abstract class AppLocalizations {
   /// **'Open Settings'**
   String get actionOpenSettings;
 
-  /// No description provided for @actionStart.
-  ///
-  /// In en, this message translates to:
-  /// **'Start'**
-  String get actionStart;
-
-  /// No description provided for @actionStop.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop'**
-  String get actionStop;
-
   /// No description provided for @actionSave.
   ///
   /// In en, this message translates to:
@@ -212,41 +200,11 @@ abstract class AppLocalizations {
   /// **'Opens a floating button and screen capture so you can analyze the board inside any app.'**
   String get homeSolverModeDesc;
 
-  /// No description provided for @homeSolverModeUnsupported.
-  ///
-  /// In en, this message translates to:
-  /// **'Solver Mode needs a real Android device. Everything else still works here for testing.'**
-  String get homeSolverModeUnsupported;
-
   /// No description provided for @homeYourSide.
   ///
   /// In en, this message translates to:
   /// **'Your side'**
   String get homeYourSide;
-
-  /// No description provided for @homeYourSideDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Whose turn it is when you analyze.'**
-  String get homeYourSideDesc;
-
-  /// No description provided for @homeTryMockTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Try it (test mode)'**
-  String get homeTryMockTitle;
-
-  /// No description provided for @homeTryMockDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick an image to run the full upload and analysis flow without screen capture.'**
-  String get homeTryMockDesc;
-
-  /// No description provided for @homePickImage.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick an image & analyze (test)'**
-  String get homePickImage;
 
   /// No description provided for @homeShareInTitle.
   ///
@@ -338,23 +296,11 @@ abstract class AppLocalizations {
   /// **'Analysis'**
   String get resultTitle;
 
-  /// No description provided for @resultIdle.
-  ///
-  /// In en, this message translates to:
-  /// **'No analysis yet. Start one from the Home screen.'**
-  String get resultIdle;
-
   /// No description provided for @resultErrorCode.
   ///
   /// In en, this message translates to:
   /// **'Code: {code}'**
   String resultErrorCode(String code);
-
-  /// No description provided for @resultBestMove.
-  ///
-  /// In en, this message translates to:
-  /// **'Best move'**
-  String get resultBestMove;
 
   /// No description provided for @resultTopMoves.
   ///
@@ -367,36 +313,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Explanation'**
   String get resultExplanation;
-
-  /// No description provided for @resultNoExplanation.
-  ///
-  /// In en, this message translates to:
-  /// **'No explanation provided.'**
-  String get resultNoExplanation;
-
-  /// No description provided for @resultBoard.
-  ///
-  /// In en, this message translates to:
-  /// **'Board'**
-  String get resultBoard;
-
-  /// No description provided for @resultBoardInfo.
-  ///
-  /// In en, this message translates to:
-  /// **'{side} to move • {count} pieces'**
-  String resultBoardInfo(String side, int count);
-
-  /// No description provided for @resultFen.
-  ///
-  /// In en, this message translates to:
-  /// **'FEN: {fen}'**
-  String resultFen(String fen);
-
-  /// No description provided for @resultPipeline.
-  ///
-  /// In en, this message translates to:
-  /// **'How it was solved'**
-  String get resultPipeline;
 
   /// No description provided for @resultScreenshotUnavailable.
   ///
@@ -446,12 +362,6 @@ abstract class AppLocalizations {
   /// **'No move for this position.'**
   String get bestMoveNone;
 
-  /// No description provided for @labelWxf.
-  ///
-  /// In en, this message translates to:
-  /// **'WXF'**
-  String get labelWxf;
-
   /// No description provided for @labelUci.
   ///
   /// In en, this message translates to:
@@ -463,24 +373,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Score'**
   String get labelScore;
-
-  /// No description provided for @labelDepth.
-  ///
-  /// In en, this message translates to:
-  /// **'Depth'**
-  String get labelDepth;
-
-  /// No description provided for @labelFrom.
-  ///
-  /// In en, this message translates to:
-  /// **'From'**
-  String get labelFrom;
-
-  /// No description provided for @labelTo.
-  ///
-  /// In en, this message translates to:
-  /// **'To'**
-  String get labelTo;
 
   /// No description provided for @privacyBannerTitle.
   ///
@@ -589,12 +481,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings'**
   String get settingsTitle;
-
-  /// No description provided for @settingsAnalysisMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Analysis mode'**
-  String get settingsAnalysisMode;
 
   /// No description provided for @settingsBoardReading.
   ///
@@ -787,12 +673,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use full screen'**
   String get settingsUseFullScreen;
-
-  /// No description provided for @settingsLanguageCard.
-  ///
-  /// In en, this message translates to:
-  /// **'Language'**
-  String get settingsLanguageCard;
 
   /// No description provided for @settingsAppLanguage.
   ///
@@ -1304,12 +1184,6 @@ abstract class AppLocalizations {
   /// **'Best move (UCI)'**
   String get historyBestMoveUci;
 
-  /// No description provided for @historyBestMove.
-  ///
-  /// In en, this message translates to:
-  /// **'Best move'**
-  String get historyBestMove;
-
   /// No description provided for @historyVisionProvider.
   ///
   /// In en, this message translates to:
@@ -1327,12 +1201,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confidence'**
   String get historyConfidence;
-
-  /// No description provided for @historyScreenshot.
-  ///
-  /// In en, this message translates to:
-  /// **'Screenshot'**
-  String get historyScreenshot;
 
   /// No description provided for @routeNotFound.
   ///
