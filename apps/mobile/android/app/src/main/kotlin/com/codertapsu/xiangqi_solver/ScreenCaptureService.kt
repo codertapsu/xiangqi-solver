@@ -281,6 +281,12 @@ class ScreenCaptureService : Service() {
                         Constants.KEY_HEIGHT to h,
                     ),
                 )
+                // The analysis runs in Flutter. If its engine is gone — the app's
+                // task was removed (swiped away, or after an App-language switch
+                // changed the launcher alias) — the capture waits in
+                // SolverEventBus until the app runs again. Open it now instead of
+                // leaving the floating button spinning.
+                if (!SolverEventBus.hasListener()) openApp()
             }
             return CaptureResult.Success(file.absolutePath, w, h)
         } catch (t: Throwable) {
@@ -288,6 +294,19 @@ class ScreenCaptureService : Service() {
         } finally {
             image?.close()
         }
+    }
+
+    /**
+     * Brings the app to the front so its Flutter engine starts and picks up the
+     * buffered capture. Allowed from the background: the app holds the
+     * overlay permission and its floating window is showing.
+     */
+    private fun openApp() {
+        val launch = packageManager.getLaunchIntentForPackage(packageName) ?: return
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        // Best effort: if the system refuses, the capture still waits for the
+        // next time the user opens the app.
+        runCatching { startActivity(launch) }
     }
 
     /**

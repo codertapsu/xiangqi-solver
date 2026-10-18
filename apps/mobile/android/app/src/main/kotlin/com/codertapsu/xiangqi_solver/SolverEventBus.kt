@@ -44,6 +44,9 @@ object SolverEventBus {
         }
     }
 
+    /** Whether a Dart listener is attached right now (else events are buffered). */
+    fun hasListener(): Boolean = synchronized(lock) { sink != null }
+
     /**
      * Emit a typed event. [type] becomes the "type" key; [extra] supplies the
      * remaining payload. Safe to call from any thread.
