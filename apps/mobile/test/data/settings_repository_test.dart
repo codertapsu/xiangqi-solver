@@ -84,5 +84,15 @@ void main() {
       // 'unknown' is not a playable side, so it falls back to the default (red).
       expect(settings.mySide, SideToMove.red);
     });
+
+    test('theme mode persists and ignores unknown values', () async {
+      final repo = await buildRepo({});
+      expect(repo.load().themeMode, 'system');
+      await repo.save(repo.load().copyWith(themeMode: 'dark'));
+      expect(repo.load().themeMode, 'dark');
+
+      final bad = await buildRepo({'settings.themeMode': 'sepia'});
+      expect(bad.load().themeMode, 'system');
+    });
   });
 }

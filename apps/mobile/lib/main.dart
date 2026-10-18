@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart'
     show LicenseEntryWithLineBreaks, LicenseRegistry;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:persistent_device_id/persistent_device_id.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,6 +36,17 @@ Future<void> main() async {
       'Pikafish Networks releases and is not distributed with the app. See '
       'LICENSE-engine in the project for the full notice and a written offer of '
       'source.',
+    );
+  });
+  // Bundled fonts (SIL Open Font License 1.1).
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(
+      ['Be Vietnam Pro'],
+      await rootBundle.loadString('assets/licenses/OFL-BeVietnamPro.txt'),
+    );
+    yield LicenseEntryWithLineBreaks(
+      ['LXGW WenKai TC (subset, board piece glyphs)'],
+      await rootBundle.loadString('assets/licenses/OFL-LXGWWenKaiTC.txt'),
     );
   });
 

@@ -10,7 +10,7 @@ import '../core/l10n/app_l10n.dart';
 import '../core/l10n/locale_providers.dart';
 import '../core/platform/app_icon_provider.dart';
 import '../features/solver/presentation/providers/solver_providers.dart'
-    show nativeSolverProvider;
+    show nativeSolverProvider, settingsProvider;
 import 'router.dart';
 import 'theme/app_theme.dart';
 
@@ -80,6 +80,11 @@ class _XiangqiSolverAppState extends ConsumerState<XiangqiSolverApp>
     // languages by [localeResolutionCallback]); a non-null value is the user's
     // explicit App-language override from Settings.
     final locale = ref.watch(localeProvider);
+    final themeMode = switch (ref.watch(settingsProvider.select((s) => s.themeMode))) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
 
     // Keep the context-free accessor in sync so the data/network/on-device
     // layers (no BuildContext) produce error text in the active locale.
@@ -96,7 +101,7 @@ class _XiangqiSolverAppState extends ConsumerState<XiangqiSolverApp>
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

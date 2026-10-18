@@ -29,6 +29,7 @@ class AppSettings extends Equatable {
     required this.storeScreenshots,
     required this.mySide,
     required this.onDeviceVisionModel,
+    this.themeMode = 'system',
   });
 
   final String backendUrl;
@@ -73,6 +74,9 @@ class AppSettings extends Equatable {
   /// to read the small piece glyphs reliably (it misplaces advisors/elephants).
   /// Resolve the effective model with [onDeviceVisionModelOr].
   final String onDeviceVisionModel;
+
+  /// Colour theme: 'system' (follow the device), 'light' or 'dark'.
+  final String themeMode;
 
   /// Empty default = follow the backend's `RemoteConfig.onDeviceVisionModel`.
   static const String _defaultOnDeviceVisionModel = '';
@@ -146,6 +150,7 @@ class AppSettings extends Equatable {
     bool? storeScreenshots,
     SideToMove? mySide,
     String? onDeviceVisionModel,
+    String? themeMode,
   }) {
     return AppSettings(
       backendUrl: backendUrl ?? this.backendUrl,
@@ -163,6 +168,7 @@ class AppSettings extends Equatable {
       storeScreenshots: storeScreenshots ?? this.storeScreenshots,
       mySide: mySide ?? this.mySide,
       onDeviceVisionModel: onDeviceVisionModel ?? this.onDeviceVisionModel,
+      themeMode: themeMode ?? this.themeMode,
     );
   }
 
@@ -183,6 +189,7 @@ class AppSettings extends Equatable {
     storeScreenshots,
     mySide,
     onDeviceVisionModel,
+    themeMode,
   ];
 }
 
@@ -212,6 +219,7 @@ class SettingsRepository {
   static const String _kStoreScreenshots = 'settings.storeScreenshots';
   static const String _kMySide = 'settings.mySide';
   static const String _kOnDeviceVisionModel = 'settings.onDeviceVisionModel';
+  static const String _kThemeMode = 'settings.themeMode';
 
   /// Loads the persisted settings, merging over [AppSettings.defaults].
   AppSettings load() {
@@ -252,6 +260,7 @@ class SettingsRepository {
       storeScreenshots: _prefs.getBool(_kStoreScreenshots) ?? defaults.storeScreenshots,
       mySide: _readSide(_prefs.getString(_kMySide), defaults.mySide),
       onDeviceVisionModel: _readString(_kOnDeviceVisionModel, defaults.onDeviceVisionModel),
+      themeMode: _readThemeMode(defaults.themeMode),
     );
   }
 
@@ -274,6 +283,7 @@ class SettingsRepository {
       _prefs.setString(_kMySide, settings.mySide.wireValue),
       // Stored as-is (empty = "follow the backend default"); resolved at use.
       _prefs.setString(_kOnDeviceVisionModel, settings.onDeviceVisionModel.trim()),
+      _prefs.setString(_kThemeMode, settings.themeMode),
     ]);
     return settings;
   }
@@ -289,6 +299,12 @@ class SettingsRepository {
   String _readAppLanguage(String fallback) {
     final value = _prefs.getString(_kAppLanguage);
     return (value == 'system' || value == 'vi' || value == 'en') ? value! : fallback;
+  }
+
+  /// Reads the theme mode, constrained to 'system' | 'light' | 'dark'.
+  String _readThemeMode(String fallback) {
+    final value = _prefs.getString(_kThemeMode);
+    return (value == 'system' || value == 'light' || value == 'dark') ? value! : fallback;
   }
 
   /// Parses a stored side, constraining it to the two playable sides; anything
