@@ -24,4 +24,10 @@
     <!-- %1$s = tên bên hiện tại; TalkBack đọc khi chạm nút đổi bên. -->
     <string name="overlay_switch_side_current">Đổi bên, đang chơi bên %1$s</string>
     <string name="overlay_content_description">Nút nổi phân tích của Quân Sư Cờ Tướng</string>
+
+    <!-- Bộ chọn vùng chụp (vẽ trên màn hình từ menu nút nổi). -->
+    <string name="region_full_screen">Toàn màn hình</string>
+    <string name="region_cancel">Hủy</string>
+    <string name="region_use_area">Dùng vùng này</string>
+    <string name="region_hint">Kéo để di chuyển • kéo góc để đổi kích thước</string>
 </resources>

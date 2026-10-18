@@ -451,14 +451,22 @@ class ScreenCaptureService : Service() {
 
     private fun createNotificationChannel() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val strings = AppLocale.wrap(this)
         val existing = manager.getNotificationChannel(Constants.NOTIFICATION_CHANNEL_ID)
-        if (existing != null) return
+        if (existing != null) {
+            // Keep the channel's name in the current app language (allowed to
+            // change; importance etc. stay as the user set them).
+            existing.name = strings.getString(R.string.notification_channel_name)
+            existing.description = strings.getString(R.string.notification_channel_description)
+            manager.createNotificationChannel(existing)
+            return
+        }
         val channel = NotificationChannel(
             Constants.NOTIFICATION_CHANNEL_ID,
-            getString(R.string.notification_channel_name),
+            strings.getString(R.string.notification_channel_name),
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = getString(R.string.notification_channel_description)
+            description = strings.getString(R.string.notification_channel_description)
             setShowBadge(false)
         }
         manager.createNotificationChannel(channel)
@@ -476,9 +484,10 @@ class ScreenCaptureService : Service() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         }
+        val strings = AppLocale.wrap(this)
         return NotificationCompat.Builder(this, Constants.NOTIFICATION_CHANNEL_ID)
-            .setContentTitle(getString(R.string.notification_title))
-            .setContentText(getString(R.string.notification_text))
+            .setContentTitle(strings.getString(R.string.notification_title))
+            .setContentText(strings.getString(R.string.notification_text))
             .setSmallIcon(R.drawable.ic_solver_notification)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)

@@ -35,6 +35,9 @@ class RegionSelectionOverlay(private val context: Context) {
     private var windowManager: WindowManager? = null
     private var rootView: View? = null
 
+    /** Labels in the app's language (window/system services still use [context]). */
+    private val strings: Context get() = AppLocale.wrap(context)
+
     fun isShowing(): Boolean = rootView != null
 
     @SuppressLint("ClickableViewAccessibility")
@@ -43,20 +46,20 @@ class RegionSelectionOverlay(private val context: Context) {
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         windowManager = wm
 
-        val selector = SelectorView(context)
+        val selector = SelectorView(context, strings.getString(R.string.region_hint))
 
         val controls = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(24, 16, 24, 16)
             setBackgroundColor(0xE61F1714.toInt())
         }
-        controls.addView(makeButton("Full screen") {
+        controls.addView(makeButton(strings.getString(R.string.region_full_screen)) {
             CaptureRegionHolder.clear(context)
             dismiss()
         })
-        controls.addView(makeButton("Cancel") { dismiss() })
+        controls.addView(makeButton(strings.getString(R.string.region_cancel)) { dismiss() })
         controls.addView(
-            makeButton("Use this area", primary = true) {
+            makeButton(strings.getString(R.string.region_use_area), primary = true) {
                 val r = selector.normalizedRegion()
                 CaptureRegionHolder.set(context, r.left, r.top, r.right, r.bottom)
                 dismiss()
@@ -175,7 +178,7 @@ class RegionSelectionOverlay(private val context: Context) {
     }
 
     /** Custom view that draws the dimmed scrim, the selection box, and handles. */
-    private class SelectorView(context: Context) : View(context) {
+    private class SelectorView(context: Context, private val hint: String) : View(context) {
 
         private val sel = RectF()
         private var initialised = false
@@ -254,7 +257,7 @@ class RegionSelectionOverlay(private val context: Context) {
             // Selection border + corner handles.
             canvas.drawRect(sel, borderPaint)
             for (p in corners()) canvas.drawCircle(p.first, p.second, handleRadius * 0.7f, handlePaint)
-            canvas.drawText("Drag to move • drag a corner to resize", w / 2f, sel.top - 24f, hintPaint)
+            canvas.drawText(hint, w / 2f, sel.top - 24f, hintPaint)
         }
 
         private fun corners(): List<Pair<Float, Float>> = listOf(

@@ -109,7 +109,8 @@ class OverlayService : Service() {
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         windowManager = wm
 
-        val view = LayoutInflater.from(this).inflate(R.layout.overlay_widget, null)
+        // Inflate in the app's language so labels/content descriptions match it.
+        val view = LayoutInflater.from(AppLocale.wrap(this)).inflate(R.layout.overlay_widget, null)
         overlayView = view
         rootRow = view.findViewById(R.id.overlay_root)
         controlsColumn = view.findViewById(R.id.overlay_controls)
@@ -255,12 +256,13 @@ class OverlayService : Service() {
     private fun applySide() {
         val button = switchSideButton ?: return
         val isRed = currentSide != Constants.SIDE_BLACK
-        val sideLabel = getString(
+        val strings = AppLocale.wrap(this)
+        val sideLabel = strings.getString(
             if (isRed) R.string.overlay_side_red else R.string.overlay_side_black,
         )
         button.text = sideLabel
         button.contentDescription =
-            getString(R.string.overlay_switch_side_current, sideLabel)
+            strings.getString(R.string.overlay_switch_side_current, sideLabel)
         button.backgroundTintList = ColorStateList.valueOf(
             // Cinnabar / ink, as on the in-app side picker.
             if (isRed) 0xFFB3261E.toInt() else 0xFF2E2622.toInt(),

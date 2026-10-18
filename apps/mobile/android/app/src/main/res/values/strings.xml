@@ -30,4 +30,10 @@
     <!-- %1$s = current side name; spoken by TalkBack on the toggle. -->
     <string name="overlay_switch_side_current">Switch side, playing as %1$s</string>
     <string name="overlay_content_description">Xiangqi Strategist floating analysis button</string>
+
+    <!-- Capture-area selector (drawn over the screen from the overlay menu). -->
+    <string name="region_full_screen">Full screen</string>
+    <string name="region_cancel">Cancel</string>
+    <string name="region_use_area">Use this area</string>
+    <string name="region_hint">Drag to move • drag a corner to resize</string>
 </resources>
