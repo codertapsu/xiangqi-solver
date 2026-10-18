@@ -418,6 +418,31 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
     }
   }
 
+  /// Set while the user is on the system "display over other apps" screen that
+  /// [start] sent them to; the next [resumePendingStart] picks the start back up.
+  bool _awaitingOverlayGrant = false;
+
+  /// Whether the overlay permission is already granted (so Home can explain the
+  /// permissions before [start] sends the user to system settings).
+  Future<bool> hasOverlayPermission() async {
+    if (!_native.isSupported) return true;
+    try {
+      return await _native.checkOverlayPermission();
+    } catch (_) {
+      return true; // can't tell — let [start] handle it
+    }
+  }
+
+  /// Call when the app returns to the foreground. If [start] was waiting on the
+  /// overlay permission and it has now been granted, finish starting, so the
+  /// user doesn't have to find and press Start a second time.
+  Future<void> resumePendingStart() async {
+    if (!_awaitingOverlayGrant) return;
+    _awaitingOverlayGrant = false;
+    if (!await hasOverlayPermission()) return;
+    await start();
+  }
+
   /// Ensures overlay + projection permissions, then starts solver mode.
   Future<void> start() async {
     if (!_native.isSupported) {
@@ -430,6 +455,7 @@ class SolverModeNotifier extends StateNotifier<SolverModeState> {
     try {
       final hasOverlay = await _native.checkOverlayPermission();
       if (!hasOverlay) {
+        _awaitingOverlayGrant = true;
         await _native.requestOverlayPermission();
         state = state.copyWith(
           isBusy: false,

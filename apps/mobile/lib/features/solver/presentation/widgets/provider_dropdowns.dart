@@ -19,6 +19,8 @@ class AiProviderDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return DropdownButtonFormField<AiProvider>(
+      // Long labels ellipsize instead of overflowing at large text sizes.
+      isExpanded: true,
       initialValue: value,
       decoration: InputDecoration(
         labelText: l10n.providerAiLabel,
@@ -50,6 +52,8 @@ class EngineProviderDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return DropdownButtonFormField<EngineProvider>(
+      // Long labels ellipsize instead of overflowing at large text sizes.
+      isExpanded: true,
       initialValue: value,
       decoration: InputDecoration(
         labelText: l10n.providerEngineLabel,

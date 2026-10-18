@@ -13,6 +13,7 @@ import 'package:xiangqi_solver/features/solver/presentation/pages/home_page.dart
 import 'package:xiangqi_solver/features/solver/presentation/providers/solver_providers.dart';
 import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
+import 'support/fake_native_solver.dart';
 import 'support/hint_grant_test_override.dart';
 import 'support/remote_config_test_override.dart';
 
@@ -36,15 +37,25 @@ class _HealthyRepo extends AnalysisRepository {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Future<Widget> buildHome({Override? remoteConfig}) async {
-    SharedPreferences.setMockInitialValues(const {});
-    final prefs = await SharedPreferences.getInstance();
+  late SharedPreferences prefs;
+
+  /// Home in a bare MaterialApp. [firstRun] leaves the welcome sheet unseen.
+  Future<Widget> buildHome({
+    Override? remoteConfig,
+    FakeNativeSolver? native,
+    bool firstRun = false,
+  }) async {
+    SharedPreferences.setMockInitialValues({
+      if (!firstRun) 'settings.onboardingSeen': true,
+    });
+    prefs = await SharedPreferences.getInstance();
     return ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         analysisRepositoryProvider.overrideWithValue(_HealthyRepo()),
         remoteConfig ?? remoteConfigTestOverride,
         hintGrantOverride(),
+        if (native != null) nativeSolverProvider.overrideWithValue(native),
       ],
       child: const MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -54,53 +65,64 @@ void main() {
     );
   }
 
-  testWidgets('Home renders core controls and privacy banner', (tester) async {
+  testWidgets('Home leads with Solver Mode, then the screenshot action and privacy note', (
+    tester,
+  ) async {
     await tester.pumpWidget(await buildHome());
     await tester.pump();
 
-    // App title.
     expect(find.text(AppConstants.appName), findsOneWidget);
-
-    // Key sections / actions are present near the top.
     expect(find.text('Solver Mode'), findsOneWidget);
-    expect(find.text('Start'), findsOneWidget);
-    expect(find.text('Stop'), findsOneWidget);
-    // The Backend card is hidden by default (a remote-config UI flag), so it is
-    // intentionally NOT among the core controls here.
-    expect(find.text('Test Backend Connection'), findsNothing);
+    expect(find.text('Start Solver Mode'), findsOneWidget);
+    // One toggling action: no Stop while it isn't running.
+    expect(find.text('Stop Solver Mode'), findsNothing);
+    expect(find.text('Analyze a screenshot'), findsOneWidget);
+    // The Backend card is hidden by default (a remote-config UI flag).
+    expect(find.text('Test connection'), findsNothing);
 
-    // Privacy banner.
-    expect(find.text('Privacy & AI'), findsOneWidget);
-
-    // The mock-test button lives at the bottom of the scroll view.
-    final mockTestButton = find.text('Pick an image & analyze (test)');
+    final privacy = find.textContaining('sent to OpenAI', findRichText: true);
     await tester.scrollUntilVisible(
-      mockTestButton,
+      privacy,
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(mockTestButton, findsOneWidget);
+    expect(privacy, findsOneWidget);
   });
 
-  testWidgets('Backend URL field is seeded with the default URL', (
-    tester,
-  ) async {
+  testWidgets('Home lays out at 2x text on a narrow phone', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(await buildHome(remoteConfig: remoteConfigUiVisibleTestOverride));
+    await tester.pump();
+    expect(MediaQuery.of(tester.element(find.byType(HomePage))).textScaler.scale(10), 20);
+    expect(tester.takeException(), isNull);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -3000));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Backend URL field is seeded with the default URL', (tester) async {
     // The Backend card is gated behind a remote-config flag — reveal it here.
     await tester.pumpWidget(
       await buildHome(remoteConfig: remoteConfigUiVisibleTestOverride),
     );
     await tester.pump();
 
-    // Find the labelled field, then assert its controller holds the default.
     final fieldFinder = find.widgetWithText(TextField, 'Backend URL');
-    expect(fieldFinder, findsOneWidget);
+    await tester.scrollUntilVisible(
+      fieldFinder,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     final field = tester.widget<TextField>(fieldFinder);
     expect(field.controller?.text, AppConstants.defaultBackendUrl);
   });
 
-  testWidgets('iOS hides Solver Mode and shows the share-in card', (
-    tester,
-  ) async {
+  testWidgets('iOS replaces Solver Mode with the share-in hero', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     try {
       await tester.pumpWidget(await buildHome());
@@ -108,17 +130,15 @@ void main() {
 
       // Solver Mode (overlay + capture) is Android-only — hidden on iOS.
       expect(find.text('Solver Mode'), findsNothing);
-      expect(find.text('Start'), findsNothing);
-      // The iOS share-in hint card replaces it.
+      expect(find.text('Start Solver Mode'), findsNothing);
       expect(find.text('Analyze a board photo'), findsOneWidget);
+      expect(find.text('Choose a photo'), findsOneWidget);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
   });
 
-  testWidgets('Android shows Solver Mode and not the share-in card', (
-    tester,
-  ) async {
+  testWidgets('Android shows Solver Mode and not the share-in hero', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       await tester.pumpWidget(await buildHome());
@@ -131,18 +151,51 @@ void main() {
     }
   });
 
-  testWidgets('Stop button is disabled while solver mode is not running', (
+  testWidgets('first run shows the welcome sheet once, with the privacy disclosure', (
     tester,
   ) async {
-    await tester.pumpWidget(await buildHome());
+    await tester.pumpWidget(await buildHome(firstRun: true));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome to Xiangqi Strategist'), findsOneWidget);
+    expect(find.text('Privacy & AI'), findsOneWidget);
+    await tester.ensureVisible(find.text('Get started'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome to Xiangqi Strategist'), findsNothing);
+    expect(prefs.getBool('settings.onboardingSeen'), isTrue);
+  });
+
+  testWidgets('Start explains the permissions, then resumes after the overlay grant', (
+    tester,
+  ) async {
+    final native = FakeNativeSolver();
+    await tester.pumpWidget(await buildHome(native: native));
     await tester.pump();
 
-    final stopButton = tester.widget<OutlinedButton>(
-      find.ancestor(
-        of: find.text('Stop'),
-        matching: find.byType(OutlinedButton),
-      ),
-    );
-    expect(stopButton.onPressed, isNull);
+    // "Not now" backs out without touching any permission.
+    await tester.tap(find.text('Start Solver Mode'));
+    await tester.pumpAndSettle();
+    expect(find.text('Solver Mode needs two permissions'), findsOneWidget);
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(native.calls, isEmpty);
+
+    // "Continue" sends the user to the overlay setting…
+    await tester.tap(find.text('Start Solver Mode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(native.calls, ['requestOverlayPermission']);
+
+    // …and coming back with it granted carries on to screen-capture consent
+    // without a second tap on Start.
+    native.overlayGranted = true;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(native.calls, ['requestOverlayPermission', 'requestScreenCapturePermission']);
   });
 }

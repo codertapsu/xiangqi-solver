@@ -30,6 +30,7 @@ class AppSettings extends Equatable {
     required this.mySide,
     required this.onDeviceVisionModel,
     this.themeMode = 'system',
+    this.onboardingSeen = false,
   });
 
   final String backendUrl;
@@ -77,6 +78,10 @@ class AppSettings extends Equatable {
 
   /// Colour theme: 'system' (follow the device), 'light' or 'dark'.
   final String themeMode;
+
+  /// Whether the first-run welcome (with the privacy disclosure) was
+  /// acknowledged. It is shown once, before the first analysis can upload.
+  final bool onboardingSeen;
 
   /// Empty default = follow the backend's `RemoteConfig.onDeviceVisionModel`.
   static const String _defaultOnDeviceVisionModel = '';
@@ -151,6 +156,7 @@ class AppSettings extends Equatable {
     SideToMove? mySide,
     String? onDeviceVisionModel,
     String? themeMode,
+    bool? onboardingSeen,
   }) {
     return AppSettings(
       backendUrl: backendUrl ?? this.backendUrl,
@@ -169,6 +175,7 @@ class AppSettings extends Equatable {
       mySide: mySide ?? this.mySide,
       onDeviceVisionModel: onDeviceVisionModel ?? this.onDeviceVisionModel,
       themeMode: themeMode ?? this.themeMode,
+      onboardingSeen: onboardingSeen ?? this.onboardingSeen,
     );
   }
 
@@ -190,6 +197,7 @@ class AppSettings extends Equatable {
     mySide,
     onDeviceVisionModel,
     themeMode,
+    onboardingSeen,
   ];
 }
 
@@ -220,6 +228,7 @@ class SettingsRepository {
   static const String _kMySide = 'settings.mySide';
   static const String _kOnDeviceVisionModel = 'settings.onDeviceVisionModel';
   static const String _kThemeMode = 'settings.themeMode';
+  static const String _kOnboardingSeen = 'settings.onboardingSeen';
 
   /// Loads the persisted settings, merging over [AppSettings.defaults].
   AppSettings load() {
@@ -261,6 +270,7 @@ class SettingsRepository {
       mySide: _readSide(_prefs.getString(_kMySide), defaults.mySide),
       onDeviceVisionModel: _readString(_kOnDeviceVisionModel, defaults.onDeviceVisionModel),
       themeMode: _readThemeMode(defaults.themeMode),
+      onboardingSeen: _prefs.getBool(_kOnboardingSeen) ?? defaults.onboardingSeen,
     );
   }
 
@@ -284,6 +294,7 @@ class SettingsRepository {
       // Stored as-is (empty = "follow the backend default"); resolved at use.
       _prefs.setString(_kOnDeviceVisionModel, settings.onDeviceVisionModel.trim()),
       _prefs.setString(_kThemeMode, settings.themeMode),
+      _prefs.setBool(_kOnboardingSeen, settings.onboardingSeen),
     ]);
     return settings;
   }

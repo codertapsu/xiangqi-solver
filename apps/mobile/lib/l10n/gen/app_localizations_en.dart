@@ -542,7 +542,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get solverGrantOverlay =>
-      'Allow the overlay permission, then press Start again.';
+      'Turn on “Display over other apps”, then come back — Solver Mode continues automatically.';
 
   @override
   String get solverNeedCapturePermission =>
@@ -1115,4 +1115,111 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyDeleted => 'Analysis deleted.';
+
+  @override
+  String get actionContinue => 'Continue';
+
+  @override
+  String get actionNotNow => 'Not now';
+
+  @override
+  String get homeSolverOn => 'Running';
+
+  @override
+  String get homeSolverOff => 'Off';
+
+  @override
+  String get homeSolverStart => 'Start Solver Mode';
+
+  @override
+  String get homeSolverStop => 'Stop Solver Mode';
+
+  @override
+  String get homeSolverRunningHint =>
+      'Open your Xiangqi game and tap the floating button to read the board.';
+
+  @override
+  String get homeYouPlay => 'You play';
+
+  @override
+  String get homeHowItWorks => 'How it works';
+
+  @override
+  String get homeStep1 => 'Start Solver Mode — a floating button appears.';
+
+  @override
+  String get homeStep2 => 'Open your Xiangqi game in any app.';
+
+  @override
+  String get homeStep3 => 'Tap the button — the best move appears in seconds.';
+
+  @override
+  String get homeAnalyzeScreenshot => 'Analyze a screenshot';
+
+  @override
+  String get homeAnalyzeScreenshotDesc =>
+      'Pick a board image from your gallery.';
+
+  @override
+  String get homePickPhoto => 'Choose a photo';
+
+  @override
+  String get homeRecent => 'Latest analysis';
+
+  @override
+  String get homeSeeAll => 'See all';
+
+  @override
+  String get homePrivacyNote =>
+      'Screenshots you analyze are sent to OpenAI to read the board.';
+
+  @override
+  String get homePrivacyDetails => 'Details';
+
+  @override
+  String get welcomeTitle => 'Welcome to Xiangqi Strategist';
+
+  @override
+  String get welcomeSubtitle => 'Your pocket Xiangqi coach.';
+
+  @override
+  String get welcomeCaptureTitle => 'Capture any game';
+
+  @override
+  String get welcomeCaptureBody =>
+      'Solver Mode adds a floating button over your Xiangqi app — tap it to read the board.';
+
+  @override
+  String get welcomeCaptureBodyIos =>
+      'Share a screenshot of your game to this app, or pick a photo.';
+
+  @override
+  String get welcomeMoveTitle => 'See the best move';
+
+  @override
+  String get welcomeMoveBody =>
+      'A strong engine finds the move and draws it on the board, along with how the game stands.';
+
+  @override
+  String get welcomeStart => 'Get started';
+
+  @override
+  String get solverPermsTitle => 'Solver Mode needs two permissions';
+
+  @override
+  String get solverPermOverlayTitle => 'Display over other apps';
+
+  @override
+  String get solverPermOverlayBody =>
+      'Shows the floating button on top of your Xiangqi game.';
+
+  @override
+  String get solverPermCaptureTitle => 'Screen capture';
+
+  @override
+  String get solverPermCaptureBody =>
+      'Lets the app take a screenshot when you tap Analyze. Only that screenshot is used.';
+
+  @override
+  String get settingsGroupAdvanced => 'Advanced';
 }

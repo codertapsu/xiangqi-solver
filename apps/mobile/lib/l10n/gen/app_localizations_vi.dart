@@ -545,7 +545,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get solverGrantOverlay =>
-      'Hãy cấp quyền hiển thị trên ứng dụng khác, rồi nhấn Bắt đầu lại.';
+      'Hãy bật “Hiển thị trên ứng dụng khác”, rồi quay lại — Chế độ Quân Sư sẽ tự tiếp tục.';
 
   @override
   String get solverNeedCapturePermission =>
@@ -1113,4 +1113,112 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get historyDeleted => 'Đã xóa phân tích.';
+
+  @override
+  String get actionContinue => 'Tiếp tục';
+
+  @override
+  String get actionNotNow => 'Để sau';
+
+  @override
+  String get homeSolverOn => 'Đang chạy';
+
+  @override
+  String get homeSolverOff => 'Đang tắt';
+
+  @override
+  String get homeSolverStart => 'Bật Chế độ Quân Sư';
+
+  @override
+  String get homeSolverStop => 'Tắt Chế độ Quân Sư';
+
+  @override
+  String get homeSolverRunningHint =>
+      'Mở ván cờ của bạn và chạm vào nút nổi để đọc bàn cờ.';
+
+  @override
+  String get homeYouPlay => 'Bạn cầm quân';
+
+  @override
+  String get homeHowItWorks => 'Cách sử dụng';
+
+  @override
+  String get homeStep1 => 'Bật Chế độ Quân Sư — một nút nổi sẽ xuất hiện.';
+
+  @override
+  String get homeStep2 => 'Mở ván cờ tướng trong bất kỳ ứng dụng nào.';
+
+  @override
+  String get homeStep3 =>
+      'Chạm vào nút — nước đi tốt nhất hiện ra sau vài giây.';
+
+  @override
+  String get homeAnalyzeScreenshot => 'Phân tích ảnh chụp màn hình';
+
+  @override
+  String get homeAnalyzeScreenshotDesc =>
+      'Chọn ảnh bàn cờ từ thư viện của bạn.';
+
+  @override
+  String get homePickPhoto => 'Chọn ảnh';
+
+  @override
+  String get homeRecent => 'Phân tích gần nhất';
+
+  @override
+  String get homeSeeAll => 'Xem tất cả';
+
+  @override
+  String get homePrivacyNote =>
+      'Ảnh bạn phân tích được gửi tới OpenAI để đọc bàn cờ.';
+
+  @override
+  String get homePrivacyDetails => 'Chi tiết';
+
+  @override
+  String get welcomeTitle => 'Chào mừng bạn đến với Quân Sư Cờ Tướng';
+
+  @override
+  String get welcomeSubtitle => 'Quân sư cờ tướng ngay trong túi bạn.';
+
+  @override
+  String get welcomeCaptureTitle => 'Chụp mọi ván cờ';
+
+  @override
+  String get welcomeCaptureBody =>
+      'Chế độ Quân Sư thêm một nút nổi trên ứng dụng cờ tướng của bạn — chạm vào để đọc bàn cờ.';
+
+  @override
+  String get welcomeCaptureBodyIos =>
+      'Chia sẻ ảnh chụp ván cờ vào ứng dụng này, hoặc chọn một ảnh.';
+
+  @override
+  String get welcomeMoveTitle => 'Xem nước đi tốt nhất';
+
+  @override
+  String get welcomeMoveBody =>
+      'Một công cụ mạnh tìm nước đi và vẽ ngay trên bàn cờ, kèm đánh giá thế cờ.';
+
+  @override
+  String get welcomeStart => 'Bắt đầu';
+
+  @override
+  String get solverPermsTitle => 'Chế độ Quân Sư cần hai quyền';
+
+  @override
+  String get solverPermOverlayTitle => 'Hiển thị trên ứng dụng khác';
+
+  @override
+  String get solverPermOverlayBody =>
+      'Để hiện nút nổi ngay trên ván cờ của bạn.';
+
+  @override
+  String get solverPermCaptureTitle => 'Chụp màn hình';
+
+  @override
+  String get solverPermCaptureBody =>
+      'Để ứng dụng chụp màn hình khi bạn chạm Phân tích. Chỉ ảnh đó được sử dụng.';
+
+  @override
+  String get settingsGroupAdvanced => 'Nâng cao';
 }

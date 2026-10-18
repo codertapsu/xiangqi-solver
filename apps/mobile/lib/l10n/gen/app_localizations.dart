@@ -1007,7 +1007,7 @@ abstract class AppLocalizations {
   /// No description provided for @solverGrantOverlay.
   ///
   /// In en, this message translates to:
-  /// **'Allow the overlay permission, then press Start again.'**
+  /// **'Turn on “Display over other apps”, then come back — Solver Mode continues automatically.'**
   String get solverGrantOverlay;
 
   /// No description provided for @solverNeedCapturePermission.
@@ -1945,6 +1945,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Analysis deleted.'**
   String get historyDeleted;
+
+  /// No description provided for @actionContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get actionContinue;
+
+  /// No description provided for @actionNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get actionNotNow;
+
+  /// No description provided for @homeSolverOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get homeSolverOn;
+
+  /// No description provided for @homeSolverOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get homeSolverOff;
+
+  /// No description provided for @homeSolverStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Solver Mode'**
+  String get homeSolverStart;
+
+  /// No description provided for @homeSolverStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Solver Mode'**
+  String get homeSolverStop;
+
+  /// No description provided for @homeSolverRunningHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open your Xiangqi game and tap the floating button to read the board.'**
+  String get homeSolverRunningHint;
+
+  /// No description provided for @homeYouPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'You play'**
+  String get homeYouPlay;
+
+  /// No description provided for @homeHowItWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get homeHowItWorks;
+
+  /// No description provided for @homeStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Solver Mode — a floating button appears.'**
+  String get homeStep1;
+
+  /// No description provided for @homeStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Open your Xiangqi game in any app.'**
+  String get homeStep2;
+
+  /// No description provided for @homeStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the button — the best move appears in seconds.'**
+  String get homeStep3;
+
+  /// No description provided for @homeAnalyzeScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyze a screenshot'**
+  String get homeAnalyzeScreenshot;
+
+  /// No description provided for @homeAnalyzeScreenshotDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a board image from your gallery.'**
+  String get homeAnalyzeScreenshotDesc;
+
+  /// No description provided for @homePickPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a photo'**
+  String get homePickPhoto;
+
+  /// No description provided for @homeRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest analysis'**
+  String get homeRecent;
+
+  /// No description provided for @homeSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get homeSeeAll;
+
+  /// No description provided for @homePrivacyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshots you analyze are sent to OpenAI to read the board.'**
+  String get homePrivacyNote;
+
+  /// No description provided for @homePrivacyDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get homePrivacyDetails;
+
+  /// No description provided for @welcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Xiangqi Strategist'**
+  String get welcomeTitle;
+
+  /// No description provided for @welcomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your pocket Xiangqi coach.'**
+  String get welcomeSubtitle;
+
+  /// No description provided for @welcomeCaptureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture any game'**
+  String get welcomeCaptureTitle;
+
+  /// No description provided for @welcomeCaptureBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Solver Mode adds a floating button over your Xiangqi app — tap it to read the board.'**
+  String get welcomeCaptureBody;
+
+  /// No description provided for @welcomeCaptureBodyIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Share a screenshot of your game to this app, or pick a photo.'**
+  String get welcomeCaptureBodyIos;
+
+  /// No description provided for @welcomeMoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'See the best move'**
+  String get welcomeMoveTitle;
+
+  /// No description provided for @welcomeMoveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A strong engine finds the move and draws it on the board, along with how the game stands.'**
+  String get welcomeMoveBody;
+
+  /// No description provided for @welcomeStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get welcomeStart;
+
+  /// No description provided for @solverPermsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Solver Mode needs two permissions'**
+  String get solverPermsTitle;
+
+  /// No description provided for @solverPermOverlayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Display over other apps'**
+  String get solverPermOverlayTitle;
+
+  /// No description provided for @solverPermOverlayBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Shows the floating button on top of your Xiangqi game.'**
+  String get solverPermOverlayBody;
+
+  /// No description provided for @solverPermCaptureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Screen capture'**
+  String get solverPermCaptureTitle;
+
+  /// No description provided for @solverPermCaptureBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets the app take a screenshot when you tap Analyze. Only that screenshot is used.'**
+  String get solverPermCaptureBody;
+
+  /// No description provided for @settingsGroupAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get settingsGroupAdvanced;
 }
 
 class _AppLocalizationsDelegate

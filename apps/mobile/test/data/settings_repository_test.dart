@@ -94,5 +94,12 @@ void main() {
       final bad = await buildRepo({'settings.themeMode': 'sepia'});
       expect(bad.load().themeMode, 'system');
     });
+
+    test('the first-run welcome is remembered once seen', () async {
+      final repo = await buildRepo({});
+      expect(repo.load().onboardingSeen, isFalse);
+      await repo.save(repo.load().copyWith(onboardingSeen: true));
+      expect(repo.load().onboardingSeen, isTrue);
+    });
   });
 }
