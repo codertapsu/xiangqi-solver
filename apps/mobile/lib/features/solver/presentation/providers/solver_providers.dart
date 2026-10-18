@@ -580,12 +580,26 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
   /// and concurrent runs would race the shared state + double-charge hints.
   bool _inFlight = false;
 
+  /// The image of the most recent request, so a failed run can be retried.
+  File? _lastFile;
+
+  /// Whether [retry] has an image to re-run.
+  bool get canRetry => _lastFile != null;
+
+  /// Re-runs the most recent image (after a network error, or once the user
+  /// has topped up hints).
+  Future<void> retry() async {
+    final file = _lastFile;
+    if (file != null) await analyzeScreenshot(file);
+  }
+
   Future<void> analyzeScreenshot(File file) async {
     if (_inFlight) {
       _log.warn('Ignoring analyze request while another solve is in flight.');
       return;
     }
     _inFlight = true;
+    _lastFile = file;
     try {
       await _analyzeScreenshotInner(file);
     } finally {

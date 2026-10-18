@@ -956,4 +956,149 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get adminInstallRemoved => 'Đã xóa.';
+
+  @override
+  String get actionBackHome => 'Về Trang chủ';
+
+  @override
+  String get actionCopy => 'Sao chép';
+
+  @override
+  String sideToMoveLabel(String side) {
+    return '$side đi';
+  }
+
+  @override
+  String get resultIdleTitle => 'Chưa có phân tích';
+
+  @override
+  String get resultIdleBody =>
+      'Hãy chụp ván cờ bằng Chế độ Quân Sư, hoặc phân tích một ảnh chụp màn hình từ Trang chủ.';
+
+  @override
+  String get resultSavedUnavailableTitle => 'Không thể hiển thị kết quả này';
+
+  @override
+  String get resultSavedUnavailableBody =>
+      'Kết quả này được lưu bởi phiên bản cũ của ứng dụng, khi chưa lưu đầy đủ kết quả. Các phân tích mới sẽ mở được tại đây.';
+
+  @override
+  String get resultTapToPreview => 'Chạm vào một nước để xem trên bàn cờ.';
+
+  @override
+  String get resultBestBadge => 'Tốt nhất';
+
+  @override
+  String resultOptionBadge(int rank) {
+    return 'Lựa chọn $rank';
+  }
+
+  @override
+  String resultDepth(int depth) {
+    return 'Độ sâu $depth';
+  }
+
+  @override
+  String resultBoardCaption(int count, int pct) {
+    return 'Đọc được $count quân • độ tin cậy $pct%';
+  }
+
+  @override
+  String get resultTechnicalDetails => 'Chi tiết kỹ thuật';
+
+  @override
+  String get resultRawData => 'Dữ liệu bàn cờ (JSON)';
+
+  @override
+  String get resultCopied => 'Đã sao chép.';
+
+  @override
+  String get resultReadingBoard => 'Đang đọc bàn cờ…';
+
+  @override
+  String get resultReadingBoardHint => 'Thường chỉ mất vài giây.';
+
+  @override
+  String get resultOutOfHintsTitle => 'Bạn đã hết lượt';
+
+  @override
+  String boardSemantics(String side, String move) {
+    return 'Bàn cờ tướng, $side đi. Mũi tên chỉ nước $move.';
+  }
+
+  @override
+  String boardSemanticsNoMove(String side) {
+    return 'Bàn cờ tướng, $side đi.';
+  }
+
+  @override
+  String get evalEven => 'Thế cờ cân bằng';
+
+  @override
+  String evalSlightEdge(String side) {
+    return '$side hơi ưu thế';
+  }
+
+  @override
+  String evalAdvantage(String side) {
+    return '$side có ưu thế';
+  }
+
+  @override
+  String evalWinning(String side) {
+    return '$side đang thắng thế';
+  }
+
+  @override
+  String evalSlightlyWorse(String side) {
+    return '$side hơi kém thế';
+  }
+
+  @override
+  String evalWorse(String side) {
+    return '$side đang bất lợi';
+  }
+
+  @override
+  String evalLosing(String side) {
+    return '$side đang thua thế';
+  }
+
+  @override
+  String evalMateIn(String side, int n) {
+    return '$side chiếu bí sau $n nước';
+  }
+
+  @override
+  String evalMatedIn(String side, int n) {
+    return '$side bị chiếu bí sau $n nước';
+  }
+
+  @override
+  String get timeJustNow => 'Vừa xong';
+
+  @override
+  String timeMinutesAgo(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n phút trước',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeHoursAgo(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n giờ trước',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeYesterdayAt(String time) {
+    return 'Hôm qua $time';
+  }
 }

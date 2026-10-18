@@ -1723,6 +1723,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Removed.'**
   String get adminInstallRemoved;
+
+  /// No description provided for @actionBackHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Home'**
+  String get actionBackHome;
+
+  /// No description provided for @actionCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get actionCopy;
+
+  /// No description provided for @sideToMoveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} to move'**
+  String sideToMoveLabel(String side);
+
+  /// No description provided for @resultIdleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No analysis yet'**
+  String get resultIdleTitle;
+
+  /// No description provided for @resultIdleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture a game with Solver Mode, or analyze a screenshot from Home.'**
+  String get resultIdleBody;
+
+  /// No description provided for @resultSavedUnavailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This result can\'t be shown'**
+  String get resultSavedUnavailableTitle;
+
+  /// No description provided for @resultSavedUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It was saved by an older version of the app, before full results were kept. New analyses open here.'**
+  String get resultSavedUnavailableBody;
+
+  /// No description provided for @resultTapToPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a move to show it on the board.'**
+  String get resultTapToPreview;
+
+  /// No description provided for @resultBestBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Best'**
+  String get resultBestBadge;
+
+  /// No description provided for @resultOptionBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Option {rank}'**
+  String resultOptionBadge(int rank);
+
+  /// No description provided for @resultDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth {depth}'**
+  String resultDepth(int depth);
+
+  /// No description provided for @resultBoardCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} pieces read • {pct}% confidence'**
+  String resultBoardCaption(int count, int pct);
+
+  /// No description provided for @resultTechnicalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get resultTechnicalDetails;
+
+  /// No description provided for @resultRawData.
+  ///
+  /// In en, this message translates to:
+  /// **'Board data (JSON)'**
+  String get resultRawData;
+
+  /// No description provided for @resultCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard.'**
+  String get resultCopied;
+
+  /// No description provided for @resultReadingBoard.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the board…'**
+  String get resultReadingBoard;
+
+  /// No description provided for @resultReadingBoardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This usually takes a few seconds.'**
+  String get resultReadingBoardHint;
+
+  /// No description provided for @resultOutOfHintsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re out of hints'**
+  String get resultOutOfHintsTitle;
+
+  /// No description provided for @boardSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Xiangqi board, {side} to move. The arrow shows {move}.'**
+  String boardSemantics(String side, String move);
+
+  /// No description provided for @boardSemanticsNoMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Xiangqi board, {side} to move.'**
+  String boardSemanticsNoMove(String side);
+
+  /// No description provided for @evalEven.
+  ///
+  /// In en, this message translates to:
+  /// **'Even position'**
+  String get evalEven;
+
+  /// No description provided for @evalSlightEdge.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} is slightly better'**
+  String evalSlightEdge(String side);
+
+  /// No description provided for @evalAdvantage.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} is better'**
+  String evalAdvantage(String side);
+
+  /// No description provided for @evalWinning.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} is winning'**
+  String evalWinning(String side);
+
+  /// No description provided for @evalSlightlyWorse.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} is slightly worse'**
+  String evalSlightlyWorse(String side);
+
+  /// No description provided for @evalWorse.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} is worse'**
+  String evalWorse(String side);
+
+  /// No description provided for @evalLosing.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} is losing'**
+  String evalLosing(String side);
+
+  /// No description provided for @evalMateIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} mates in {n}'**
+  String evalMateIn(String side, int n);
+
+  /// No description provided for @evalMatedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} is mated in {n}'**
+  String evalMatedIn(String side, int n);
+
+  /// No description provided for @timeJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get timeJustNow;
+
+  /// No description provided for @timeMinutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{n, plural, =1{1 minute ago} other{{n} minutes ago}}'**
+  String timeMinutesAgo(int n);
+
+  /// No description provided for @timeHoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{n, plural, =1{1 hour ago} other{{n} hours ago}}'**
+  String timeHoursAgo(int n);
+
+  /// No description provided for @timeYesterdayAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday {time}'**
+  String timeYesterdayAt(String time);
 }
 
 class _AppLocalizationsDelegate

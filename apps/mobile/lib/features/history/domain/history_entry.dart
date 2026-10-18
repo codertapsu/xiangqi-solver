@@ -4,9 +4,11 @@ import '../../solver/domain/analysis_result.dart';
 
 /// A compact, persistable record of a past analysis.
 ///
-/// Stores METADATA ONLY (no image bytes) so the history list is cheap and
-/// privacy-preserving. The optional [screenshotPath] is retained only when the
-/// user has opted into local screenshot storage.
+/// Never stores image bytes. Since 1.1 it keeps the full [result] (board,
+/// moves, warnings — a few KB) so History can redraw the board and reopen the
+/// analysis; entries written by 1.0 have no [result] and list as text only. The
+/// optional [screenshotPath] is retained only when the user has opted into local
+/// screenshot storage.
 class HistoryEntry extends Equatable {
   const HistoryEntry({
     required this.analysisId,
@@ -18,6 +20,7 @@ class HistoryEntry extends Equatable {
     required this.confidence,
     required this.sideToMove,
     this.screenshotPath,
+    this.result,
   });
 
   final String analysisId;
@@ -29,6 +32,9 @@ class HistoryEntry extends Equatable {
   final double confidence;
   final String sideToMove;
   final String? screenshotPath;
+
+  /// The complete analysis (null for entries saved before 1.1).
+  final AnalysisResult? result;
 
   /// Builds an entry from a fresh [AnalysisResult].
   factory HistoryEntry.fromResult(
@@ -46,6 +52,7 @@ class HistoryEntry extends Equatable {
       confidence: result.board.confidence,
       sideToMove: result.board.sideToMove.wireValue,
       screenshotPath: screenshotPath,
+      result: result,
     );
   }
 
@@ -62,7 +69,19 @@ class HistoryEntry extends Equatable {
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
       sideToMove: json['sideToMove'] as String? ?? 'unknown',
       screenshotPath: json['screenshotPath'] as String?,
+      result: _resultFrom(json['result']),
     );
+  }
+
+  /// A stored result, or null when absent or unreadable (one bad entry must not
+  /// take the whole history list down).
+  static AnalysisResult? _resultFrom(Object? raw) {
+    if (raw is! Map) return null;
+    try {
+      return AnalysisResult.fromJson(raw.cast<String, dynamic>());
+    } catch (_) {
+      return null;
+    }
   }
 
   Map<String, dynamic> toJson() => {
@@ -75,6 +94,7 @@ class HistoryEntry extends Equatable {
     'confidence': confidence,
     'sideToMove': sideToMove,
     'screenshotPath': screenshotPath,
+    if (result != null) 'result': result!.toJson(),
   };
 
   @override
@@ -88,5 +108,6 @@ class HistoryEntry extends Equatable {
     confidence,
     sideToMove,
     screenshotPath,
+    result,
   ];
 }

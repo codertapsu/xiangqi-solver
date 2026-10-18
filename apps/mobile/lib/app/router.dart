@@ -17,6 +17,10 @@ abstract final class AppRoutes {
   static const String result = '/result';
   static const String settings = '/settings';
   static const String history = '/history';
+  static const String historyEntryPattern = '/history/:id';
+
+  /// One saved analysis, reopened on the Result screen.
+  static String historyEntry(String id) => '/history/${Uri.encodeComponent(id)}';
   static const String admin = '/admin';
   static const String adminConfig = '/admin/config';
   static const String adminGrants = '/admin/grants';
@@ -53,6 +57,12 @@ GoRouter buildRouter() {
           final id = state.uri.queryParameters['id'];
           return _page(state, HistoryPage(selectedId: id));
         },
+      ),
+      GoRoute(
+        path: AppRoutes.historyEntryPattern,
+        name: 'historyEntry',
+        pageBuilder: (context, state) =>
+            _page(state, ResultPage(historyId: state.pathParameters['id'])),
       ),
       GoRoute(
         path: AppRoutes.admin,

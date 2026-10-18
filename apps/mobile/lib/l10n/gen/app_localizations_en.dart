@@ -955,4 +955,151 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get adminInstallRemoved => 'Removed.';
+
+  @override
+  String get actionBackHome => 'Back to Home';
+
+  @override
+  String get actionCopy => 'Copy';
+
+  @override
+  String sideToMoveLabel(String side) {
+    return '$side to move';
+  }
+
+  @override
+  String get resultIdleTitle => 'No analysis yet';
+
+  @override
+  String get resultIdleBody =>
+      'Capture a game with Solver Mode, or analyze a screenshot from Home.';
+
+  @override
+  String get resultSavedUnavailableTitle => 'This result can\'t be shown';
+
+  @override
+  String get resultSavedUnavailableBody =>
+      'It was saved by an older version of the app, before full results were kept. New analyses open here.';
+
+  @override
+  String get resultTapToPreview => 'Tap a move to show it on the board.';
+
+  @override
+  String get resultBestBadge => 'Best';
+
+  @override
+  String resultOptionBadge(int rank) {
+    return 'Option $rank';
+  }
+
+  @override
+  String resultDepth(int depth) {
+    return 'Depth $depth';
+  }
+
+  @override
+  String resultBoardCaption(int count, int pct) {
+    return '$count pieces read • $pct% confidence';
+  }
+
+  @override
+  String get resultTechnicalDetails => 'Technical details';
+
+  @override
+  String get resultRawData => 'Board data (JSON)';
+
+  @override
+  String get resultCopied => 'Copied to clipboard.';
+
+  @override
+  String get resultReadingBoard => 'Reading the board…';
+
+  @override
+  String get resultReadingBoardHint => 'This usually takes a few seconds.';
+
+  @override
+  String get resultOutOfHintsTitle => 'You\'re out of hints';
+
+  @override
+  String boardSemantics(String side, String move) {
+    return 'Xiangqi board, $side to move. The arrow shows $move.';
+  }
+
+  @override
+  String boardSemanticsNoMove(String side) {
+    return 'Xiangqi board, $side to move.';
+  }
+
+  @override
+  String get evalEven => 'Even position';
+
+  @override
+  String evalSlightEdge(String side) {
+    return '$side is slightly better';
+  }
+
+  @override
+  String evalAdvantage(String side) {
+    return '$side is better';
+  }
+
+  @override
+  String evalWinning(String side) {
+    return '$side is winning';
+  }
+
+  @override
+  String evalSlightlyWorse(String side) {
+    return '$side is slightly worse';
+  }
+
+  @override
+  String evalWorse(String side) {
+    return '$side is worse';
+  }
+
+  @override
+  String evalLosing(String side) {
+    return '$side is losing';
+  }
+
+  @override
+  String evalMateIn(String side, int n) {
+    return '$side mates in $n';
+  }
+
+  @override
+  String evalMatedIn(String side, int n) {
+    return '$side is mated in $n';
+  }
+
+  @override
+  String get timeJustNow => 'Just now';
+
+  @override
+  String timeMinutesAgo(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n minutes ago',
+      one: '1 minute ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeHoursAgo(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n hours ago',
+      one: '1 hour ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeYesterdayAt(String time) {
+    return 'Yesterday $time';
+  }
 }
