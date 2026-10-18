@@ -992,6 +992,9 @@ class AnalysisNotifier extends StateNotifier<AnalysisStatus> {
       await _history.add(
         HistoryEntry.fromResult(result, screenshotPath: path),
       );
+      // The entry is written only now — after the success state went out — so
+      // refresh the list here rather than off the analysis state.
+      _ref.invalidate(historyListProvider);
     } catch (e) {
       _log.warn('Failed to record history: $e');
     }
@@ -1030,9 +1033,8 @@ final lastResultProvider = Provider<AnalysisResult?>((ref) {
   return status is AnalysisSuccess ? status.result : null;
 });
 
-/// History list, recomputed whenever an analysis succeeds.
+/// The saved history, most recent first. Whoever changes the store (a new
+/// analysis, a delete, a clear) invalidates this provider afterwards.
 final historyListProvider = Provider<List<HistoryEntry>>((ref) {
-  // Depend on analysis status so the list refreshes after a new entry.
-  ref.watch(analysisProvider);
   return ref.watch(historyRepositoryProvider).loadAll();
 });

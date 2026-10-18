@@ -1283,7 +1283,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Analyses you run appear here as local details (time, provider, best move, confidence).'**
+  /// **'Analyses you run appear here, so you can revisit the board and the best move.'**
   String get historyEmptyBody;
 
   /// No description provided for @historyAnalysisId.
@@ -1921,6 +1921,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Yesterday {time}'**
   String timeYesterdayAt(String time);
+
+  /// No description provided for @actionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get actionDelete;
+
+  /// No description provided for @actionUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get actionUndo;
+
+  /// No description provided for @historyLegacyEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved by an older version — no board preview.'**
+  String get historyLegacyEntry;
+
+  /// No description provided for @historyDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis deleted.'**
+  String get historyDeleted;
 }
 
 class _AppLocalizationsDelegate

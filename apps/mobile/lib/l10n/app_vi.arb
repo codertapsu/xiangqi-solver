@@ -227,7 +227,7 @@
   "historyClearBody": "Thao tác này xóa mọi bản ghi phân tích lưu trên thiết bị.",
   "historyNoMove": "Không có nước đi",
   "historyEmptyTitle": "Chưa có lịch sử",
-  "historyEmptyBody": "Các phân tích bạn chạy sẽ hiện ở đây dưới dạng thông tin cục bộ (thời gian, nhà cung cấp, nước đi tốt nhất, độ tin cậy).",
+  "historyEmptyBody": "Các phân tích của bạn sẽ hiện ở đây để bạn xem lại bàn cờ và nước đi tốt nhất.",
   "historyAnalysisId": "Mã phân tích",
   "historySideToMove": "Bên tới lượt",
   "historyBestMoveUci": "Nước đi tốt nhất (UCI)",
@@ -336,5 +336,10 @@
   "timeJustNow": "Vừa xong",
   "timeMinutesAgo": "{n, plural, other{{n} phút trước}}",
   "timeHoursAgo": "{n, plural, other{{n} giờ trước}}",
-  "timeYesterdayAt": "Hôm qua {time}"
+  "timeYesterdayAt": "Hôm qua {time}",
+
+  "actionDelete": "Xóa",
+  "actionUndo": "Hoàn tác",
+  "historyLegacyEntry": "Lưu bởi phiên bản cũ — không có bàn cờ.",
+  "historyDeleted": "Đã xóa phân tích."
 }

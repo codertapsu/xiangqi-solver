@@ -726,7 +726,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get historyEmptyBody =>
-      'Các phân tích bạn chạy sẽ hiện ở đây dưới dạng thông tin cục bộ (thời gian, nhà cung cấp, nước đi tốt nhất, độ tin cậy).';
+      'Các phân tích của bạn sẽ hiện ở đây để bạn xem lại bàn cờ và nước đi tốt nhất.';
 
   @override
   String get historyAnalysisId => 'Mã phân tích';
@@ -1101,4 +1101,16 @@ class AppLocalizationsVi extends AppLocalizations {
   String timeYesterdayAt(String time) {
     return 'Hôm qua $time';
   }
+
+  @override
+  String get actionDelete => 'Xóa';
+
+  @override
+  String get actionUndo => 'Hoàn tác';
+
+  @override
+  String get historyLegacyEntry => 'Lưu bởi phiên bản cũ — không có bàn cờ.';
+
+  @override
+  String get historyDeleted => 'Đã xóa phân tích.';
 }

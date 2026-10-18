@@ -270,7 +270,7 @@
   "historyClearBody": "This removes all analysis records stored on this device.",
   "historyNoMove": "No move",
   "historyEmptyTitle": "No history yet",
-  "historyEmptyBody": "Analyses you run appear here as local details (time, provider, best move, confidence).",
+  "historyEmptyBody": "Analyses you run appear here, so you can revisit the board and the best move.",
   "historyAnalysisId": "Analysis ID",
   "historySideToMove": "Side to move",
   "historyBestMoveUci": "Best move (UCI)",
@@ -399,5 +399,10 @@
   "timeHoursAgo": "{n, plural, =1{1 hour ago} other{{n} hours ago}}",
   "@timeHoursAgo": { "placeholders": { "n": { "type": "int" } } },
   "timeYesterdayAt": "Yesterday {time}",
-  "@timeYesterdayAt": { "placeholders": { "time": { "type": "String" } } }
+  "@timeYesterdayAt": { "placeholders": { "time": { "type": "String" } } },
+
+  "actionDelete": "Delete",
+  "actionUndo": "Undo",
+  "historyLegacyEntry": "Saved by an older version — no board preview.",
+  "historyDeleted": "Analysis deleted."
 }

@@ -61,6 +61,17 @@ class HistoryRepository {
     await _prefs.remove(_key);
   }
 
+  /// Removes one entry (and its saved screenshot, if any) and persists.
+  Future<List<HistoryEntry>> remove(String analysisId) async {
+    final all = loadAll();
+    for (final e in all.where((e) => e.analysisId == analysisId)) {
+      await _deleteScreenshot(e.screenshotPath);
+    }
+    final kept = all.where((e) => e.analysisId != analysisId).toList(growable: false);
+    await _persist(kept);
+    return kept;
+  }
+
   /// Best-effort delete of a saved screenshot file; never throws.
   Future<void> _deleteScreenshot(String? path) async {
     if (path == null || path.isEmpty) return;

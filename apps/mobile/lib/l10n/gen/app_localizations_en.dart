@@ -724,7 +724,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyEmptyBody =>
-      'Analyses you run appear here as local details (time, provider, best move, confidence).';
+      'Analyses you run appear here, so you can revisit the board and the best move.';
 
   @override
   String get historyAnalysisId => 'Analysis ID';
@@ -1102,4 +1102,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String timeYesterdayAt(String time) {
     return 'Yesterday $time';
   }
+
+  @override
+  String get actionDelete => 'Delete';
+
+  @override
+  String get actionUndo => 'Undo';
+
+  @override
+  String get historyLegacyEntry =>
+      'Saved by an older version — no board preview.';
+
+  @override
+  String get historyDeleted => 'Analysis deleted.';
 }
