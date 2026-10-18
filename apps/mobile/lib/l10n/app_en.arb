@@ -438,5 +438,16 @@
   "solverPermOverlayBody": "Shows the floating button on top of your Xiangqi game.",
   "solverPermCaptureTitle": "Screen capture",
   "solverPermCaptureBody": "Lets the app take a screenshot when you tap Analyze. Only that screenshot is used.",
-  "settingsGroupAdvanced": "Advanced"
+  "settingsGroupAdvanced": "Advanced",
+
+  "settingsGroupAnalysis": "Analysis",
+  "settingsGroupGame": "Game",
+  "settingsGroupAppearance": "Appearance",
+  "settingsGroupAbout": "About",
+  "settingsTheme": "Theme",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "settingsVersion": "Version",
+  "settingsWelcomeGuide": "Welcome guide"
 }

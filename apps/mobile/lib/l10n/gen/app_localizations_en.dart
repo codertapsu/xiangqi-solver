@@ -1222,4 +1222,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsGroupAdvanced => 'Advanced';
+
+  @override
+  String get settingsGroupAnalysis => 'Analysis';
+
+  @override
+  String get settingsGroupGame => 'Game';
+
+  @override
+  String get settingsGroupAppearance => 'Appearance';
+
+  @override
+  String get settingsGroupAbout => 'About';
+
+  @override
+  String get settingsTheme => 'Theme';
+
+  @override
+  String get themeSystem => 'System';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get settingsVersion => 'Version';
+
+  @override
+  String get settingsWelcomeGuide => 'Welcome guide';
 }

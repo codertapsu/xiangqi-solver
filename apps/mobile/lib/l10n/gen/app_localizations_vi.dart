@@ -1221,4 +1221,34 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get settingsGroupAdvanced => 'Nâng cao';
+
+  @override
+  String get settingsGroupAnalysis => 'Phân tích';
+
+  @override
+  String get settingsGroupGame => 'Ván cờ';
+
+  @override
+  String get settingsGroupAppearance => 'Giao diện';
+
+  @override
+  String get settingsGroupAbout => 'Giới thiệu';
+
+  @override
+  String get settingsTheme => 'Chủ đề';
+
+  @override
+  String get themeSystem => 'Hệ thống';
+
+  @override
+  String get themeLight => 'Sáng';
+
+  @override
+  String get themeDark => 'Tối';
+
+  @override
+  String get settingsVersion => 'Phiên bản';
+
+  @override
+  String get settingsWelcomeGuide => 'Hướng dẫn bắt đầu';
 }

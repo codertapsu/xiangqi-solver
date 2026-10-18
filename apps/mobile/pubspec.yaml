@@ -70,6 +70,8 @@ dependencies:
   # Monetization (hint wallet): rewarded ads + in-app purchases.
   google_mobile_ads: ^9.1.0
   in_app_purchase: ^3.3.1
+  # The installed version/build, shown in Settings → About.
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:

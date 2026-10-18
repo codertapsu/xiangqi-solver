@@ -4,26 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
 import '../../../app/router.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/remote_config/remote_config_provider.dart';
+import '../../../core/utils/privacy_policy.dart';
+import '../../../core/widgets/callout.dart';
+import '../../../core/widgets/section_header.dart';
 import '../../admin/presentation/admin_providers.dart';
 import '../../monetization/presentation/banner_ad.dart';
+import '../../onboarding/presentation/welcome_sheet.dart';
 import '../../solver/domain/solver_enums.dart';
 import '../../solver/presentation/providers/engine_net_provider.dart';
 import '../../solver/presentation/providers/solver_providers.dart';
 import '../../solver/presentation/widgets/provider_dropdowns.dart';
-import '../../solver/presentation/widgets/section_card.dart';
-import '../../solver/presentation/widgets/side_selector.dart';
+import '../../solver/presentation/widgets/side_token_picker.dart';
 import '../data/settings_repository.dart';
 
-/// Full settings editor: backend URL, providers, engine tuning, language, and
-/// local screenshot storage. API keys are intentionally NOT here — they live on
-/// the backend only.
+/// All settings, in groups: Analysis (who reads the board, where the engine
+/// runs, your own key), Game, Appearance, Privacy, Advanced (remote-gated) and
+/// About.
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -36,6 +38,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   late final TextEditingController _visionModelController;
   final TextEditingController _apiKeyController = TextEditingController();
   bool _apiKeyObscured = true;
+
+  /// The installed version, for About. Resolves to an error under tests.
+  final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
   @override
   void initState() {
@@ -70,44 +75,44 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final remoteConfig = ref.watch(remoteConfigProvider);
     // Admin entry — only for an admin device (server says so). Hidden otherwise.
     final isAdmin = ref.watch(adminStatusProvider).value ?? false;
+    final showAdvanced = remoteConfig.showBackendSection ||
+        remoteConfig.showProvidersSection ||
+        remoteConfig.showEngineTuning;
     return Scaffold(
       appBar: AppBar(title: Text(_l10n.settingsTitle)),
+      bottomNavigationBar: const BannerAdWidget(),
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            const BannerAdWidget(),
-            if (remoteConfig.showBackendSection) ...[
-              _buildBackendCard(),
-              const SizedBox(height: 16),
-            ],
+            SectionHeader(_l10n.settingsGroupAnalysis),
             _buildModeCard(settings),
-            const SizedBox(height: 16),
-            _buildSideCard(settings),
-            const SizedBox(height: 16),
-            if (remoteConfig.showProvidersSection) ...[
-              _buildProvidersCard(settings),
-              const SizedBox(height: 16),
-            ],
-            if (remoteConfig.showEngineTuning) ...[
-              _buildEngineCard(settings),
-              const SizedBox(height: 16),
-            ],
-            _buildCaptureAreaCard(),
-            _buildLanguageCard(settings),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            SectionHeader(_l10n.settingsGroupGame),
+            _buildGameCard(settings),
+            const SizedBox(height: 24),
+            SectionHeader(_l10n.settingsGroupAppearance),
+            _buildAppearanceCard(settings),
+            const SizedBox(height: 24),
+            SectionHeader(_l10n.settingsPrivacy),
             _buildPrivacyCard(settings),
-            if (isAdmin) ...[
-              const SizedBox(height: 16),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.admin_panel_settings_outlined),
-                  title: Text(_l10n.adminSettingsEntry),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push(AppRoutes.admin),
-                ),
-              ),
+            if (showAdvanced) ...[
+              const SizedBox(height: 24),
+              SectionHeader(_l10n.settingsGroupAdvanced),
+              if (remoteConfig.showBackendSection) ...[
+                _buildBackendCard(),
+                const SizedBox(height: 12),
+              ],
+              if (remoteConfig.showProvidersSection) ...[
+                _buildProvidersCard(settings),
+                const SizedBox(height: 12),
+              ],
+              if (remoteConfig.showEngineTuning) _buildEngineCard(settings),
             ],
+            const SizedBox(height: 24),
+            SectionHeader(_l10n.settingsGroupAbout),
+            _buildAboutCard(isAdmin: isAdmin),
           ],
         ),
       ),
@@ -136,9 +141,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       });
     }
 
-    return SectionCard(
-      title: l10n.settingsAnalysisMode,
-      icon: Icons.dns_outlined,
+    return _Group(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -210,7 +213,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
           _buildEngineNetStatus(netState),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           _buildCostHint(settings, theme),
         ],
       ),
@@ -254,7 +257,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           padding: const EdgeInsets.only(top: 8),
           child: Row(
             children: [
-              Icon(Icons.check_circle_outline, size: 16, color: theme.colorScheme.primary),
+              Icon(Icons.check_circle_outline, size: 16, color: theme.colorScheme.tertiary),
               const SizedBox(width: 6),
               Text(l10n.settingsEngineReady, style: theme.textTheme.bodySmall),
             ],
@@ -299,9 +302,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final n = ref.watch(remoteConfigProvider).ownKeyHintDivisor;
       text = l10n.costHintOwnCloud(n);
     }
-    return Text(
-      text,
-      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+    return Callout(
+      tone: CalloutTone.info,
+      icon: Icons.lightbulb_outline_rounded,
+      child: Text(text, style: theme.textTheme.bodySmall),
     );
   }
 
@@ -407,9 +411,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildBackendCard() {
-    return SectionCard(
+    return _Group(
       title: _l10n.backendTitle,
-      icon: Icons.cloud_outlined,
       child: TextField(
         controller: _backendController,
         keyboardType: TextInputType.url,
@@ -425,22 +428,47 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildSideCard(AppSettings settings) {
-    return SectionCard(
-      title: _l10n.homeYourSide,
-      icon: Icons.flag_outlined,
+  /// Your side, the capture area (Android) and the move-notation language.
+  Widget _buildGameCard(AppSettings settings) {
+    final l10n = _l10n;
+    final theme = Theme.of(context);
+    final native = ref.read(nativeSolverProvider);
+    return _Group(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            _l10n.settingsYourSideDesc,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Text(l10n.homeYourSide, style: theme.textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(l10n.settingsYourSideDesc, style: theme.textTheme.bodySmall),
           const SizedBox(height: 12),
-          SideSelector(
-            value: settings.mySide,
-            onChanged: (side) =>
-                _notifier.patch((s) => s.copyWith(mySide: side)),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SideTokenPicker(
+              value: settings.mySide,
+              onChanged: (side) => _notifier.patch((s) => s.copyWith(mySide: side)),
+            ),
+          ),
+          if (native.isSupported) ...[
+            const Divider(height: 32),
+            _buildCaptureArea(),
+          ],
+          const Divider(height: 32),
+          // Chess move-notation output language (independent of the UI language).
+          DropdownButtonFormField<String>(
+            // Long labels ellipsize instead of overflowing at large text sizes.
+            isExpanded: true,
+            initialValue: settings.language,
+            decoration: InputDecoration(
+              labelText: l10n.settingsMoveNotationLanguage,
+            ),
+            items: const [
+              DropdownMenuItem(value: 'en', child: Text('English')),
+              DropdownMenuItem(value: 'vi', child: Text('Tiếng Việt')),
+              DropdownMenuItem(value: 'zh', child: Text('中文')),
+            ],
+            onChanged: (v) {
+              if (v != null) _notifier.patch((s) => s.copyWith(language: v));
+            },
           ),
         ],
       ),
@@ -448,9 +476,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildProvidersCard(AppSettings settings) {
-    return SectionCard(
+    return _Group(
       title: _l10n.providersTitle,
-      icon: Icons.tune,
       child: Column(
         children: [
           AiProviderDropdown(
@@ -470,9 +497,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildEngineCard(AppSettings settings) {
     final l10n = _l10n;
-    return SectionCard(
+    return _Group(
       title: l10n.settingsEngineTuning,
-      icon: Icons.memory_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -544,46 +570,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// Android-only: manage the optional screen capture focus area. Selecting an
   /// area is driven by the floating overlay (it needs Solver Mode running), but
   /// resetting to full screen works any time.
-  Widget _buildCaptureAreaCard() {
-    final native = ref.read(nativeSolverProvider);
-    if (!native.isSupported) return const SizedBox.shrink();
+  Widget _buildCaptureArea() {
     final l10n = _l10n;
+    final theme = Theme.of(context);
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionCard(
-          title: l10n.settingsCaptureArea,
-          icon: Icons.crop_free,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.settingsCaptureAreaDesc,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _selectCaptureArea,
-                      icon: const Icon(Icons.crop),
-                      label: Text(l10n.settingsSelectArea),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextButton.icon(
-                      onPressed: _resetCaptureArea,
-                      icon: const Icon(Icons.fullscreen),
-                      label: Text(l10n.settingsUseFullScreen),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+        Text(l10n.settingsCaptureArea, style: theme.textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Text(l10n.settingsCaptureAreaDesc, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 12),
+        // A Wrap, so the two buttons stack instead of squeezing at large text.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: _selectCaptureArea,
+              icon: const Icon(Icons.crop),
+              label: Text(l10n.settingsSelectArea),
+            ),
+            TextButton.icon(
+              onPressed: _resetCaptureArea,
+              icon: const Icon(Icons.fullscreen),
+              label: Text(l10n.settingsUseFullScreen),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
       ],
     );
   }
@@ -608,16 +621,42 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Widget _buildLanguageCard(AppSettings settings) {
+  /// Theme (system / light / dark) and the app's UI language.
+  Widget _buildAppearanceCard(AppSettings settings) {
     final l10n = _l10n;
-    return SectionCard(
-      title: l10n.settingsLanguageCard,
-      icon: Icons.language_outlined,
+    final theme = Theme.of(context);
+    return _Group(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(l10n.settingsTheme, style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          // Labels only: three icons + labels squeeze "System" onto two lines.
+          SegmentedButton<String>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(
+                value: 'system',
+                label: Text(l10n.themeSystem),
+              ),
+              ButtonSegment(
+                value: 'light',
+                label: Text(l10n.themeLight),
+              ),
+              ButtonSegment(
+                value: 'dark',
+                label: Text(l10n.themeDark),
+              ),
+            ],
+            selected: {settings.themeMode},
+            onSelectionChanged: (v) =>
+                _notifier.patch((s) => s.copyWith(themeMode: v.first)),
+          ),
+          const SizedBox(height: 20),
           // App UI language. Changing this re-localizes the whole app live.
           DropdownButtonFormField<String>(
+            // Long labels ellipsize instead of overflowing at large text sizes.
+            isExpanded: true,
             initialValue: settings.appLanguage,
             decoration: InputDecoration(
               labelText: l10n.settingsAppLanguage,
@@ -631,22 +670,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               if (v != null) _notifier.patch((s) => s.copyWith(appLanguage: v));
             },
           ),
-          const SizedBox(height: 12),
-          // Chess move-notation output language (independent of the UI language).
-          DropdownButtonFormField<String>(
-            initialValue: settings.language,
-            decoration: InputDecoration(
-              labelText: l10n.settingsMoveNotationLanguage,
-            ),
-            items: const [
-              DropdownMenuItem(value: 'en', child: Text('English')),
-              DropdownMenuItem(value: 'vi', child: Text('Tiếng Việt')),
-              DropdownMenuItem(value: 'zh', child: Text('中文')),
-            ],
-            onChanged: (v) {
-              if (v != null) _notifier.patch((s) => s.copyWith(language: v));
-            },
-          ),
         ],
       ),
     );
@@ -654,9 +677,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildPrivacyCard(AppSettings settings) {
     final l10n = _l10n;
-    return SectionCard(
-      title: l10n.settingsPrivacy,
-      icon: Icons.privacy_tip_outlined,
+    return _Group(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -699,9 +720,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             leading: const Icon(Icons.policy_outlined),
             title: Text(l10n.settingsPrivacyPolicy),
             trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: _openPrivacyPolicy,
+            onTap: () => openPrivacyPolicy(context),
           ),
-          if (ref.watch(remoteConfigProvider).showLicenses)
+        ],
+      ),
+    );
+  }
+
+  /// Version, the welcome guide, licences / device id (remote-gated) and the
+  /// admin entry (admin devices only).
+  Widget _buildAboutCard({required bool isAdmin}) {
+    final l10n = _l10n;
+    final config = ref.watch(remoteConfigProvider);
+    return _Group(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FutureBuilder<PackageInfo>(
+            future: _packageInfo,
+            builder: (context, snapshot) {
+              final info = snapshot.data;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.info_outline_rounded),
+                title: Text(l10n.settingsVersion),
+                subtitle: Text(info == null ? '—' : '${info.version} (${info.buildNumber})'),
+              );
+            },
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.waving_hand_outlined),
+            title: Text(l10n.settingsWelcomeGuide),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () => showWelcomeSheet(context),
+          ),
+          if (config.showLicenses)
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.description_outlined),
@@ -712,7 +767,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 applicationName: _l10n.appTitle,
               ),
             ),
-          if (ref.watch(remoteConfigProvider).showDeviceId) _buildDeviceIdTile(),
+          if (config.showDeviceId) _buildDeviceIdTile(),
+          if (isAdmin)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.admin_panel_settings_outlined),
+              title: Text(l10n.adminSettingsEntry),
+              trailing: const Icon(Icons.chevron_right, size: 18),
+              onTap: () => context.push(AppRoutes.admin),
+            ),
         ],
       ),
     );
@@ -741,16 +804,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       },
     );
   }
+}
 
-  Future<void> _openPrivacyPolicy() async {
-    final uri = Uri.parse(AppConstants.privacyPolicyUrl);
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(content: Text(_l10n.settingsPrivacyOpenFailed)),
-        );
-    }
+/// One settings group: a card with an optional title.
+class _Group extends StatelessWidget {
+  const _Group({
+    required this.child,
+    this.title,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  final Widget child;
+  final String? title;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: padding,
+        child: title == null
+            ? child
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(title!, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  child,
+                ],
+              ),
+      ),
+    );
   }
 }

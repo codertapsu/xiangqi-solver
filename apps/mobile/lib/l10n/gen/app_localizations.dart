@@ -2143,6 +2143,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Advanced'**
   String get settingsGroupAdvanced;
+
+  /// No description provided for @settingsGroupAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis'**
+  String get settingsGroupAnalysis;
+
+  /// No description provided for @settingsGroupGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Game'**
+  String get settingsGroupGame;
+
+  /// No description provided for @settingsGroupAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsGroupAppearance;
+
+  /// No description provided for @settingsGroupAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsGroupAbout;
+
+  /// No description provided for @settingsTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsTheme;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get themeSystem;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @settingsVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get settingsVersion;
+
+  /// No description provided for @settingsWelcomeGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome guide'**
+  String get settingsWelcomeGuide;
 }
 
 class _AppLocalizationsDelegate

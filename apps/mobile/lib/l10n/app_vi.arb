@@ -375,5 +375,16 @@
   "solverPermOverlayBody": "Để hiện nút nổi ngay trên ván cờ của bạn.",
   "solverPermCaptureTitle": "Chụp màn hình",
   "solverPermCaptureBody": "Để ứng dụng chụp màn hình khi bạn chạm Phân tích. Chỉ ảnh đó được sử dụng.",
-  "settingsGroupAdvanced": "Nâng cao"
+  "settingsGroupAdvanced": "Nâng cao",
+
+  "settingsGroupAnalysis": "Phân tích",
+  "settingsGroupGame": "Ván cờ",
+  "settingsGroupAppearance": "Giao diện",
+  "settingsGroupAbout": "Giới thiệu",
+  "settingsTheme": "Chủ đề",
+  "themeSystem": "Hệ thống",
+  "themeLight": "Sáng",
+  "themeDark": "Tối",
+  "settingsVersion": "Phiên bản",
+  "settingsWelcomeGuide": "Hướng dẫn bắt đầu"
 }
