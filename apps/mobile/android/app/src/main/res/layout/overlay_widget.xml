@@ -81,7 +81,7 @@
                 android:layout_width="42dp"
                 android:layout_height="42dp"
                 android:background="@drawable/overlay_sub_bg"
-                android:backgroundTint="#FF1E88E5"
+                android:backgroundTint="#FF7C5A0E"
                 android:contentDescription="@string/overlay_menu_select_area"
                 android:padding="11dp"
                 android:scaleType="fitCenter"
@@ -97,7 +97,7 @@
                 android:minWidth="64dp"
                 android:layout_marginStart="10dp"
                 android:background="@drawable/overlay_pill_bg"
-                android:backgroundTint="#FFE53935"
+                android:backgroundTint="#FFB3261E"
                 android:contentDescription="@string/overlay_menu_switch_side"
                 android:gravity="center"
                 android:paddingStart="14dp"
@@ -113,7 +113,7 @@
                 android:layout_height="42dp"
                 android:layout_marginStart="10dp"
                 android:background="@drawable/overlay_sub_bg"
-                android:backgroundTint="#FFE53935"
+                android:backgroundTint="#FF3A2F2A"
                 android:contentDescription="@string/overlay_menu_stop"
                 android:padding="11dp"
                 android:scaleType="fitCenter"
@@ -141,7 +141,7 @@
             android:id="@+id/result_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FF8BC34A"
+            android:textColor="#FFE9BE62"
             android:textSize="15sp"
             android:textStyle="bold" />
 
@@ -150,7 +150,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textColor="#FFFFFFFF"
+            android:textColor="#FFFBEFE3"
             android:textSize="13sp"
             android:visibility="gone" />
     </LinearLayout>

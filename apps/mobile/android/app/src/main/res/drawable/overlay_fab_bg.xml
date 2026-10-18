@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Circular background for the main floating action button. -->
+<!-- Circular background for the main floating action button: a cinnabar
+     lacquer disc with a gold rim (docs/DESIGN.md "Sơn Mài"). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
     <gradient
         android:angle="270"
-        android:startColor="#FFE53935"
-        android:endColor="#FFB71C1C" />
+        android:startColor="#FFC62A1C"
+        android:endColor="#FF8E1410" />
     <stroke
         android:width="2dp"
-        android:color="#33FFFFFF" />
+        android:color="#E6D9A441" />
 </shape>

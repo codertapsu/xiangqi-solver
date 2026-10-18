@@ -2,6 +2,7 @@ package com.codertapsu.xiangqi_solver
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -47,18 +48,20 @@ class RegionSelectionOverlay(private val context: Context) {
         val controls = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(24, 16, 24, 16)
-            setBackgroundColor(0xCC000000.toInt())
+            setBackgroundColor(0xE61F1714.toInt())
         }
         controls.addView(makeButton("Full screen") {
             CaptureRegionHolder.clear(context)
             dismiss()
         })
         controls.addView(makeButton("Cancel") { dismiss() })
-        controls.addView(makeButton("Use this area") {
-            val r = selector.normalizedRegion()
-            CaptureRegionHolder.set(context, r.left, r.top, r.right, r.bottom)
-            dismiss()
-        })
+        controls.addView(
+            makeButton("Use this area", primary = true) {
+                val r = selector.normalizedRegion()
+                CaptureRegionHolder.set(context, r.left, r.top, r.right, r.bottom)
+                dismiss()
+            },
+        )
 
         val container = FrameLayout(context)
         container.addView(
@@ -154,10 +157,15 @@ class RegionSelectionOverlay(private val context: Context) {
         }
     }
 
-    private fun makeButton(label: String, onClick: () -> Unit): Button {
+    private fun makeButton(label: String, primary: Boolean = false, onClick: () -> Unit): Button {
         return Button(context).apply {
             text = label
             isAllCaps = false
+            if (primary) {
+                // The one confirming action: cinnabar, like the app's main button.
+                backgroundTintList = ColorStateList.valueOf(0xFFB3261E.toInt())
+                setTextColor(Color.WHITE)
+            }
             setOnClickListener { onClick() }
             val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             lp.marginStart = 8
@@ -180,7 +188,7 @@ class RegionSelectionOverlay(private val context: Context) {
         }
         private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-            color = 0xFF4CAF50.toInt()
+            color = 0xFFE9BE62.toInt() // gold handles
         }
         private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE

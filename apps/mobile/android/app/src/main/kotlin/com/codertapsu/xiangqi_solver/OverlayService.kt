@@ -262,7 +262,8 @@ class OverlayService : Service() {
         button.contentDescription =
             getString(R.string.overlay_switch_side_current, sideLabel)
         button.backgroundTintList = ColorStateList.valueOf(
-            if (isRed) 0xFFE53935.toInt() else 0xFF455A64.toInt(),
+            // Cinnabar / ink, as on the in-app side picker.
+            if (isRed) 0xFFB3261E.toInt() else 0xFF2E2622.toInt(),
         )
     }
 
@@ -305,8 +306,8 @@ class OverlayService : Service() {
 
         resultTitle?.setTextColor(
             when (kind) {
-                Constants.OVERLAY_KIND_ERROR -> 0xFFFF8A80.toInt() // soft red
-                else -> 0xFF8BC34A.toInt() // green for a result
+                Constants.OVERLAY_KIND_ERROR -> 0xFFFFB4A9.toInt() // soft cinnabar
+                else -> 0xFFE9BE62.toInt() // gold leaf for a result
             },
         )
         resultTitle?.text = title
