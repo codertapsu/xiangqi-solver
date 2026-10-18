@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xiangqi_solver/l10n/gen/app_localizations.dart';
 
+import '../../../app/theme/app_palette.dart';
 import '../../../core/remote_config/remote_config_provider.dart';
 import '../domain/hint_pack.dart';
 import '../monetization_config.dart';
@@ -26,12 +27,12 @@ Future<void> showGetMoreHintsSheet(BuildContext context) {
 ///  - The content is a [SingleChildScrollView] so it adapts to short screens and
 ///    large accessibility font scales instead of overflowing.
 ///  - The [Column] uses [CrossAxisAlignment.stretch], so every child is laid out
-///    with a TIGHT, bounded width. That is deliberate: the app theme makes
-///    [FilledButton] full-width (`minimumSize: Size.fromHeight(48)` →
-///    width = infinity), and a full-width button laid out with an UNBOUNDED width
-///    (which is what a [Row] does to its non-flex children) throws "BoxConstraints
-///    forces an infinite width". So every button is a direct, full-width child of
-///    the stretch column — never a child of a [Row].
+///    with a TIGHT, bounded width. That is deliberate: a button whose theme asks
+///    for a full width (1.0's theme did: `minimumSize: Size.fromHeight(48)` →
+///    width = infinity) laid out with an UNBOUNDED width (which is what a [Row]
+///    does to its non-flex children) throws "BoxConstraints forces an infinite
+///    width". So every button is a direct, full-width child of the stretch
+///    column — never a child of a [Row].
 ///  - Each pack is itself a full-width button whose label is a [Row]; that inner
 ///    Row inherits the button's bounded width, so its [Expanded] title is safe.
 class GetMoreHintsSheet extends ConsumerStatefulWidget {
@@ -112,7 +113,9 @@ class _GetMoreHintsSheetState extends ConsumerState<GetMoreHintsSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ---- Header ----
+            // ---- Header: the balance as a gold coin ----
+            Center(child: _Coin(count: balance)),
+            const SizedBox(height: 12),
             Text(
               l10n.hintsGetMore,
               style: theme.textTheme.titleLarge,
@@ -121,10 +124,12 @@ class _GetMoreHintsSheetState extends ConsumerState<GetMoreHintsSheet> {
             const SizedBox(height: 6),
             Text(
               l10n.hintsBalance(balance),
-              style: theme.textTheme.bodySmall,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             // ---- Watch an ad (+1 hint, credited locally) — backend-gated ----
             if (_rewardedOn) ...[
@@ -185,14 +190,18 @@ class _PackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
     return OutlinedButton(
       onPressed: onBuy,
       style: OutlinedButton.styleFrom(
         // minWidth 0 (width comes from the stretch column), fixed comfortable
         // height; never request an infinite width here.
-        minimumSize: const Size(0, 56),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        minimumSize: const Size(0, 64),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         alignment: Alignment.centerLeft,
+        foregroundColor: theme.colorScheme.onSurface,
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       // Only fixed-width icons sit beside the flexible middle. The hint count and
       // price are stacked inside an Expanded, so they wrap (the button grows
@@ -200,7 +209,15 @@ class _PackButton extends StatelessWidget {
       // any font scale or screen width.
       child: Row(
         children: [
-          const Icon(Icons.lightbulb_outline),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: palette.gold.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.lightbulb_rounded, color: palette.goldText),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -220,8 +237,41 @@ class _PackButton extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.chevron_right),
+          Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant),
         ],
+      ),
+    );
+  }
+}
+
+/// The balance, drawn as a gold coin.
+class _Coin extends StatelessWidget {
+  const _Coin({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      width: 72,
+      height: 72,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF6D98B), Color(0xFFD9A441), Color(0xFFB07A1C)],
+        ),
+        border: Border.all(color: palette.goldText.withValues(alpha: 0.5), width: 2),
+      ),
+      child: Text(
+        '$count',
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          color: const Color(0xFF3A2900),
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
