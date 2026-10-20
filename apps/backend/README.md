@@ -77,7 +77,7 @@ Every variable has a safe mock default (see `.env.example`).
 | `LOCAL_CODEX_TIMEOUT_MS`           | `620000`                       | Local Codex request deadline                                                |
 | `AI_LOCAL_VISION_PROVIDER`         | `codex`                        | Which local bridge allowlisted devices use: `codex` \| `claude` \| `none`    |
 | `LOCAL_CLAUDE_URL`                 | `http://127.0.0.1:5612`        | Mother Claude HTTP bridge base URL for allowlisted devices                  |
-| `LOCAL_CLAUDE_TOKEN`               | _(empty)_                      | Optional bridge bearer token                                                |
+| `LOCAL_CLAUDE_TOKEN`               | _(empty)_                      | Mother Claude token (Bearer); required while a tunnel points at the bridge  |
 | `LOCAL_CLAUDE_MODEL`               | _(empty)_                      | Model override; empty inherits the bridge default                           |
 | `LOCAL_CLAUDE_EFFORT`              | _(empty)_                      | Effort override; empty inherits the bridge default                          |
 | `LOCAL_CLAUDE_CWD`                 | _(empty)_                      | Conversation working directory; empty uses the bridge default               |
