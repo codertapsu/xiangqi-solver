@@ -353,6 +353,22 @@ describe('LocalClaudeVisionProvider', () => {
     );
   });
 
+  it.each([
+    ['a request budget shorter than the configured timeout wins', 40_000, 40_000],
+    ['the configured timeout caps a longer request budget', 600_000, 180_000],
+    ['no request budget keeps the configured timeout', undefined, 180_000],
+  ])('%s', async (_case, budget, expected) => {
+    scriptFetch([created(), ran(), closed()]);
+    const provider = new LocalClaudeVisionProvider(configWith(), errorLog);
+
+    await provider.extractBoardState({ ...input, timeoutMs: budget });
+
+    const started = loggerLogSpy.mock.calls
+      .map(([message]) => String(message))
+      .find((message) => message.startsWith('Local Claude request started'));
+    expect(started).toContain(`"timeoutMs":${expected}`);
+  });
+
   it('describes an unreachable bridge without losing the underlying cause', async () => {
     const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5612'), {
       code: 'ECONNREFUSED',

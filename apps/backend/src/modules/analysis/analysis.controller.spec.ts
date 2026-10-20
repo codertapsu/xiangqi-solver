@@ -1,7 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
-import { AnalysisController, STREAM_HEARTBEAT_MS } from './analysis.controller';
+import {
+  AnalysisController,
+  STREAM_HEARTBEAT_MS,
+  SYNC_LOCAL_VISION_BUDGET_MS,
+} from './analysis.controller';
 import { AnalysisService } from './analysis.service';
 import { AnalysisResult, ExtractionResult } from './analysis.types';
 import { AnalyzeScreenshotDto } from './dto/analyze-screenshot.dto';
@@ -116,8 +120,13 @@ describe('AnalysisController', () => {
       const dto = new AnalyzeScreenshotDto();
       const result = await controller.analyzeScreenshot(fakeFile(), dto, '  device-main  ');
       expect(service.analyzeScreenshot).toHaveBeenCalledTimes(1);
+      // Not streamed, so the app's 60 s limit applies: the local bridge gets a
+      // capped budget and the cloud fallback still has time to answer.
       expect(service.analyzeScreenshot).toHaveBeenCalledWith(
-        expect.objectContaining({ deviceId: 'device-main' }),
+        expect.objectContaining({
+          deviceId: 'device-main',
+          localBudgetMs: SYNC_LOCAL_VISION_BUDGET_MS,
+        }),
       );
       expect(result).toBe(sampleResult);
     });
@@ -142,6 +151,8 @@ describe('AnalysisController', () => {
     expect(service.analyzeScreenshot).toHaveBeenCalledWith(
       expect.objectContaining({ deviceId: 'device-stream' }),
     );
+    // Keep-alives hold the stream open, so the bridge keeps its full timeout.
+    expect(service.analyzeScreenshot.mock.calls[0][0].localBudgetMs).toBeUndefined();
   });
 
   describe('analyzeScreenshotStream keep-alive', () => {
@@ -232,7 +243,10 @@ describe('AnalysisController', () => {
     );
 
     expect(service.extractBoard).toHaveBeenCalledWith(
-      expect.objectContaining({ deviceId: 'device-extract' }),
+      expect.objectContaining({
+        deviceId: 'device-extract',
+        localBudgetMs: SYNC_LOCAL_VISION_BUDGET_MS,
+      }),
     );
     expect(result).toBe(sampleExtraction);
   });

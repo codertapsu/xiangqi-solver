@@ -82,7 +82,7 @@ Every variable has a safe mock default (see `.env.example`).
 | `LOCAL_CLAUDE_EFFORT`              | _(empty)_                      | Effort override; empty inherits the bridge default                          |
 | `LOCAL_CLAUDE_CWD`                 | _(empty)_                      | Conversation working directory; empty uses the bridge default               |
 | `LOCAL_CLAUDE_PERMISSION_MODE`     | `default`                      | Bridge permission mode for the one-shot vision conversation                 |
-| `LOCAL_CLAUDE_TIMEOUT_MS`          | `180000`                       | Local Claude request deadline                                               |
+| `LOCAL_CLAUDE_TIMEOUT_MS`          | `180000`                       | Local Claude request deadline (non-streaming requests cap it at 40 s)       |
 | `VISION_PREPROCESS`                | `true`                         | sharp preprocessing (EXIF rotate + downscale + JPEG) before the vision call |
 | `VISION_IMAGE_SHORT_SIDE`          | `768`                          | Downscale budget: shortest side (px)                                        |
 | `VISION_IMAGE_LONG_SIDE`           | `2048`                         | Downscale budget: longest side (px)                                         |
@@ -122,6 +122,16 @@ restart), and `data/` is not part of the release rsync, so create it on each
 server by hand. A device ID is not a secret — it travels in a request header,
 and Settings can show it when the remote `ui.deviceId` flag is on — so list only
 your own devices.
+
+#### Slow local reads and the app's 60-second limit
+
+The app gives up when no byte arrives for 60 s. The streaming endpoint
+(`/screenshot/stream`, used by default) sends a `{"stage":"waiting"}` line every
+15 s while the bridge works, so a local read may take the bridge's full
+`LOCAL_CLAUDE_TIMEOUT_MS` / `LOCAL_CODEX_TIMEOUT_MS`. The JSON endpoints
+(`/extract`, used with the on-device engine, and `/screenshot`) can't send
+anything early, so they cap the local attempt at 40 s and leave the cloud
+fallback time to answer.
 
 #### Choosing the bridge — exactly one, never both
 

@@ -376,8 +376,10 @@ describe('AiService Local Codex device routing', () => {
     return {
       name,
       calls: 0,
-      async extractBoardState(): Promise<ExtractBoardStateResult> {
+      timeouts: [] as (number | undefined)[],
+      async extractBoardState(input: ExtractBoardStateInput): Promise<ExtractBoardStateResult> {
         this.calls++;
+        this.timeouts.push(input.timeoutMs);
         if (options.localFails) throw new Error('bridge unavailable');
         return usable(`from ${name}`);
       },
@@ -394,8 +396,10 @@ describe('AiService Local Codex device routing', () => {
     const standard = {
       name: 'apikeyfun',
       calls: 0,
-      async extractBoardState(): Promise<ExtractBoardStateResult> {
+      timeouts: [] as (number | undefined)[],
+      async extractBoardState(input: ExtractBoardStateInput): Promise<ExtractBoardStateResult> {
         this.calls++;
+        this.timeouts.push(input.timeoutMs);
         return usable('from standard');
       },
     };
@@ -511,6 +515,22 @@ describe('AiService Local Codex device routing', () => {
         /Local Claude vision was unavailable/.test(warning),
       ),
     ).toBe(true);
+  });
+
+  it('caps only the local attempt with the request budget', async () => {
+    const { service, claude, standard } = setup({
+      allowed: true,
+      selected: 'claude',
+      localFails: true,
+    });
+    await service.extractBoardStateForRequest(input, undefined, {
+      deviceId: 'device-allowed',
+      localBudgetMs: 40_000,
+    });
+
+    expect(claude.timeouts).toEqual([40_000]);
+    // The cloud fallback keeps its own timeout.
+    expect(standard.timeouts).toEqual([undefined]);
   });
 
   it('skips both bridges — and the allowlist read — when none is selected', async () => {

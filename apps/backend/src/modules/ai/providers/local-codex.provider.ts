@@ -60,7 +60,10 @@ export class LocalCodexVisionProvider implements AiVisionProvider {
     const token = ai?.localCodexToken?.trim() || '';
     const model = input.modelOverride?.trim() || ai?.localCodexModel?.trim() || '';
     const reasoningEffort = ai?.localCodexReasoningEffort?.trim() || '';
-    const timeoutMs = ai?.localCodexTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = Math.min(
+      ai?.localCodexTimeoutMs ?? DEFAULT_TIMEOUT_MS,
+      input.timeoutMs ?? Number.POSITIVE_INFINITY,
+    );
     const endpoint = `${baseUrl.replace(/\/+$/, '')}/chat`;
     const dataUrl = `data:${input.mimeType};base64,${input.imageBuffer.toString('base64')}`;
     const hint = this.hintText(input.sideToMoveHint);

@@ -108,7 +108,10 @@ export class LocalClaudeVisionProvider implements AiVisionProvider {
     const effort = ai?.localClaudeEffort?.trim() || '';
     const cwd = ai?.localClaudeCwd?.trim() || '';
     const permissionMode = ai?.localClaudePermissionMode?.trim() || 'default';
-    const timeoutMs = ai?.localClaudeTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = Math.min(
+      ai?.localClaudeTimeoutMs ?? DEFAULT_TIMEOUT_MS,
+      input.timeoutMs ?? Number.POSITIVE_INFINITY,
+    );
     const startedAt = Date.now();
 
     const context = {

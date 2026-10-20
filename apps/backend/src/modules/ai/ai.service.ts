@@ -19,10 +19,15 @@ import { LocalCodexVisionAllowlist } from './local-codex-vision.allowlist';
 
 export type AiProviderName = 'gemini' | 'openai' | 'apikeyfun' | 'mock';
 
-/** Request-scoped inputs that decide whether a local bridge runs. */
+/** Request-scoped inputs that decide whether, and for how long, a local bridge runs. */
 export interface LocalVisionRouting {
   /** `x-device-id` — matched against the local-vision allowlist. */
   deviceId?: string;
+  /**
+   * Cap on the local attempt, so the cloud fallback can still answer before
+   * the client gives up. Unset = the bridge's configured timeout.
+   */
+  localBudgetMs?: number;
 }
 
 /** Device-aware extraction result, including the provider that produced it. */
@@ -169,7 +174,7 @@ export class AiService {
 
     try {
       return {
-        result: await this.extractVia(local, input),
+        result: await this.extractVia(local, { ...input, timeoutMs: routing.localBudgetMs }),
         providerName: local.name,
       };
     } catch (err) {
@@ -235,6 +240,7 @@ export class AiService {
       imageBuffer: buffer,
       mimeType,
       sideToMoveHint: input.sideToMoveHint,
+      timeoutMs: input.timeoutMs,
     };
 
     let result = await impl.extractBoardState(baseInput);

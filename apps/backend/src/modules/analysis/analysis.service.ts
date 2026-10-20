@@ -45,6 +45,8 @@ export interface AnalyzeScreenshotParams extends EngineOptions {
   mimeType: string;
   /** Stable x-device-id used for server-side provider rollout routing. */
   deviceId?: string;
+  /** Cap on a local-bridge attempt (see LocalVisionRouting.localBudgetMs). */
+  localBudgetMs?: number;
   provider?: AiProviderName;
   sideToMove?: SideToMove;
   language?: NotationLanguage;
@@ -62,6 +64,8 @@ export interface ExtractScreenshotParams {
   mimeType: string;
   /** Stable x-device-id used for server-side provider rollout routing. */
   deviceId?: string;
+  /** Cap on a local-bridge attempt (see LocalVisionRouting.localBudgetMs). */
+  localBudgetMs?: number;
   provider?: AiProviderName;
   sideToMove?: SideToMove;
 }
@@ -151,7 +155,7 @@ export class AnalysisService {
           sideToMoveHint: params.sideToMove,
         },
         params.provider,
-        { deviceId: params.deviceId },
+        { deviceId: params.deviceId, localBudgetMs: params.localBudgetMs },
       );
       extraction = outcome.result;
       visionName = outcome.providerName;

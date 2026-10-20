@@ -35,6 +35,15 @@ const ACCEPTED_MIME_TYPES: readonly DetectedImageType[] = ['image/png', 'image/j
 export const STREAM_HEARTBEAT_MS = 15_000;
 
 /**
+ * How long a NON-streaming request (/screenshot, /extract) lets a local vision
+ * bridge try before the cloud provider takes over. Those responses can't carry
+ * keep-alives and the app gives up after 60 s without a byte, so the local
+ * attempt must leave the fallback time to answer. The streaming endpoint keeps
+ * the connection alive and gives the bridge its full configured timeout.
+ */
+export const SYNC_LOCAL_VISION_BUDGET_MS = 40_000;
+
+/**
  * Analysis endpoints. Both return an AnalysisResult under the standard
  * { success, data } envelope (applied globally by the ResponseInterceptor).
  *
@@ -78,6 +87,7 @@ export class AnalysisController {
       // mislabeled-but-valid image is sent to the vision API correctly.
       mimeType: upload.mimeType,
       deviceId: this.normalizeDeviceId(deviceId),
+      localBudgetMs: SYNC_LOCAL_VISION_BUDGET_MS,
       provider: dto.provider,
       sideToMove: dto.sideToMove,
       engineProvider: dto.engineProvider,
@@ -208,6 +218,7 @@ export class AnalysisController {
       imageBuffer: upload.buffer,
       mimeType: upload.mimeType,
       deviceId: this.normalizeDeviceId(deviceId),
+      localBudgetMs: SYNC_LOCAL_VISION_BUDGET_MS,
       provider: dto.provider,
       sideToMove: dto.sideToMove,
     });

@@ -258,7 +258,7 @@ Recognize a board from a screenshot, normalize it, then run the engine.
 
 | Header                 | Required | Notes                                                                                                                                                                        |
 | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap. A device listed in `local-codex-vision-devices.json` is read by the local vision bridge first (cloud fallback on any failure). |
+| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap. A device listed in `local-codex-vision-devices.json` is read by the local vision bridge first (cloud fallback on any failure); on this non-streaming endpoint that attempt is capped at 40 s. |
 
 **Fields:**
 
@@ -411,7 +411,7 @@ running the engine**. Intended for clients that compute the move themselves
 
 | Header                 | Required | Notes                                                                                                                                                                        |
 | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap. A device listed in `local-codex-vision-devices.json` is read by the local vision bridge first (cloud fallback on any failure). |
+| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap. A device listed in `local-codex-vision-devices.json` is read by the local vision bridge first (cloud fallback on any failure); on this non-streaming endpoint that attempt is capped at 40 s. |
 
 **Fields:**
 

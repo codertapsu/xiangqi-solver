@@ -8,6 +8,9 @@ export interface ExtractBoardStateInput {
   /** Override the configured model for this one call (used by the accuracy
    *  cascade to re-read a weak board on a stronger model). */
   modelOverride?: string;
+  /** Local bridges only: give up after this many ms, if that is sooner than
+   *  the bridge's configured timeout (see LocalVisionRouting.localBudgetMs). */
+  timeoutMs?: number;
 }
 
 /** Structured board state extracted from an image (never a move). */
