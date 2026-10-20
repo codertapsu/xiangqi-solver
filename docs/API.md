@@ -365,6 +365,9 @@ nginx/Caddy proxy buffering so stages reach the client live).
 ```
 
 - `received` — upload accepted (sent immediately after validation).
+- `waiting` — keep-alive, sent every 15 s while a stage is still running (a
+  local vision bridge can take minutes). It carries no data; clients must
+  ignore it, and any other stage they don't recognize.
 - `board` — vision + board repair done, **before** the engine runs. The
   `board` object is `{ sideToMove, fen, pieces, confidence, warnings }`
   (pieces in the output shape, with nested `position`).

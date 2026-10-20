@@ -27,6 +27,14 @@ import { DeviceRateLimitGuard } from '../../common/guards/device-rate-limit.guar
 const ACCEPTED_MIME_TYPES: readonly DetectedImageType[] = ['image/png', 'image/jpeg', 'image/webp'];
 
 /**
+ * How often the NDJSON stream sends a `{"stage":"waiting"}` keep-alive while a
+ * stage is still running. A local vision bridge can take minutes to read the
+ * board, and clients time out on the gap BETWEEN chunks (the app allows 60 s),
+ * as do idle proxies and NAT entries. Clients ignore stages they don't know.
+ */
+export const STREAM_HEARTBEAT_MS = 15_000;
+
+/**
  * Analysis endpoints. Both return an AnalysisResult under the standard
  * { success, data } envelope (applied globally by the ResponseInterceptor).
  *
@@ -97,6 +105,8 @@ export class AnalysisController {
    * each stage completes, so the client can render the recognized board while
    * the engine is still searching. Stages:
    *   {"stage":"received"}                          - upload accepted
+   *   {"stage":"waiting"}                           - keep-alive, every
+   *                                                   STREAM_HEARTBEAT_MS while busy
    *   {"stage":"board","board":{...}}               - vision + repair done
    *   {"stage":"done","data":<AnalysisResult>}      - engine + notation done
    *   {"stage":"error","error":{code,message}}      - failure after streaming began
@@ -137,9 +147,12 @@ export class AnalysisController {
     // Disable proxy buffering (nginx/Caddy) so stages reach the client live.
     res.setHeader('X-Accel-Buffering', 'no');
     const write = (obj: unknown): void => {
+      // The client may have gone away mid-analysis; don't write to a dead socket.
+      if (res.writableEnded || res.destroyed) return;
       res.write(`${JSON.stringify(obj)}\n`);
     };
     write({ stage: 'received' });
+    const heartbeat = setInterval(() => write({ stage: 'waiting' }), STREAM_HEARTBEAT_MS);
 
     try {
       const result = await this.analysisService.analyzeScreenshot({
@@ -164,6 +177,7 @@ export class AnalysisController {
       // (mirrors the envelope's { code, message } shape).
       write({ stage: 'error', error: this.streamError(err) });
     } finally {
+      clearInterval(heartbeat);
       res.end();
     }
   }

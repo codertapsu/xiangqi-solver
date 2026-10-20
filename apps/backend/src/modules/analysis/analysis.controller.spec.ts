@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
-import { AnalysisController } from './analysis.controller';
+import { AnalysisController, STREAM_HEARTBEAT_MS } from './analysis.controller';
 import { AnalysisService } from './analysis.service';
 import { AnalysisResult, ExtractionResult } from './analysis.types';
 import { AnalyzeScreenshotDto } from './dto/analyze-screenshot.dto';
@@ -169,6 +169,84 @@ describe('AnalysisController', () => {
     expect(service.analyzeScreenshot).toHaveBeenCalledWith(
       expect.objectContaining({ deviceId: 'device-stream', localVisionToken: 'rollout-secret' }),
     );
+  });
+
+  describe('analyzeScreenshotStream keep-alive', () => {
+    afterEach(() => jest.useRealTimers());
+
+    function streamResponse(): { response: Response; lines: () => unknown[] } {
+      const write = jest.fn();
+      const response = {
+        status: jest.fn().mockReturnThis(),
+        setHeader: jest.fn(),
+        write,
+        end: jest.fn(),
+      } as unknown as Response;
+      const lines = (): unknown[] =>
+        write.mock.calls.map(([chunk]) => JSON.parse(String(chunk).trim()) as unknown);
+      return { response, lines };
+    }
+
+    it('sends waiting lines while a slow vision stage runs, then stops', async () => {
+      jest.useFakeTimers();
+      const { controller, service } = buildController();
+      let finish: (value: AnalysisResult) => void = () => undefined;
+      service.analyzeScreenshot.mockReturnValue(
+        new Promise<AnalysisResult>((resolve) => (finish = resolve)),
+      );
+      const { response, lines } = streamResponse();
+
+      const done = controller.analyzeScreenshotStream(
+        fakeFile(),
+        new AnalyzeScreenshotDto(),
+        response,
+      );
+      await jest.advanceTimersByTimeAsync(STREAM_HEARTBEAT_MS * 3);
+      expect(lines()).toEqual([
+        { stage: 'received' },
+        { stage: 'waiting' },
+        { stage: 'waiting' },
+        { stage: 'waiting' },
+      ]);
+
+      finish(sampleResult);
+      await done;
+      await jest.advanceTimersByTimeAsync(STREAM_HEARTBEAT_MS * 3);
+      expect(lines().slice(4)).toEqual([{ stage: 'done', data: sampleResult }]);
+      expect(response.end).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops the keep-alive when the analysis fails', async () => {
+      jest.useFakeTimers();
+      const { controller, service } = buildController();
+      service.analyzeScreenshot.mockRejectedValue(new Error('boom'));
+      const { response, lines } = streamResponse();
+
+      await controller.analyzeScreenshotStream(fakeFile(), new AnalyzeScreenshotDto(), response);
+      await jest.advanceTimersByTimeAsync(STREAM_HEARTBEAT_MS * 2);
+
+      expect(lines()).toEqual([
+        { stage: 'received' },
+        {
+          stage: 'error',
+          error: { code: 'INTERNAL_ERROR', message: 'Analysis failed unexpectedly.' },
+        },
+      ]);
+    });
+
+    it('does not write after the client has disconnected', async () => {
+      jest.useFakeTimers();
+      const { controller, service } = buildController();
+      service.analyzeScreenshot.mockReturnValue(new Promise<AnalysisResult>(() => undefined));
+      const { response, lines } = streamResponse();
+
+      void controller.analyzeScreenshotStream(fakeFile(), new AnalyzeScreenshotDto(), response);
+      await jest.advanceTimersByTimeAsync(0);
+      (response as unknown as { destroyed: boolean }).destroyed = true;
+      await jest.advanceTimersByTimeAsync(STREAM_HEARTBEAT_MS * 2);
+
+      expect(lines()).toEqual([{ stage: 'received' }]);
+    });
   });
 
   it('forwards the device ID for vision-only extraction', async () => {
