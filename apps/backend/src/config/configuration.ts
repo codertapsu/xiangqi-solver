@@ -25,10 +25,6 @@ export interface AppConfig {
     /** Which local bridge an allowlisted device tries first. At most one runs:
      *  Local Codex and Local Claude are mutually exclusive by construction. */
     localVisionProvider: 'codex' | 'claude' | 'none';
-    /** Shared secret (header `x-local-vision-token`) required ALONGSIDE the
-     *  device allowlist before any request reaches a local bridge. Empty
-     *  disables the local-bridge path entirely. */
-    localVisionRolloutToken: string;
     /** Codex HTTP bridge used for device-gated Local Codex vision. */
     localCodexUrl: string;
     localCodexToken: string;
@@ -153,7 +149,6 @@ export function configuration(): { app: AppConfig } {
       localCodexReasoningEffort: env.LOCAL_CODEX_REASONING_EFFORT,
       localCodexTimeoutMs: env.LOCAL_CODEX_TIMEOUT_MS,
       localVisionProvider: env.AI_LOCAL_VISION_PROVIDER,
-      localVisionRolloutToken: env.LOCAL_VISION_ROLLOUT_TOKEN,
       localClaudeUrl: env.LOCAL_CLAUDE_URL,
       localClaudeToken: env.LOCAL_CLAUDE_TOKEN,
       localClaudeModel: env.LOCAL_CLAUDE_MODEL,

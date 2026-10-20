@@ -258,8 +258,7 @@ Recognize a board from a screenshot, normalize it, then run the engine.
 
 | Header                 | Required | Notes                                                                                                                                                                        |
 | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap and identifies a local-vision rollout device. **Public value** (Settings shows it so users can share it for hint grants) — it authorizes nothing on its own. |
-| `x-local-vision-token` | no       | Must equal `LOCAL_VISION_ROLLOUT_TOKEN` for an allowlisted device to be served by a local bridge. Missing/wrong simply uses `AI_PROVIDER` — never an error, so the path cannot be probed. |
+| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap. A device listed in `local-codex-vision-devices.json` is read by the local vision bridge first (cloud fallback on any failure). |
 
 **Fields:**
 
@@ -350,7 +349,7 @@ completes, so the client can render the recognized board while the engine is
 still searching. **Not** wrapped in the response envelope.
 
 **Content-Type (request):** `multipart/form-data` — identical fields **and
-headers** (`x-device-id`, `x-local-vision-token`) to `/screenshot`.
+headers** (`x-device-id`) to `/screenshot`.
 
 **Response headers:** `200 OK`, `Content-Type: application/x-ndjson;
 charset=utf-8`, `Cache-Control: no-cache`, `X-Accel-Buffering: no` (disables
@@ -412,8 +411,7 @@ running the engine**. Intended for clients that compute the move themselves
 
 | Header                 | Required | Notes                                                                                                                                                                        |
 | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap and identifies a local-vision rollout device. **Public value** (Settings shows it so users can share it for hint grants) — it authorizes nothing on its own. |
-| `x-local-vision-token` | no       | Must equal `LOCAL_VISION_ROLLOUT_TOKEN` for an allowlisted device to be served by a local bridge. Missing/wrong simply uses `AI_PROVIDER` — never an error, so the path cannot be probed. |
+| `x-device-id`          | no       | 8–256 chars. Meters the per-device rate cap. A device listed in `local-codex-vision-devices.json` is read by the local vision bridge first (cloud fallback on any failure). |
 
 **Fields:**
 

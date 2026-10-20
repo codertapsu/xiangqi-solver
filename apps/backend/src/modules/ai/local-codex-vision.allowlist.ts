@@ -1,4 +1,3 @@
-import { timingSafeEqual } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Injectable } from '@nestjs/common';
@@ -12,26 +11,18 @@ const MAX_DEVICE_ID_LENGTH = 256;
 /**
  * Runtime gate for routing selected devices through a local vision bridge.
  *
- * Authorization has TWO factors, mirroring [AdminService]:
+ * The gate is `<dataDir>/local-codex-vision-devices.json`, a hand-edited object
+ * whose keys are exact device IDs and whose values are optional operator notes.
+ * Keys beginning with `_` are comments. The file is re-read when its mtime
+ * changes, so rollout changes need no backend restart.
  *
- *  - IDENTITY — `<dataDir>/local-codex-vision-devices.json`, a hand-edited
- *    object whose keys are exact device IDs and whose values are optional
- *    operator notes. Keys beginning with `_` are comments. The file is re-read
- *    when its mtime changes, so rollout changes need no backend restart.
- *  - AUTHORIZATION — `LOCAL_VISION_ROLLOUT_TOKEN`, presented as the
- *    `x-local-vision-token` header and compared in constant time.
+ * Membership alone authorizes the path, so the released app needs nothing new:
+ * it already sends `x-device-id`. The trade-off is that a device ID is not a
+ * secret (it travels in a header, and Settings can show it when the remote
+ * `ui.deviceId` flag is on), so keep this list to your own devices.
  *
- * The device ID alone cannot authorize this path. It is a PUBLIC identifier:
- * the app renders a "Device ID" tile in Settings whose documented purpose is
- * for users to share it with the operator to receive hint grants. Anyone who
- * saw a tester's ID could otherwise send arbitrary images to the operator's own
- * machine on the operator's personal subscription, holding a socket open for
- * the bridge's whole (multi-minute) deadline — and the response's
- * `vision.provider` would confirm each guess.
- *
- * Fails closed everywhere: missing/unreadable/malformed data, an unset token,
- * or a mismatched token all mean "not allowed", and callers continue through
- * the normal cloud provider.
+ * Fails closed: missing/unreadable/malformed data means "not allowed", and
+ * callers continue through the normal cloud provider.
  */
 @Injectable()
 export class LocalCodexVisionAllowlist {
@@ -45,38 +36,7 @@ export class LocalCodexVisionAllowlist {
     return path.join(dataDir, FILE_NAME);
   }
 
-  private get rolloutToken(): string {
-    // Trimmed on BOTH sides of the compare: the presented header is trimmed by
-    // the controller, so a configured value with stray whitespace (an easy .env
-    // typo) would otherwise be a token that can never match anything.
-    return (this.config.get<AppConfig['ai']>('app.ai')?.localVisionRolloutToken ?? '').trim();
-  }
-
-  /**
-   * Full authorization for the local-bridge path: a valid rollout token AND an
-   * allowlisted device. The token is checked first — it is an in-memory compare,
-   * so an unauthorized caller never reaches the allowlist file at all.
-   */
-  async authorize(deviceId: string | undefined, token: string | undefined): Promise<boolean> {
-    return this.verifyRolloutToken(token) && (await this.isAllowlisted(deviceId));
-  }
-
-  /**
-   * Constant-time check of the presented rollout token against
-   * LOCAL_VISION_ROLLOUT_TOKEN. False when no token is configured — the
-   * local-bridge path is then DISABLED, exactly like an unset ADMIN_SECRET
-   * disables admin writes.
-   */
-  verifyRolloutToken(token: string | undefined): boolean {
-    const expected = this.rolloutToken;
-    if (!expected) return false;
-    const a = Buffer.from(token ?? '', 'utf8');
-    const b = Buffer.from(expected, 'utf8');
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  }
-
-  /** Whether an exact, valid device ID is currently allowlisted (identity only). */
+  /** Whether an exact, valid device ID is currently allowlisted. */
   async isAllowlisted(deviceId?: string): Promise<boolean> {
     if (!this.isValidDeviceId(deviceId)) return false;
     await this.refresh();

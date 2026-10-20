@@ -19,18 +19,10 @@ import { LocalCodexVisionAllowlist } from './local-codex-vision.allowlist';
 
 export type AiProviderName = 'gemini' | 'openai' | 'apikeyfun' | 'mock';
 
-/**
- * Request-scoped credentials that decide whether a local bridge may run.
- *
- * Both are client-supplied headers, and only one of them is a secret: the
- * device ID is PUBLIC (users are told to share it to receive hint grants), so
- * it identifies a rollout device but authorizes nothing on its own.
- */
-export interface LocalVisionCredentials {
-  /** `x-device-id` — matched against the rollout allowlist. */
+/** Request-scoped inputs that decide whether a local bridge runs. */
+export interface LocalVisionRouting {
+  /** `x-device-id` — matched against the local-vision allowlist. */
   deviceId?: string;
-  /** `x-local-vision-token` — the unguessable secret that authorizes the path. */
-  rolloutToken?: string;
 }
 
 /** Device-aware extraction result, including the provider that produced it. */
@@ -149,31 +141,26 @@ export class AiService {
 
   /**
    * Device-aware request path used by screenshot endpoints. A device that is
-   * BOTH allowlisted and carrying the rollout token gets one attempt on the
+   * allowlisted (see [LocalCodexVisionAllowlist]) gets one attempt on the
    * selected local bridge. If that attempt throws, run the normally resolved
    * provider (currently apikeyfun) and report that provider as the one that
    * actually produced the board.
    *
    * The local bridges stay out of AiProviderName intentionally: clients cannot
-   * opt themselves into this rollout by posting a provider name. Nor can they
-   * opt in with a device ID alone — that value is published to users, so the
-   * bridge (the operator's own machine and subscription) is gated by a secret
-   * as well; see [LocalCodexVisionAllowlist].
+   * opt themselves into this rollout by posting a provider name — only the
+   * operator's allowlist can; see [LocalCodexVisionAllowlist].
    */
   async extractBoardStateForRequest(
     input: ExtractBoardStateInput,
     provider?: AiProviderName,
-    credentials: LocalVisionCredentials = {},
+    routing: LocalVisionRouting = {},
   ): Promise<VisionExtractionOutcome> {
     const standard = this.resolve(provider);
     const local = this.localProvider();
     // Authorize only when a local bridge could actually serve the request —
     // with none selected there is nothing to gate, and the allowlist file read
     // would be pure overhead on every screenshot.
-    if (
-      !local ||
-      !(await this.localVisionAllowlist.authorize(credentials.deviceId, credentials.rolloutToken))
-    ) {
+    if (!local || !(await this.localVisionAllowlist.isAllowlisted(routing.deviceId))) {
       return {
         result: await this.extractVia(standard, input),
         providerName: standard.name,

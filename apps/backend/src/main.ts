@@ -71,14 +71,15 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  // A bridge is selected but no rollout token is set: the two-factor gate fails
-  // closed, so every device silently uses the cloud provider. Say so once at
-  // boot rather than leaving the operator to wonder why nothing routes.
-  if (appConfig?.ai.localVisionProvider !== 'none' && !appConfig?.ai.localVisionRolloutToken) {
-    logger.warn(
-      `AI_LOCAL_VISION_PROVIDER=${appConfig?.ai.localVisionProvider ?? 'codex'} but ` +
-        'LOCAL_VISION_ROLLOUT_TOKEN is empty - local vision is DISABLED for every device. ' +
-        'Set the token here and have the client send it as x-local-vision-token.',
+  // Say once at boot where allowlisted devices' board reads go, so the operator
+  // can see which bridge (and tunnel URL) this process will try.
+  const localVision = appConfig?.ai.localVisionProvider ?? 'codex';
+  if (localVision !== 'none') {
+    const bridgeUrl =
+      localVision === 'claude' ? appConfig?.ai.localClaudeUrl : appConfig?.ai.localCodexUrl;
+    logger.log(
+      `Local vision: devices in local-codex-vision-devices.json try ${localVision} ` +
+        `at ${bridgeUrl || 'its default URL'} first.`,
     );
   }
 

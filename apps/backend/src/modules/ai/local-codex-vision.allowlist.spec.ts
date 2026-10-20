@@ -5,15 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import { LocalCodexVisionAllowlist } from './local-codex-vision.allowlist';
 
 const FILE_NAME = 'local-codex-vision-devices.json';
-const ROLLOUT_TOKEN = 'rollout-secret-value';
 
-function config(dataDir: string, localVisionRolloutToken = ROLLOUT_TOKEN): ConfigService {
+function config(dataDir: string): ConfigService {
   return {
-    get: (key: string) => {
-      if (key === 'app.hints') return { dataDir };
-      if (key === 'app.ai') return { localVisionRolloutToken };
-      return undefined;
-    },
+    get: (key: string) => (key === 'app.hints' ? { dataDir } : undefined),
   } as unknown as ConfigService;
 }
 
@@ -87,50 +82,13 @@ describe('LocalCodexVisionAllowlist', () => {
     expect(await allowlist.isAllowlisted('device-A')).toBe(true);
   });
 
-  describe('rollout-token authorization', () => {
-    // `x-device-id` is a PUBLIC value — Settings shows it so users can share it
-    // to receive hint grants — so allowlist membership alone must never open the
-    // path to the operator's own machine.
-    beforeEach(async () => {
-      await fs.writeFile(filePath, JSON.stringify({ 'device-A': 'test phone' }));
-    });
+  it('lets an allowlisted device through on its device ID alone', async () => {
+    // The released app sends only x-device-id; membership is the whole gate.
+    await fs.writeFile(filePath, JSON.stringify({ 'device-A': 'test phone' }));
+    const allowlist = new LocalCodexVisionAllowlist(config(dataDir));
 
-    it('authorizes only an allowlisted device that ALSO presents the token', async () => {
-      const allowlist = new LocalCodexVisionAllowlist(config(dataDir));
-
-      expect(await allowlist.authorize('device-A', ROLLOUT_TOKEN)).toBe(true);
-      expect(await allowlist.authorize('device-B', ROLLOUT_TOKEN)).toBe(false);
-    });
-
-    it.each([
-      ['a missing token', undefined],
-      ['an empty token', ''],
-      ['a wrong token', 'some-other-secret-val'],
-      ['a prefix of the token', ROLLOUT_TOKEN.slice(0, 8)],
-      ['the token plus a suffix', `${ROLLOUT_TOKEN}x`],
-    ])('refuses an allowlisted device with %s', async (_case, token) => {
-      const allowlist = new LocalCodexVisionAllowlist(config(dataDir));
-
-      expect(await allowlist.authorize('device-A', token)).toBe(false);
-      expect(allowlist.verifyRolloutToken(token)).toBe(false);
-    });
-
-    it('fails closed when LOCAL_VISION_ROLLOUT_TOKEN is unset — even for the empty string', async () => {
-      const allowlist = new LocalCodexVisionAllowlist(config(dataDir, ''));
-
-      expect(await allowlist.authorize('device-A', '')).toBe(false);
-      expect(await allowlist.authorize('device-A', undefined)).toBe(false);
-      expect(allowlist.verifyRolloutToken('')).toBe(false);
-    });
-
-    it('checks the token BEFORE touching the allowlist file', async () => {
-      const allowlist = new LocalCodexVisionAllowlist(config(dataDir));
-      const statSpy = jest.spyOn(fs, 'stat');
-
-      expect(await allowlist.authorize('device-A', 'wrong-secret-value')).toBe(false);
-      // An unauthorized caller must not be able to make the server do I/O.
-      expect(statSpy).not.toHaveBeenCalled();
-    });
+    expect(await allowlist.isAllowlisted('device-A')).toBe(true);
+    expect(await allowlist.isAllowlisted('device-B')).toBe(false);
   });
 
   it('uses its mtime cache and live-reloads changed membership', async () => {

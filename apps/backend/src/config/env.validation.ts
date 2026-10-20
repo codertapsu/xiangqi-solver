@@ -73,15 +73,6 @@ export const envSchema = z.object({
   // than a pair of flags that could contradict each other. `none` keeps every
   // device on AI_PROVIDER while leaving the bridge settings in place.
   AI_LOCAL_VISION_PROVIDER: z.enum(['codex', 'claude', 'none']).default('codex'),
-  // Shared secret that AUTHORIZES the local-bridge path, presented as the
-  // `x-local-vision-token` header. The device allowlist alone cannot authorize
-  // it: `x-device-id` is a PUBLIC identifier (Settings shows a "Device ID" tile
-  // precisely so users can share it to receive hint grants), so anyone who sees
-  // a tester's id could otherwise aim uploads at the operator's own machine and
-  // personal subscription. Empty = local-bridge routing DISABLED for every
-  // device (fail closed), mirroring ADMIN_SECRET. Generate with
-  // `openssl rand -base64 32` and set it on the backend AND the tester build.
-  LOCAL_VISION_ROLLOUT_TOKEN: z.string().default(''),
   // Device-gated Mother Claude HTTP bridge. Model/effort are optional: blank
   // values inherit the bridge's own defaults, which are chosen on its API
   // screen. The default URL is the bridge's loopback port — a backend running

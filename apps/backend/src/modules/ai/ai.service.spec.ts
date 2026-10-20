@@ -23,7 +23,7 @@ const identityPreprocess = {
 const unusedLocalProvider = {} as LocalCodexVisionProvider;
 const unusedLocalClaudeProvider = {} as LocalClaudeVisionProvider;
 const noLocalDevices = {
-  authorize: async () => false,
+  isAllowlisted: async () => false,
 } as unknown as LocalCodexVisionAllowlist;
 
 /** Mock provider stand-in that counts real extractions. */
@@ -314,13 +314,13 @@ describe('AiService accuracy cascade', () => {
       {} as ApikeyFunVisionProvider,
       unusedLocalProvider,
       bridge as unknown as LocalClaudeVisionProvider,
-      { authorize: async () => true } as unknown as LocalCodexVisionAllowlist,
+      { isAllowlisted: async () => true } as unknown as LocalCodexVisionAllowlist,
     );
 
     const outcome = await service.extractBoardStateForRequest(
       { imageBuffer: Buffer.from('bridge-cascade'), mimeType: 'image/png' },
       undefined,
-      { deviceId: 'device-allowed', rolloutToken: 'rollout-secret' },
+      { deviceId: 'device-allowed' },
     );
 
     // One call, with no model override — the weak read is returned as it is.
@@ -361,8 +361,6 @@ describe('AiService accuracy cascade', () => {
 });
 
 describe('AiService Local Codex device routing', () => {
-  /** Stands in for LOCAL_VISION_ROLLOUT_TOKEN; only requests carrying it may route. */
-  const ROLLOUT_TOKEN = 'rollout-secret';
   const usable = (warning = ''): ExtractBoardStateResult => ({
     boardDetected: true,
     sideToMove: 'red',
@@ -402,12 +400,10 @@ describe('AiService Local Codex device routing', () => {
       },
     };
     const allowlist = {
-      seen: [] as { deviceId?: string; token?: string }[],
-      // Mirrors the real two-factor gate: an allowlisted device ID is not enough
-      // on its own, the rollout token must be presented with it.
-      async authorize(deviceId?: string, token?: string): Promise<boolean> {
-        this.seen.push({ deviceId, token });
-        return token === ROLLOUT_TOKEN && options.allowed;
+      seen: [] as (string | undefined)[],
+      async isAllowlisted(deviceId?: string): Promise<boolean> {
+        this.seen.push(deviceId);
+        return options.allowed;
       },
     };
     const service = new AiService(
@@ -439,10 +435,9 @@ describe('AiService Local Codex device routing', () => {
     const { service, local, standard, allowlist } = setup({ allowed: true });
     const outcome = await service.extractBoardStateForRequest(input, undefined, {
       deviceId: 'device-allowed',
-      rolloutToken: ROLLOUT_TOKEN,
     });
 
-    expect(allowlist.seen).toEqual([{ deviceId: 'device-allowed', token: ROLLOUT_TOKEN }]);
+    expect(allowlist.seen).toEqual(['device-allowed']);
     expect(local.calls).toBe(1);
     expect(standard.calls).toBe(0);
     expect(outcome.providerName).toBe('local-codex');
@@ -453,7 +448,6 @@ describe('AiService Local Codex device routing', () => {
     const { service, local, standard } = setup({ allowed: false });
     const outcome = await service.extractBoardStateForRequest(input, undefined, {
       deviceId: 'device-standard',
-      rolloutToken: ROLLOUT_TOKEN,
     });
 
     expect(local.calls).toBe(0);
@@ -467,7 +461,6 @@ describe('AiService Local Codex device routing', () => {
     const { service, local, standard } = setup(options);
     const first = await service.extractBoardStateForRequest(input, undefined, {
       deviceId: 'device-allowed',
-      rolloutToken: ROLLOUT_TOKEN,
     });
 
     expect(local.calls).toBe(1);
@@ -481,7 +474,6 @@ describe('AiService Local Codex device routing', () => {
     options.allowed = false;
     await service.extractBoardStateForRequest(input, undefined, {
       deviceId: 'device-standard',
-      rolloutToken: ROLLOUT_TOKEN,
     });
     expect(standard.calls).toBe(1);
   });
@@ -490,7 +482,6 @@ describe('AiService Local Codex device routing', () => {
     const { service, local, claude, standard } = setup({ allowed: true, selected: 'claude' });
     const outcome = await service.extractBoardStateForRequest(input, undefined, {
       deviceId: 'device-allowed',
-      rolloutToken: ROLLOUT_TOKEN,
     });
 
     expect(claude.calls).toBe(1);
@@ -510,7 +501,6 @@ describe('AiService Local Codex device routing', () => {
     });
     const outcome = await service.extractBoardStateForRequest(input, undefined, {
       deviceId: 'device-allowed',
-      rolloutToken: ROLLOUT_TOKEN,
     });
 
     expect(claude.calls).toBe(1);
@@ -523,29 +513,6 @@ describe('AiService Local Codex device routing', () => {
     ).toBe(true);
   });
 
-  // Regression: `x-device-id` is PUBLISHED to users (Settings renders it so it
-  // can be shared to receive hint grants), so knowing an allowlisted ID must not
-  // be enough to aim uploads at the operator's own machine and subscription.
-  it.each([
-    ['no rollout token at all', undefined],
-    ['a wrong rollout token', 'not-the-rollout-secret'],
-    ['a prefix of the rollout token', ROLLOUT_TOKEN.slice(0, 5)],
-  ])('keeps an allowlisted device on the standard provider with %s', async (_case, token) => {
-    const { service, local, claude, standard } = setup({ allowed: true });
-    const outcome = await service.extractBoardStateForRequest(input, undefined, {
-      deviceId: 'device-allowed',
-      rolloutToken: token,
-    });
-
-    expect(local.calls).toBe(0);
-    expect(claude.calls).toBe(0);
-    expect(standard.calls).toBe(1);
-    // The envelope must not confirm the guess either: it names the cloud
-    // provider, exactly as it would for any non-rollout device.
-    expect(outcome.providerName).toBe('apikeyfun');
-    expect(outcome.fallbackFrom).toBeUndefined();
-  });
-
   it('skips both bridges — and the allowlist read — when none is selected', async () => {
     const { service, local, claude, standard, allowlist } = setup({
       allowed: true,
@@ -553,7 +520,6 @@ describe('AiService Local Codex device routing', () => {
     });
     const outcome = await service.extractBoardStateForRequest(input, undefined, {
       deviceId: 'device-allowed',
-      rolloutToken: ROLLOUT_TOKEN,
     });
 
     expect(local.calls).toBe(0);
